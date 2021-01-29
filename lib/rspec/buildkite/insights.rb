@@ -4,5 +4,10 @@ require_relative "insights/version"
 
 module RSpec::Buildkite::Insights
   class Error < StandardError; end
-  # Your code goes here...
+
+  def self.configure
+    require_relative "insights/uploader"
+
+    self::Uploader.configure
+  end
 end
