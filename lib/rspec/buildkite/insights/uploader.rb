@@ -79,6 +79,8 @@ module RSpec::Buildkite::Insights
         end
       end
 
+      RSpec::Buildkite::Insights::Instrumentation::NetHTTP.configure
+
       ActiveSupport::Notifications.subscribe("sql.active_record") do |name, start, finish, id, payload|
         tracer&.backfill(:sql, finish - start, { query: payload[:sql] })
       end
