@@ -8,6 +8,8 @@ require "websocket"
 
 require_relative "tracer"
 
+require_relative "../instrumentations/network"
+
 require "active_support"
 require "active_support/notifications"
 
@@ -248,6 +250,8 @@ module RSpec::Buildkite::Insights
           end
         end
       end
+
+      RSpec::Buildkite::Insights::Instrumentations::Network.configure
 
       ActiveSupport::Notifications.subscribe("sql.active_record") do |name, start, finish, id, payload|
         tracer&.backfill(:sql, finish - start, { query: payload[:sql] })
