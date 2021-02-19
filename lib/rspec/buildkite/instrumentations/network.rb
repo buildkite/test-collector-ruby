@@ -5,43 +5,25 @@ module RSpec::Buildkite::Insights
     class Network
       module NetHTTPPatch
         def request(request, *args, &block)
-          response = nil
-
-          start = Concurrent.monotonic_time
-          response = super
-          finish = Concurrent.monotonic_time
-
-          RSpec::Buildkite::Insights::Uploader.tracer&.backfill(:http, finish - start, { method: request.method, path: request.path.to_s, url: request.uri.to_s })
-
-          response
+          RSpec::Buildkite::Insights::Uploader.trace(:http, method: request.method, path: request.path.to_s, url: request.uri.to_s) do
+            super
+          end
         end
       end
 
       module VCRPatch
         def handle
-          response = nil
-
-          start = Concurrent.monotonic_time
-          response = super
-          finish = Concurrent.monotonic_time
-
-          RSpec::Buildkite::Insights::Uploader.tracer&.backfill(:http, finish - start, { method: request.method, url: request.uri.to_s })
-
-          response
+          RSpec::Buildkite::Insights::Uploader.trace(:http, method: request.method, url: request.uri.to_s) do
+            super
+          end
         end
       end
 
       module HTTPPatch
         def perform(request, options)
-          response = nil
-
-          start = Concurrent.monotonic_time
-          response = super
-          finish = Concurrent.monotonic_time
-
-          RSpec::Buildkite::Insights::Uploader.tracer&.backfill(:http, finish - start, { method: request.verb.to_s, url: request.uri.to_s })
-
-          response
+          RSpec::Buildkite::Insights::Uploader.trace(:http, method: request.verb.to_s, url: request.uri.to_s) do
+            super
+          end
         end
       end
 
