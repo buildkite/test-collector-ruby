@@ -8,6 +8,8 @@ require_relative "tracer"
 require "active_support"
 require "active_support/notifications"
 
+require "securerandom"
+
 module RSpec::Buildkite::Insights
   class Uploader
     class Trace
@@ -68,7 +70,7 @@ module RSpec::Buildkite::Insights
         end
 
         config.after(:suite) do
-          filename = "tmp/bk-insights-#{$$}.json.gz"
+          filename = "tmp/bk-insights-#{SecureRandom.uuid}.json.gz"
           data_set = { results: uploader.traces.map(&:as_json) }
 
           File.open(filename, "wb") do |f|
