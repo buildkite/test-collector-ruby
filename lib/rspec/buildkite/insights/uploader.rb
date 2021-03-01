@@ -53,7 +53,7 @@ module RSpec::Buildkite::Insights
     end
 
     class SocketConnection
-      def initialize(url, session)
+      def initialize(session, url, headers)
         uri = URI.parse(url)
         @session = session
 
@@ -73,13 +73,25 @@ module RSpec::Buildkite::Insights
 
         @socket = socket
 
-        handshake = WebSocket::Handshake::Client.new(url: url, headers: { "Origin" => "http://buildkite.localhost" })
+        headers = { "Origin" => "http://#{uri.host}" }.merge(headers)
+        handshake = WebSocket::Handshake::Client.new(url: url, headers: headers)
 
         @socket.write handshake.to_s
 
         until handshake.finished?
           if byte = @socket.getc
             handshake << byte
+          end
+        end
+
+        unless handshake.valid?
+          case handshake.error
+          when Exception, String
+            raise handshake.error
+          when nil
+            raise "Invalid handshake"
+          else
+            raise handshake.error.inspect
           end
         end
 
@@ -128,18 +140,19 @@ module RSpec::Buildkite::Insights
     end
 
     class Session
-      def initialize(url, session_key)
+      def initialize(url, authorization_header, channel)
         @queue = Queue.new
-        @session_key = session_key
+        @channel = channel
 
-        @socket = SocketConnection.new(url, self)
+        @socket = SocketConnection.new(self, url, {
+          "Authorization" => authorization_header,
+        })
 
         welcome = @queue.pop
         unless welcome == { "type" => "welcome" }
           raise "Not a welcome: #{welcome.inspect}"
         end
 
-        @channel = { "channel" => "Insights::UploadChannel", "uuid" => "bece03ea-17ca-4d9d-b719-8ffa0183e88f" }.to_json
         @socket.transmit({ "command" => "subscribe", "identifier" => @channel })
 
         confirm = @queue.pop
@@ -190,11 +203,39 @@ module RSpec::Buildkite::Insights
           trace = RSpec::Buildkite::Insights::Uploader::Trace.new(example, tracer.history)
           uploader.traces << trace
 
-          session.write_result(trace)
+          session&.write_result(trace)
         end
 
         config.before(:suite) do
-          session = Session.new("ws://buildkite.localhost/_cable?insights_key=VWtmcK1UMhc6F7nLuJA4mkbM", nil)
+          contact_uri = URI.parse(RSpec::Buildkite::Insights.url)
+
+          http = Net::HTTP.new(contact_uri.host, contact_uri.port)
+          http.use_ssl = contact_uri.scheme == "https"
+
+          authorization_header = "Token token=\"#{RSpec::Buildkite::Insights.api_token}\""
+
+          contact = Net::HTTP::Post.new(contact_uri.path, {
+            "Authorization" => authorization_header,
+            "Content-Type" => "application/json",
+          })
+          contact.body = {
+            # FIXME: Unique identifying attributes of the current build
+            run_key: ENV["BUILDKITE_STEP_ID"] || SecureRandom.uuid,
+          }.to_json
+
+          response = http.request(contact)
+
+          if response.is_a?(Net::HTTPSuccess)
+            json = JSON.parse(response.body)
+
+            socket_url = json["cable"] ||
+              "#{contact_uri.scheme.sub("http", "ws")}://#{contact_uri.host}:#{contact_uri.port}/_cable"
+
+            channel = json["channel"] ||
+              { "channel" => "Insights::UploadChannel", "id" => json["id"] }.to_json
+
+            session = Session.new(socket_url, authorization_header, channel)
+          end
         end
 
         config.after(:suite) do
