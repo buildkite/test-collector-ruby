@@ -8,7 +8,7 @@ module RSpec::Buildkite::Insights
           # No request.uri for localhost requests
           url = request.uri.nil? ? request.path : request.uri
 
-          RSpec::Buildkite::Insights::Uploader.trace(:http, method: request.method, url: url, lib: "net-http") do
+          RSpec::Buildkite::Insights::Uploader.trace(:http, method: request.method.upcase, url: url, lib: "net-http") do
             super
           end
         end
@@ -16,7 +16,7 @@ module RSpec::Buildkite::Insights
 
       module VCRPatch
         def handle
-          RSpec::Buildkite::Insights::Uploader.trace(:http, method: request.method, url: request.uri.to_s, lib: "vcr") do
+          RSpec::Buildkite::Insights::Uploader.trace(:http, method: request.method.upcase, url: request.uri.to_s, lib: "vcr") do
             super
           end
         end
@@ -24,7 +24,7 @@ module RSpec::Buildkite::Insights
 
       module HTTPPatch
         def perform(request, options)
-          RSpec::Buildkite::Insights::Uploader.trace(:http, method: request.verb.to_s, url: request.uri.to_s, lib: "http") do
+          RSpec::Buildkite::Insights::Uploader.trace(:http, method: request.verb.to_s.upcase, url: request.uri.to_s, lib: "http") do
             super
           end
         end
@@ -32,7 +32,7 @@ module RSpec::Buildkite::Insights
 
       module WebMockPatch
         def register_request_stub(stub)
-          meth = stub.request_pattern.method_pattern.instance_variable_get(:@pattern).to_s
+          meth = stub.request_pattern.method_pattern.instance_variable_get(:@pattern).to_s.upcase
           url = stub.request_pattern.uri_pattern.instance_variable_get(:@pattern).to_s
 
           RSpec::Buildkite::Insights::Uploader.trace(:http, method: meth, url: url, lib: "webmock") do
