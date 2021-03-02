@@ -30,10 +30,25 @@ module RSpec::Buildkite::Insights
         end
       end
 
+      module WebMockPatch
+        def register_request_stub(stub)
+          meth = stub.request_pattern.method_pattern.instance_variable_get(:@pattern).to_s
+          url = stub.request_pattern.uri_pattern.instance_variable_get(:@pattern).to_s
+
+          RSpec::Buildkite::Insights::Uploader.trace(:http, method: meth, url: url, lib: "webmock") do
+            super
+          end
+        end
+      end
+
       def self.configure
         if defined?(VCR)
           require "vcr/request_handler"
           VCR::RequestHandler.prepend(VCRPatch)
+        end
+
+        if defined?(WebMock)
+          WebMock::StubRegistry.prepend(WebMockPatch)
         end
 
         if defined?(Net) && defined?(Net::HTTP)
