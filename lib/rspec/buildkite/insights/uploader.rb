@@ -207,45 +207,44 @@ module RSpec::Buildkite::Insights
         end
 
         config.before(:suite) do
-          contact_uri = URI.parse(RSpec::Buildkite::Insights.url)
+          if RSpec::Buildkite::Insights.api_token
+            contact_uri = URI.parse(RSpec::Buildkite::Insights.url)
 
-          http = Net::HTTP.new(contact_uri.host, contact_uri.port)
-          http.use_ssl = contact_uri.scheme == "https"
+            http = Net::HTTP.new(contact_uri.host, contact_uri.port)
+            http.use_ssl = contact_uri.scheme == "https"
 
-          authorization_header = "Token token=\"#{RSpec::Buildkite::Insights.api_token}\""
+            authorization_header = "Token token=\"#{RSpec::Buildkite::Insights.api_token}\""
 
-          contact = Net::HTTP::Post.new(contact_uri.path, {
-            "Authorization" => authorization_header,
-            "Content-Type" => "application/json",
-          })
-          contact.body = {
-            # FIXME: Unique identifying attributes of the current build
-            run_key: ENV["BUILDKITE_STEP_ID"] || SecureRandom.uuid,
-          }.to_json
+            contact = Net::HTTP::Post.new(contact_uri.path, {
+              "Authorization" => authorization_header,
+              "Content-Type" => "application/json",
+            })
+            contact.body = {
+              # FIXME: Unique identifying attributes of the current build
+              run_key: ENV["BUILDKITE_BUILD_ID"] || SecureRandom.uuid,
+            }.to_json
 
-          response = http.request(contact)
+            response = http.request(contact)
 
-          if response.is_a?(Net::HTTPSuccess)
-            json = JSON.parse(response.body)
+            if response.is_a?(Net::HTTPSuccess)
+              json = JSON.parse(response.body)
 
-            socket_url = json["cable"] ||
-              "#{contact_uri.scheme.sub("http", "ws")}://#{contact_uri.host}:#{contact_uri.port}/_cable"
-
-            channel = json["channel"] ||
-              { "channel" => "Insights::UploadChannel", "id" => json["id"] }.to_json
-
-            session = Session.new(socket_url, authorization_header, channel)
+              if (socket_url = json["cable"]) && (channel = json["channel"])
+                session = Session.new(socket_url, authorization_header, channel)
+              end
+            end
           end
         end
 
         config.after(:suite) do
-          filename = "tmp/bk-insights-#{SecureRandom.uuid}.json.gz"
-          data_set = { results: uploader.traces.map(&:as_json) }
+          if filename = RSpec::Buildkite::Insights.filename
+            data_set = { results: uploader.traces.map(&:as_json) }
 
-          File.open(filename, "wb") do |f|
-            gz = Zlib::GzipWriter.new(f)
-            gz.write(data_set.to_json)
-            gz.close
+            File.open(filename, "wb") do |f|
+              gz = Zlib::GzipWriter.new(f)
+              gz.write(data_set.to_json)
+              gz.close
+            end
           end
         end
       end
