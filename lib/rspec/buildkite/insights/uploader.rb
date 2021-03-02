@@ -262,12 +262,12 @@ module RSpec::Buildkite::Insights
       Thread.current[:_buildkite_tracer]
     end
 
-    def self.trace(type, **detail)
-      start = Concurrent.monotonic_time
-      response = yield
-      finish = Concurrent.monotonic_time
+    def self.trace(section, detail)
+      http_tracer = tracer || RSpec::Buildkite::Insights::Tracer.new
 
-      tracer&.backfill(type, finish - start, detail)
+      http_tracer.enter(section, detail)
+      response = yield
+      http_tracer.leave
 
       response
     end
