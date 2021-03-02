@@ -5,7 +5,10 @@ module RSpec::Buildkite::Insights
     class Network
       module NetHTTPPatch
         def request(request, *args, &block)
-          RSpec::Buildkite::Insights::Uploader.trace(:http, method: request.method, path: request.path.to_s, url: request.uri.to_s) do
+          # No request.uri for localhost requests
+          url = request.uri.nil? ? request.path : request.uri
+
+          RSpec::Buildkite::Insights::Uploader.trace(:http, method: request.method, url: url, lib: "net-http") do
             super
           end
         end
@@ -13,7 +16,7 @@ module RSpec::Buildkite::Insights
 
       module VCRPatch
         def handle
-          RSpec::Buildkite::Insights::Uploader.trace(:http, method: request.method, url: request.uri.to_s) do
+          RSpec::Buildkite::Insights::Uploader.trace(:http, method: request.method, url: request.uri.to_s, lib: "vcr") do
             super
           end
         end
@@ -21,20 +24,23 @@ module RSpec::Buildkite::Insights
 
       module HTTPPatch
         def perform(request, options)
-          RSpec::Buildkite::Insights::Uploader.trace(:http, method: request.verb.to_s, url: request.uri.to_s) do
+          RSpec::Buildkite::Insights::Uploader.trace(:http, method: request.verb.to_s, url: request.uri.to_s, lib: "http") do
             super
           end
         end
       end
 
       def self.configure
-        case
-        when defined?(VCR)
+        if defined?(VCR)
           require "vcr/request_handler"
           VCR::RequestHandler.prepend(VCRPatch)
-        when defined?(Net) && defined?(Net::HTTP)
+        end
+
+        if defined?(Net) && defined?(Net::HTTP)
           Net::HTTP.prepend(NetHTTPPatch)
-        when defined?(HTTP) && defined?(HTTP::Client)
+        end
+
+        if defined?(HTTP) && defined?(HTTP::Client)
           HTTP::Client.prepend(HTTPPatch)
         end
       end
