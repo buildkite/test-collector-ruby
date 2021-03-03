@@ -45,8 +45,6 @@ module RSpec::Buildkite::Insights
 
           if response_from_webmock
             RSpec::Buildkite::Insights::Uploader.tracer.current_span.detail.merge!(stubbed: "webmock")
-          else
-            # not by webmock
           end
 
           response_from_webmock
