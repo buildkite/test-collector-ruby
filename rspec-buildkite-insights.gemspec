@@ -30,6 +30,7 @@ Gem::Specification.new do |spec|
   spec.add_dependency "activesupport"
   spec.add_dependency "rspec-core"
   spec.add_dependency "rspec-expectations"
+  spec.add_dependency "websocket"
 
   # For more information and examples about making a new gem, checkout our
   # guide at: https://bundler.io/guides/creating_gem.html
