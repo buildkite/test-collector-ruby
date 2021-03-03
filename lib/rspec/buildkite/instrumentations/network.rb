@@ -5,39 +5,51 @@ module RSpec::Buildkite::Insights
     class Network
       module NetHTTPPatch
         def request(request, *args, &block)
-          # No request.uri for localhost requests
-          url = request.uri.nil? ? request.path : request.uri
+          detail = { method: request.method.upcase, url: request.uri.to_s, lib: "net-http" }
 
-          RSpec::Buildkite::Insights::Uploader.trace(:http, method: request.method.upcase, url: url, lib: "net-http") do
-            super
-          end
+          http_tracer = RSpec::Buildkite::Insights::Uploader.tracer
+          http_tracer&.enter("http", detail)
+
+          super
+        ensure
+          http_tracer&.leave
         end
       end
 
       module VCRPatch
         def handle
-          RSpec::Buildkite::Insights::Uploader.trace(:http, method: request.method.upcase, url: request.uri.to_s, lib: "vcr") do
-            super
+          if request_type == :stubbed_by_vcr
+            RSpec::Buildkite::Insights::Uploader.tracer.current_span.detail.merge!(stubbed: "vcr")
           end
+
+          super
         end
       end
 
       module HTTPPatch
         def perform(request, options)
-          RSpec::Buildkite::Insights::Uploader.trace(:http, method: request.verb.to_s.upcase, url: request.uri.to_s, lib: "http") do
-            super
-          end
+          detail = { method: request.verb.to_s.upcase, url: request.uri.to_s, lib: "http" }
+
+          http_tracer = RSpec::Buildkite::Insights::Uploader.tracer
+          http_tracer&.enter("http", detail)
+
+          super
+        ensure
+          http_tracer&.leave
         end
       end
 
       module WebMockPatch
-        def register_request_stub(stub)
-          meth = stub.request_pattern.method_pattern.instance_variable_get(:@pattern).to_s.upcase
-          url = stub.request_pattern.uri_pattern.instance_variable_get(:@pattern).to_s
+        def response_for_request(request_signature)
+          response_from_webmock = super
 
-          RSpec::Buildkite::Insights::Uploader.trace(:http, method: meth, url: url, lib: "webmock") do
-            super
+          if response_from_webmock
+            RSpec::Buildkite::Insights::Uploader.tracer.current_span.detail.merge!(stubbed: "webmock")
+          else
+            # not by webmock
           end
+
+          response_from_webmock
         end
       end
 

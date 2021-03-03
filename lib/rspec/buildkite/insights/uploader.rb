@@ -261,15 +261,5 @@ module RSpec::Buildkite::Insights
     def self.tracer
       Thread.current[:_buildkite_tracer]
     end
-
-    def self.trace(section, detail)
-      http_tracer = tracer || RSpec::Buildkite::Insights::Tracer.new
-
-      http_tracer.enter(section, detail)
-      response = yield
-      http_tracer.leave
-
-      response
-    end
   end
 end
