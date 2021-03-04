@@ -249,7 +249,7 @@ module RSpec::Buildkite::Insights
         end
       end
 
-      ActiveSupport::Notifications.subscribe("sql.active_record") do |name, start, finish, id, payload|
+      ActiveSupport::Notifications.monotonic_subscribe("sql.active_record") do |name, start, finish, id, payload|
         tracer&.backfill(:sql, finish - start, { query: payload[:sql] })
       end
     end
