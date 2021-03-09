@@ -1,6 +1,6 @@
 # RSpec Buildkite Insights
 
-A RSpec gem to gather insights from your Test Suite.
+An RSpec gem to gather insights from your Test Suite.
 
 ## Installation
 
