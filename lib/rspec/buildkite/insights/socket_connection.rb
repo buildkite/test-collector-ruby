@@ -9,11 +9,12 @@ module RSpec::Buildkite::Insights
     def initialize(session, url, headers)
       uri = URI.parse(url)
       @session = session
-
+      protocol = "http"
       socket = TCPSocket.new(uri.host, uri.port || (uri.scheme == "wss" ? 443 : 80))
 
       if uri.scheme == "wss"
         ctx = OpenSSL::SSL::SSLContext.new
+        protocol = "https"
 
         # FIXME: Are any of these needed / not defaults?
         #ctx.min_version = :TLS1_2
@@ -26,7 +27,7 @@ module RSpec::Buildkite::Insights
 
       @socket = socket
 
-      headers = { "Origin" => "http://#{uri.host}" }.merge(headers)
+      headers = { "Origin" => "#{protocol}://#{uri.host}" }.merge(headers)
       handshake = WebSocket::Handshake::Client.new(url: url, headers: headers)
 
       @socket.write handshake.to_s
