@@ -7,8 +7,8 @@ require "openssl"
 require "websocket"
 
 require_relative "tracer"
-
 require_relative "network"
+require_relative "session"
 
 require "active_support"
 require "active_support/notifications"
@@ -51,49 +51,6 @@ module RSpec::Buildkite::Insights
           failure: failure_message,
           history: history,
         }
-      end
-    end
-
-    class Session
-      def initialize(url, authorization_header, channel)
-        @queue = Queue.new
-        @channel = channel
-
-        @socket = SocketConnection.new(self, url, {
-          "Authorization" => authorization_header,
-        })
-
-        welcome = @queue.pop
-        unless welcome == { "type" => "welcome" }
-          raise "Not a welcome: #{welcome.inspect}"
-        end
-
-        @socket.transmit({ "command" => "subscribe", "identifier" => @channel })
-
-        confirm = @queue.pop
-        unless confirm == { "type" => "confirm_subscription", "identifier" => @channel }
-          raise "Not a confirm: #{confirm.inspect}"
-        end
-      end
-
-      def connected(socket)
-      end
-
-      def disconnected(_socket)
-      end
-
-      def handle(_socket, data)
-        data = JSON.parse(data)
-        if data["type"] == "ping"
-          # FIXME: If we don't pong, I'm pretty sure we'll get
-          # disconnected
-        else
-          @queue.push(data)
-        end
-      end
-
-      def write_result(result)
-        @socket.transmit({ "identifier" => @channel, "command" => "message", "data" => { "action" => "record_results", "results" => [result.as_json] }.to_json})
       end
     end
 
