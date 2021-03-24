@@ -12,17 +12,11 @@ module RSpec::Buildkite::Insights
         "Authorization" => authorization_header,
       })
 
-      welcome = @queue.pop
-      unless welcome == { "type" => "welcome" }
-        raise "Not a welcome: #{welcome.inspect}"
-      end
+      verify_welcome(@queue.pop)
 
       @socket.transmit({ "command" => "subscribe", "identifier" => @channel })
 
-      confirm = @queue.pop
-      unless confirm == { "type" => "confirm_subscription", "identifier" => @channel }
-        raise "Not a confirm: #{confirm.inspect}"
-      end
+      verify_confirm(@queue.pop)
     end
 
     def connected(socket)
@@ -43,6 +37,20 @@ module RSpec::Buildkite::Insights
 
     def write_result(result)
       @socket.transmit({ "identifier" => @channel, "command" => "message", "data" => { "action" => "record_results", "results" => [result.as_json] }.to_json})
+    end
+
+    private
+
+    def verify_welcome(welcome)
+      unless welcome == { "type" => "welcome" }
+        raise "Not a welcome: #{welcome.inspect}"
+      end
+    end
+
+    def verify_confirm(confirm)
+      unless confirm == { "type" => "confirm_subscription", "identifier" => @channel }
+        raise "Not a confirm: #{confirm.inspect}"
+      end
     end
   end
 end
