@@ -1,0 +1,8 @@
+steps:
+  - label: ":rspec: Tests"
+    command:
+      - "bundle"
+      - "bundle exec rake"
+    plugins:
+      - docker#v3.7.0:
+          image: ruby:latest
