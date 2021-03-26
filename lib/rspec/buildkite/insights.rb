@@ -5,7 +5,7 @@ require_relative "insights/version"
 module RSpec::Buildkite::Insights
   class Error < StandardError; end
 
-  DEFAULT_URL = "https://insights-api.buildkite.com/v1/upload"
+  DEFAULT_URL = "https://insights-api.buildkite.com/v1/uploads"
 
   class << self
     attr_accessor :api_token
