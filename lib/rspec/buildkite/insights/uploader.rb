@@ -47,10 +47,34 @@ module RSpec::Buildkite::Insights
           name: example.description,
           identifier: example.id,
           location: example.location,
+          file_name: generate_file_name(example),
           result: result_state,
           failure: failure_message,
           history: history,
         }
+      end
+
+      private
+
+      def generate_file_name(example)
+        file_path_regex = /^(.*?\.rb)/
+        identifier_file_name = example.id[file_path_regex]
+        location_file_name = example.location[file_path_regex]
+
+        if identifier_file_name != location_file_name
+          # If the identifier and location files are not the same, we assume
+          # that the test was run as part of a shared example. If this isn't the
+          # case, then there's something we haven't accounted for
+          if example.metadata[:shared_group_inclusion_backtrace].any?
+            # Taking the last frame in this backtrace will give us the original
+            # entry point for the shared example
+            example.metadata[:shared_group_inclusion_backtrace].last.inclusion_location[file_path_regex]
+          else
+            "Unknown"
+          end
+        else
+          identifier_file_name
+        end
       end
     end
 
