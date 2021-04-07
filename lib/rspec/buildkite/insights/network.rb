@@ -18,7 +18,7 @@ module RSpec::Buildkite::Insights
     module VCRPatch
       def handle
         if request_type == :stubbed_by_vcr
-          RSpec::Buildkite::Insights::Uploader.tracer.current_span.detail.merge!(stubbed: "vcr")
+          RSpec::Buildkite::Insights::Uploader&.tracer&.current_span&.detail&.merge!(stubbed: "vcr")
         end
 
         super
@@ -43,7 +43,7 @@ module RSpec::Buildkite::Insights
         response_from_webmock = super
 
         if response_from_webmock
-          RSpec::Buildkite::Insights::Uploader.tracer.current_span.detail.merge!(stubbed: "webmock")
+          RSpec::Buildkite::Insights::Uploader&.tracer&.current_span&.detail&.merge!(stubbed: "webmock")
         end
 
         response_from_webmock
