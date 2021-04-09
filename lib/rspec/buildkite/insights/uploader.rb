@@ -9,6 +9,7 @@ require "websocket"
 require_relative "tracer"
 require_relative "network"
 require_relative "session"
+require_relative "reporter"
 
 require "active_support"
 require "active_support/notifications"
