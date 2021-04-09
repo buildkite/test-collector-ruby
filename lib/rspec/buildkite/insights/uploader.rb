@@ -15,10 +15,19 @@ require "active_support/notifications"
 
 require "securerandom"
 
+class RSpec::Core::Example
+  def ==(example)
+    self.file_path == example.file_path &&
+    self.full_description == example.full_description &&
+    self.location == example.location
+  end
+end
+
 module RSpec::Buildkite::Insights
   class Uploader
     class Trace
-      attr_reader :example, :history
+      attr_accessor :example
+      attr_reader :history
       def initialize(example, history)
         @example = example
         @history = history
@@ -83,25 +92,10 @@ module RSpec::Buildkite::Insights
     end
 
     def self.configure
-      uploader = self
-      session = nil
+      $__buildkite__uploader = self
+      $__buildkite__session = nil
 
       RSpec.configure do |config|
-        config.around(:each) do |example|
-          tracer = RSpec::Buildkite::Insights::Tracer.new
-
-          Thread.current[:_buildkite_tracer] = tracer
-          example.run
-          Thread.current[:_buildkite_tracer] = nil
-
-          tracer.finalize
-
-          trace = RSpec::Buildkite::Insights::Uploader::Trace.new(example, tracer.history)
-          uploader.traces << trace
-
-          session&.write_result(trace)
-        end
-
         config.before(:suite) do
           if RSpec::Buildkite::Insights.api_token
             contact_uri = URI.parse(RSpec::Buildkite::Insights.url)
@@ -126,15 +120,28 @@ module RSpec::Buildkite::Insights
               json = JSON.parse(response.body)
 
               if (socket_url = json["cable"]) && (channel = json["channel"])
-                session = Session.new(socket_url, authorization_header, channel)
+                $__buildkite__session = Session.new(socket_url, authorization_header, channel)
               end
             end
           end
         end
 
+        config.around(:each) do |example|
+          tracer = RSpec::Buildkite::Insights::Tracer.new
+
+          Thread.current[:_buildkite_tracer] = tracer
+          example.run
+          Thread.current[:_buildkite_tracer] = nil
+
+          tracer.finalize
+
+          trace = RSpec::Buildkite::Insights::Uploader::Trace.new(example, tracer.history)
+          $__buildkite__uploader.traces << trace
+        end
+
         config.after(:suite) do
           if filename = RSpec::Buildkite::Insights.filename
-            data_set = { results: uploader.traces.map(&:as_json) }
+            data_set = { results: $__buildkite__uploader.traces.map(&:as_json) }
 
             File.open(filename, "wb") do |f|
               gz = Zlib::GzipWriter.new(f)
@@ -142,6 +149,8 @@ module RSpec::Buildkite::Insights
               gz.close
             end
           end
+
+          $__buildkite__uploader = $__buildkite__session = nil
         end
       end
 
