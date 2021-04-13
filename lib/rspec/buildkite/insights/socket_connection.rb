@@ -12,8 +12,12 @@ module RSpec::Buildkite::Insights
     def initialize(url:, headers:)
       @url = url
       @uri ||= URI.parse(url)
-      protocol = uri.scheme == "wss" ? "https" : "http"
+      protocol = secure_connection? ? "https" : "http"
       @headers = { "Origin" => "#{protocol}://#{uri.host}" }.merge(headers)
+    end
+
+    def secure_connection?
+      uri.scheme == "wss"
     end
   end
 
@@ -67,11 +71,10 @@ module RSpec::Buildkite::Insights
     end
 
     def setup_socket
-      _socket = TCPSocket.new(uri.host, uri.port || (uri.scheme == "wss" ? 443 : 80))
+      _socket = TCPSocket.new(uri.host, uri.port || (conn_detail.secure_connection? ? 443 : 80))
 
-      if uri.scheme == "wss"
+      if conn_detail.secure_connection?
         ctx = OpenSSL::SSL::SSLContext.new
-        protocol = "https"
 
         # FIXME: Are any of these needed / not defaults?
         #ctx.min_version = :TLS1_2
