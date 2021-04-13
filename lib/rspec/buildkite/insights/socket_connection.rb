@@ -70,9 +70,11 @@ module RSpec::Buildkite::Insights
     end
 
     def transmit(data, type: :text)
+      return if @socket.nil?
+
       raw_data = data.to_json
       frame = WebSocket::Frame::Outgoing::Client.new(data: raw_data, type: :text, version: @version)
-      @socket&.write(frame.to_s)
+      @socket.write(frame.to_s)
     rescue Errno::EPIPE
       @session.disconnected(self)
       disconnect
