@@ -23,6 +23,7 @@ module RSpec::Buildkite::Insights
   end
 
   class SocketConnection
+    extend Forwardable
     def_delegators :@conn_detail, :url, :uri, :headers, :port
 
     def initialize(session, url, headers)
