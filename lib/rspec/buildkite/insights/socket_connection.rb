@@ -3,14 +3,28 @@
 require "socket"
 require "openssl"
 require "json"
+require "forwardable"
 
 module RSpec::Buildkite::Insights
+  class ConnectionDetail
+    attr :url, :uri, :headers
+
+    def initialize(url:, headers:)
+      @url = url
+      @uri ||= URI.parse(url)
+      protocol = uri.scheme == "wss" ? "https" : "http"
+      @headers = { "Origin" => "#{protocol}://#{uri.host}" }.merge(headers)
+    end
+  end
+
   class SocketConnection
+    def_delegators :@conn_detail, :url, :uri, :headers
+
     def initialize(session, url, headers)
-      uri = URI.parse(url)
+      @conn_detail = ConnectionDetail.new(url: url, headers: headers)
+
       @session = session
-      protocol = "http"
-      @socket = setup_socket(uri, headers)
+      @socket = setup_socket
 
       @version = handshake.version
 
@@ -49,10 +63,10 @@ module RSpec::Buildkite::Insights
     private
 
     def current_socket
-      @socket || (@socket = setup_socket(uri, headers))
+      @socket || (@socket = setup_socket)
     end
 
-    def setup_socket(uri, headers)
+    def setup_socket
       _socket = TCPSocket.new(uri.host, uri.port || (uri.scheme == "wss" ? 443 : 80))
 
       if uri.scheme == "wss"
@@ -68,13 +82,12 @@ module RSpec::Buildkite::Insights
         _socket.connect
       end
 
-      headers = { "Origin" => "#{protocol}://#{uri.host}" }.merge(headers)
-      handshake(_socket, uri, headers)
+      handshake(_socket)
 
       _socket
     end
 
-    def handshake(socket, uri, headers)
+    def handshake(socket)
       handshake = WebSocket::Handshake::Client.new(url: url, headers: headers)
 
       socket.write handshake.to_s
