@@ -6,7 +6,7 @@ module RSpec::Buildkite::Insights
       @output = output
     end
 
-    def example_passed(notification)
+    def handle_example(notification)
       example = notification.example
       trace = RSpec::Buildkite::Insights.uploader.traces.find { |trace| example == trace.example }
 
@@ -16,24 +16,8 @@ module RSpec::Buildkite::Insights
       end
     end
 
-    def example_failed(notification)
-      example = notification.example
-      trace = RSpec::Buildkite::Insights.uploader.traces.find { |trace| example == trace.example }
-
-      if trace
-        trace.example = example
-        RSpec::Buildkite::Insights.session.write_result(trace)
-      end
-    end
-
-    def example_pending(notification)
-      example = notification.example
-      trace = RSpec::Buildkite::Insights.uploader.traces.find { |trace| example == trace.example }
-
-      if trace
-        trace.example = example
-        RSpec::Buildkite::Insights.session.write_result(trace)
-      end
-    end
+    alias_method :example_passed, :handle_example
+    alias_method :example_failed, :handle_example
+    alias_method :example_pending, :handle_example
   end
 end
