@@ -16,14 +16,6 @@ require "active_support/notifications"
 
 require "securerandom"
 
-class RSpec::Core::Example
-  def ==(example)
-    self.file_path == example.file_path &&
-    self.full_description == example.full_description &&
-    self.location == example.location
-  end
-end
-
 module RSpec::Buildkite::Insights
   class Uploader
     class Trace
