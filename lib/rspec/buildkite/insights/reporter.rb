@@ -8,26 +8,32 @@ module RSpec::Buildkite::Insights
 
     def example_passed(notification)
       example = notification.example
-      trace = $__buildkite__uploader.traces.find {|trace| example == trace.example }
-      trace.example = example
+      trace = RSpec::Buildkite::Insights.uploader.traces.find { |trace| example == trace.example }
 
-      $__buildkite__session.write_result(trace)
+      if trace
+        trace.example = example
+        RSpec::Buildkite::Insights.session.write_result(trace)
+      end
     end
 
     def example_failed(notification)
       example = notification.example
-      trace = $__buildkite__uploader.traces.find {|trace| example == trace.example }
-      trace.example = example
+      trace = RSpec::Buildkite::Insights.uploader.traces.find { |trace| example == trace.example }
 
-      $__buildkite__session.write_result(trace)
+      if trace
+        trace.example = example
+        RSpec::Buildkite::Insights.session.write_result(trace)
+      end
     end
 
     def example_pending(notification)
       example = notification.example
-      trace = $__buildkite__uploader.traces.find {|trace| example == trace.example }
-      trace.example = example
+      trace = RSpec::Buildkite::Insights.uploader.traces.find { |trace| example == trace.example }
 
-      $__buildkite__session.write_result(trace)
+      if trace
+        trace.example = example
+        RSpec::Buildkite::Insights.session.write_result(trace)
+      end
     end
   end
 end

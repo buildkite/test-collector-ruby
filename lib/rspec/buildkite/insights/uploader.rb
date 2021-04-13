@@ -93,8 +93,7 @@ module RSpec::Buildkite::Insights
     end
 
     def self.configure
-      $__buildkite__uploader = self
-      $__buildkite__session = nil
+      RSpec::Buildkite::Insights.uploader = self
 
       RSpec.configure do |config|
         config.before(:suite) do
@@ -121,7 +120,7 @@ module RSpec::Buildkite::Insights
               json = JSON.parse(response.body)
 
               if (socket_url = json["cable"]) && (channel = json["channel"])
-                $__buildkite__session = Session.new(socket_url, authorization_header, channel)
+                RSpec::Buildkite::Insights.session = Session.new(socket_url, authorization_header, channel)
               end
             end
           end
@@ -137,12 +136,12 @@ module RSpec::Buildkite::Insights
           tracer.finalize
 
           trace = RSpec::Buildkite::Insights::Uploader::Trace.new(example, tracer.history)
-          $__buildkite__uploader.traces << trace
+          RSpec::Buildkite::Insights.uploader.traces << trace
         end
 
         config.after(:suite) do
           if filename = RSpec::Buildkite::Insights.filename
-            data_set = { results: $__buildkite__uploader.traces.map(&:as_json) }
+            data_set = { results: RSpec::Buildkite::Insights.uploader.traces.map(&:as_json) }
 
             File.open(filename, "wb") do |f|
               gz = Zlib::GzipWriter.new(f)
@@ -151,7 +150,7 @@ module RSpec::Buildkite::Insights
             end
           end
 
-          $__buildkite__uploader = $__buildkite__session = nil
+          RSpec::Buildkite::Insights.uploader = RSpec::Buildkite::Insights.session = nil
         end
       end
 
