@@ -7,13 +7,14 @@ require "forwardable"
 
 module RSpec::Buildkite::Insights
   class ConnectionDetail
-    attr :url, :uri, :headers
+    attr :url, :uri, :headers, :port
 
     def initialize(url:, headers:)
       @url = url
       @uri ||= URI.parse(url)
       protocol = secure_connection? ? "https" : "http"
       @headers = { "Origin" => "#{protocol}://#{uri.host}" }.merge(headers)
+      @port = secure_connection? ? 443 : 80
     end
 
     def secure_connection?
@@ -22,7 +23,7 @@ module RSpec::Buildkite::Insights
   end
 
   class SocketConnection
-    def_delegators :@conn_detail, :url, :uri, :headers
+    def_delegators :@conn_detail, :url, :uri, :headers, :port
 
     def initialize(session, url, headers)
       @conn_detail = ConnectionDetail.new(url: url, headers: headers)
@@ -71,7 +72,7 @@ module RSpec::Buildkite::Insights
     end
 
     def setup_socket
-      _socket = TCPSocket.new(uri.host, uri.port || (conn_detail.secure_connection? ? 443 : 80))
+      _socket = TCPSocket.new(uri.host, port)
 
       if conn_detail.secure_connection?
         ctx = OpenSSL::SSL::SSLContext.new
