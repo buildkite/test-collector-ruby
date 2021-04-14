@@ -11,6 +11,8 @@ module RSpec::Buildkite::Insights
     attr_accessor :api_token
     attr_accessor :filename
     attr_accessor :url
+    attr_accessor :uploader
+    attr_accessor :session
   end
 
   def self.configure(token: nil, url: nil, filename: nil)
