@@ -14,7 +14,7 @@ module RSpec::Buildkite::Insights
 
       if trace
         trace.example = example
-        RSpec::Buildkite::Insights.session.write_result(trace)
+        RSpec::Buildkite::Insights.session&.write_result(trace)
       end
     end
 
