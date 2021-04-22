@@ -88,9 +88,9 @@ module RSpec::Buildkite::Insights
       RSpec::Buildkite::Insights.uploader = self
 
       RSpec.configure do |config|
-        config.add_formatter RSpec::Buildkite::Insights::Reporter
-
         config.before(:suite) do
+          config.add_formatter RSpec::Buildkite::Insights::Reporter
+
           if RSpec::Buildkite::Insights.api_token
             contact_uri = URI.parse(RSpec::Buildkite::Insights.url)
 
