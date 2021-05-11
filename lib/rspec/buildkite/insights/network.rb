@@ -7,7 +7,7 @@ module RSpec::Buildkite::Insights
         detail = { method: request.method.upcase, url: request.uri.to_s, lib: "net-http" }
 
         http_tracer = RSpec::Buildkite::Insights::Uploader.tracer
-        http_tracer&.enter("http", detail)
+        http_tracer&.enter("http", **detail)
 
         super
       ensure
@@ -30,7 +30,7 @@ module RSpec::Buildkite::Insights
         detail = { method: request.verb.to_s.upcase, url: request.uri.to_s, lib: "http" }
 
         http_tracer = RSpec::Buildkite::Insights::Uploader.tracer
-        http_tracer&.enter("http", detail)
+        http_tracer&.enter("http", **detail)
 
         super
       ensure
