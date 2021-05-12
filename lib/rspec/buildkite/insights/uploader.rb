@@ -10,6 +10,7 @@ require_relative "tracer"
 require_relative "network"
 require_relative "session"
 require_relative "reporter"
+require_relative "ci"
 
 require "active_support"
 require "active_support/notifications"
@@ -104,8 +105,7 @@ module RSpec::Buildkite::Insights
               "Content-Type" => "application/json",
             })
             contact.body = {
-              # FIXME: Unique identifying attributes of the current build
-              run_key: ENV["BUILDKITE_BUILD_ID"] || SecureRandom.uuid,
+              run_key: CI.key
             }.to_json
 
             response = http.request(contact)
