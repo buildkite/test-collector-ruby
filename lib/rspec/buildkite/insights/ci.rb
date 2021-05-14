@@ -8,12 +8,15 @@ require_relative "ci/github_actions"
 
 module RSpec::Buildkite::Insights::CI
   class NoCI
-    def self.key
-      SecureRandom.uuid
+    def self.env
+      {
+        "CI" => nil,
+        "key" => SecureRandom.uuid,
+      }
     end
   end
 
-  def self.key
+  def self.env
     provider_class = case
       when ENV["BUILDKITE"]
         Buildkite
@@ -25,6 +28,6 @@ module RSpec::Buildkite::Insights::CI
         NoCI
       end
 
-    provider_class.key
+    provider_class.env
   end
 end

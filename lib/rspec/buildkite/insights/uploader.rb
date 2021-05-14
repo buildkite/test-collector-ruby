@@ -105,7 +105,7 @@ module RSpec::Buildkite::Insights
               "Content-Type" => "application/json",
             })
             contact.body = {
-              run_key: CI.key
+              run_env: CI.env
             }.to_json
 
             response = http.request(contact)
