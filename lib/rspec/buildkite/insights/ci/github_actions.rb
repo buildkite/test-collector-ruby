@@ -5,7 +5,8 @@ module RSpec::Buildkite::Insights::CI
     NAME = "github_actions"
 
     def self.env
-      key = ENV["GITHUB_ACTION"] + "-" + ENV["GITHUB_RUN_ID"] + "-" + ENV["GITHUB_RUN_NUMBER"]
+      run_id = ENV["GITHUB_RUN_ID"]
+      key = ENV["GITHUB_ACTION"] + "-" + run_id + "-" + ENV["GITHUB_RUN_NUMBER"]
       url = File.join("https://github.com", ENV["GITHUB_REPOSITORY"], "actions/runs", ENV["GITHUB_RUN_ID"])
 
       {
@@ -14,6 +15,7 @@ module RSpec::Buildkite::Insights::CI
         "url" => url,
         "branch" => ENV["GITHUB_REF"], # could be nil
         "commit_sha" => ENV["GITHUB_SHA"],
+        "number" => run_id,
       }
     end
   end
