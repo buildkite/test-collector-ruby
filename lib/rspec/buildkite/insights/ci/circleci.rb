@@ -6,6 +6,7 @@ module RSpec::Buildkite::Insights::CI
 
     def self.env
       key = ENV["CIRCLE_WORKFLOW_ID"] + "-" + ENV["CIRCLE_BUILD_NUM"]
+
       {
         "CI" => NAME,
         "key" => key,
