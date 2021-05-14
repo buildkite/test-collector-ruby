@@ -5,7 +5,8 @@ module RSpec::Buildkite::Insights::CI
     NAME = "circleci"
 
     def self.env
-      key = ENV["CIRCLE_WORKFLOW_ID"] + "-" + ENV["CIRCLE_BUILD_NUM"]
+      number = ENV["CIRCLE_BUILD_NUM"]
+      key = ENV["CIRCLE_WORKFLOW_ID"] + "-" + number
 
       {
         "CI" => NAME,
@@ -13,6 +14,7 @@ module RSpec::Buildkite::Insights::CI
         "url" => ENV["CIRCLE_BUILD_URL"],
         "branch" => ENV["CIRCLE_BRANCH"],
         "commit_sha" => ENV["CIRCLE_SHA1"],
+        "number" => number,
       }
     end
   end

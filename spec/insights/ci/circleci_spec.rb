@@ -16,7 +16,6 @@ RSpec.describe RSpec::Buildkite::Insights::CI::CircleCI do
       let(:commit_sha) { "9883a9a92ec0f3055849cd5488e8e9347c6e2878" }
 
       before do
-
         fake_env("CIRCLECI", "true")
         fake_env("CIRCLE_WORKFLOW_ID", workflow_id)
         fake_env("CIRCLE_BUILD_NUM", build_num)
@@ -34,6 +33,7 @@ RSpec.describe RSpec::Buildkite::Insights::CI::CircleCI do
           "url" => build_url,
           "branch" => branch,
           "commit_sha" => commit_sha,
+          "number" => build_num,
         })
       end
     end
