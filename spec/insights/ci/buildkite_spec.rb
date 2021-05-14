@@ -13,6 +13,7 @@ RSpec.describe RSpec::Buildkite::Insights::CI::Buildkite do
       let(:build_url) { "https://buildkite.com/buildkite/buildkite/builds/1234" }
       let(:branch) { "main" }
       let(:commit_sha) { "3683a9a92ec0f3055849cd5488e8e9347c6e2878" }
+      let(:number) { "4242" }
 
       before do
         fake_env("BUILDKITE", "true")
@@ -20,6 +21,7 @@ RSpec.describe RSpec::Buildkite::Insights::CI::Buildkite do
         fake_env("BUILDKITE_BUILD_URL", build_url)
         fake_env("BUILDKITE_BRANCH", branch)
         fake_env("BUILDKITE_COMMIT", commit_sha)
+        fake_env("BUILDKITE_BUILD_NUMBER", number)
       end
 
       it "returns env" do
@@ -31,6 +33,7 @@ RSpec.describe RSpec::Buildkite::Insights::CI::Buildkite do
           "url" => build_url,
           "branch" => branch,
           "commit_sha" => commit_sha,
+          "number" => number,
         })
       end
     end
