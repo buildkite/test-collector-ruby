@@ -35,6 +35,7 @@ RSpec.describe RSpec::Buildkite::Insights::CI::GitHubActions do
           "url" => "https://github.com/buildkite/buildkite/actions/runs/840583718",
           "branch" => branch,
           "commit_sha" => commit_sha,
+          "commit_message" => nil,
           "number" => run_id,
         })
       end

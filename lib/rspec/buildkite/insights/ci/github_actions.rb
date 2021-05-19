@@ -15,6 +15,7 @@ module RSpec::Buildkite::Insights::CI
         "url" => url,
         "branch" => ENV["GITHUB_REF"], # could be nil
         "commit_sha" => ENV["GITHUB_SHA"],
+        "commit_message" => nil,
         "number" => run_id,
       }
     end

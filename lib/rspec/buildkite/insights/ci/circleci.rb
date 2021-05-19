@@ -14,6 +14,7 @@ module RSpec::Buildkite::Insights::CI
         "url" => ENV["CIRCLE_BUILD_URL"],
         "branch" => ENV["CIRCLE_BRANCH"],
         "commit_sha" => ENV["CIRCLE_SHA1"],
+        "commit_message" => nil,
         "number" => number,
       }
     end

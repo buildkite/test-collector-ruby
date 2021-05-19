@@ -11,6 +11,7 @@ module RSpec::Buildkite::Insights::CI
         "url" => ENV["BUILDKITE_BUILD_URL"],
         "branch" => ENV["BUILDKITE_BRANCH"],
         "commit_sha" => ENV["BUILDKITE_COMMIT"],
+        "commit_message" => ENV["BUILDKITE_MESSAGE"],
         "number" => ENV["BUILDKITE_BUILD_NUMBER"],
       }
     end

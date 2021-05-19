@@ -33,6 +33,7 @@ RSpec.describe RSpec::Buildkite::Insights::CI::CircleCI do
           "url" => build_url,
           "branch" => branch,
           "commit_sha" => commit_sha,
+          "commit_message" => nil,
           "number" => build_num,
         })
       end
