@@ -4,7 +4,12 @@ module RSpec::Buildkite::Insights
   class Network
     module NetHTTPPatch
       def request(request, *args, &block)
-        detail = { method: request.method.upcase, url: request.uri.to_s, lib: "net-http" }
+        unless uri = request.uri
+          protocol = @use_ssl ? "https" : "http"
+          uri = URI.join("#{protocol}://#{address}:#{port}", request.path)
+        end
+
+        detail = { method: request.method.upcase, url: uri.to_s, lib: "net-http" }
 
         http_tracer = RSpec::Buildkite::Insights::Uploader.tracer
         http_tracer&.enter("http", **detail)
