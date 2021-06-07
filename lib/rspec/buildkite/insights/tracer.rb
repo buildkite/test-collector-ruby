@@ -41,6 +41,11 @@ module RSpec::Buildkite::Insights
       @stack.pop
     end
 
+    def disable
+      new_entry = Span.new("disable", Concurrent.monotonic_time, nil, {})
+      @stack << new_entry
+    end
+
     def backfill(section, duration, **detail)
       new_entry = Span.new(section, Concurrent.monotonic_time - duration, Concurrent.monotonic_time, detail)
       current_span.children << new_entry

@@ -54,11 +54,30 @@ module RSpec::Buildkite::Insights
         response_from_webmock
       end
     end
+# concern visit, test call click_button <- Capybara has too many to patch
+#
+#  Patch it
+#
+#  #6  Selenium::WebDriver::Remote::Http::Default.request(verb#Symbol, url#URI::HTTP, headers#Hash, payload#String, redirects#Integer) at /Users/hhh/.rubies/ruby-2.7.2/lib/ruby/gems/2.7.0/gems/selenium-webdriver-3.142.3/lib/selenium/webdriver/remote/http/default.rb:82
+    module CapybaraPatch
+      def request
+        http_tracer = RSpec::Buildkite::Insights::Uploader.tracer
+        http_tracer&.disable
+
+        super
+      ensure
+        http_tracer&.leave
+      end
+    end
 
     def self.configure
       if defined?(VCR)
         require "vcr/request_handler"
         VCR::RequestHandler.prepend(VCRPatch)
+      end
+
+      if defined?(Capybara)
+        Capybara::Server::Checker.prepend(CapybaraPatch)
       end
 
       if defined?(WebMock)
