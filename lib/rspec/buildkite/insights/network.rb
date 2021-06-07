@@ -5,7 +5,7 @@ module RSpec::Buildkite::Insights
     module NetHTTPPatch
       def request(request, *args, &block)
         unless uri = request.uri
-          protocol = @use_ssl ? "https" : "http"
+          protocol = use_ssl? ? "https" : "http"
           uri = URI.join("#{protocol}://#{address}:#{port}", request.path)
         end
 
