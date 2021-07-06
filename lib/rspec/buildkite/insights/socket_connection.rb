@@ -6,8 +6,6 @@ require "json"
 
 module RSpec::Buildkite::Insights
   class SocketConnection
-    attr :state
-
     def initialize(session, url, headers)
       uri = URI.parse(url)
       @session = session
@@ -82,7 +80,7 @@ module RSpec::Buildkite::Insights
         @state = "timedout"
       end
 
-      unless ["error", "timedout"].include?(state)
+      unless ["error", "timedout"].include?(@state)
         @session.connected(self)
       end
     end

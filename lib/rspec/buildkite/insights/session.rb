@@ -4,8 +4,6 @@ require_relative "socket_connection"
 
 module RSpec::Buildkite::Insights
   class Session
-    attr :socket_connected
-
     def initialize(url, authorization_header, channel)
       @queue = Queue.new
       @channel = channel
