@@ -6,6 +6,8 @@ require "json"
 
 module RSpec::Buildkite::Insights
   class SocketConnection
+    attr :state
+
     def initialize(session, url, headers)
       uri = URI.parse(url)
       @session = session
@@ -51,6 +53,8 @@ module RSpec::Buildkite::Insights
 
       @version = handshake.version
 
+      elapsed_time = 0
+
       @thread = Thread.new do
         frame = WebSocket::Frame::Incoming::Client.new
 
@@ -58,15 +62,29 @@ module RSpec::Buildkite::Insights
           frame << @socket.readpartial(4096)
 
           while data = frame.next
+            start = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+
             @session.handle(self, data.data)
+
+            elapsed_time += (Process.clock_gettime(Process::CLOCK_MONOTONIC) - start)
+            if elapsed_time >= RSpec::Buildkite::Insights.connect_timeout
+              raise Timeout::Error
+            end
           end
         end
       rescue EOFError
         @session.disconnected(self)
         disconnect
+        @state = "error"
+      rescue Timeout::Error
+        @session.disconnected(self)
+        disconnect
+        @state = "timedout"
       end
 
-      @session.connected(self)
+      unless ["error", "timedout"].include?(state)
+        @session.connected(self)
+      end
     end
 
     def transmit(data, type: :text)

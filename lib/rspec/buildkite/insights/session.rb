@@ -4,6 +4,8 @@ require_relative "socket_connection"
 
 module RSpec::Buildkite::Insights
   class Session
+    attr :socket_connected
+
     def initialize(url, authorization_header, channel)
       @queue = Queue.new
       @channel = channel
@@ -14,15 +16,22 @@ module RSpec::Buildkite::Insights
 
       verify_welcome(@queue.pop)
 
-      @socket.transmit({ "command" => "subscribe", "identifier" => @channel })
-
-      verify_confirm(@queue.pop)
+      if connected?
+        @socket.transmit({ "command" => "subscribe", "identifier" => @channel })
+        verify_confirm(@queue.pop)
+      end
     end
 
-    def connected(socket)
+    def connected?
+      @socket_connected == true
+    end
+
+    def connected(_socket)
+      @socket_connected = true
     end
 
     def disconnected(_socket)
+      @socket_connected = false
     end
 
     def handle(_socket, data)
