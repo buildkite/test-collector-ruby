@@ -65,7 +65,7 @@ module RSpec::Buildkite::Insights
             @session.handle(self, data.data)
 
             elapsed_time += (Process.clock_gettime(Process::CLOCK_MONOTONIC) - start)
-            if elapsed_time >= RSpec::Buildkite::Insights.connect_timeout
+            if elapsed_time >= RSpec::Buildkite::Insights.connection_timeout
               raise Timeout::Error
             end
           end
