@@ -17,10 +17,12 @@ module RSpec::Buildkite::Insights
       else
         NullLogger.new
       end
-    end.freeze
+    end
 
     def self.debug(message, logger: Logger)
       logger.debug(message)
     end
+
+    freeze
   end
 end
