@@ -73,6 +73,7 @@ module RSpec::Buildkite::Insights
       return if @socket.nil?
 
       raw_data = data.to_json
+      RSpec::Buildkite::Insights::Debugger.debug("#{self.class.name}#transmit Transmitted #{raw_data.bytesize} bytes")
       frame = WebSocket::Frame::Outgoing::Client.new(data: raw_data, type: :text, version: @version)
       @socket.write(frame.to_s)
     rescue Errno::EPIPE
