@@ -27,6 +27,7 @@ module RSpec::Buildkite::Insights
 
     def handle(_socket, data)
       data = JSON.parse(data)
+      RSpec::Buildkite::Insights::Debugger.debug("#{self.class.name}#handle Received #{data}")
       if data["type"] == "ping"
         # FIXME: If we don't pong, I'm pretty sure we'll get
         # disconnected
