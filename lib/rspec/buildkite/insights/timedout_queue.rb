@@ -12,8 +12,9 @@ module RSpec::Buildkite::Insights
       @queue.push(obj)
     end
 
-    def pop
-      to_finish_at = now + @timeout
+    def pop(wait_time: nil)
+      timeout = wait_time || @timeout
+      to_finish_at = now + timeout
 
       @mutex.synchronize do
         loop do
@@ -24,7 +25,7 @@ module RSpec::Buildkite::Insights
           end
 
           if (to_finish_at - now) <= 0
-            raise RSpec::Buildkite::Insights::TimeoutError, "Waited #{@timeout} seconds"
+            raise RSpec::Buildkite::Insights::TimeoutError, "Waited #{timeout} seconds"
           end
         end
       end
