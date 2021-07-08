@@ -12,11 +12,11 @@ module RSpec::Buildkite::Insights
         "Authorization" => authorization_header,
       })
 
-      verify_welcome(@queue.pop)
+      wait_for_welcome
 
       @socket.transmit({ "command" => "subscribe", "identifier" => @channel })
 
-      verify_confirm(@queue.pop)
+      wait_for_confirm
     end
 
     def connected(socket)
@@ -41,14 +41,28 @@ module RSpec::Buildkite::Insights
 
     private
 
-    def verify_welcome(welcome)
-      unless welcome == { "type" => "welcome" }
+
+    def pop_with_timeout
+      Timeout.timeout(30, RSpec::Buildkite::Insights::TimeoutError, "Waited 30 seconds") do
+        @queue.pop
+      end
+    rescue RSpec::Buildkite::Insights::TimeoutError
+      $stderr.puts "RSpec Buildkite Insights timed out. Please get in touch with support@buildkite.com with the following information: #{@channel.inspect}"
+      nil
+    end
+
+    def wait_for_welcome
+      welcome = pop_with_timeout
+
+      if welcome && welcome != { "type" => "welcome" }
         raise "Not a welcome: #{welcome.inspect}"
       end
     end
 
-    def verify_confirm(confirm)
-      unless confirm == { "type" => "confirm_subscription", "identifier" => @channel }
+    def wait_for_confirm
+      confirm = pop_with_timeout
+
+      if confirm && confirm != { "type" => "confirm_subscription", "identifier" => @channel }
         raise "Not a confirm: #{confirm.inspect}"
       end
     end
