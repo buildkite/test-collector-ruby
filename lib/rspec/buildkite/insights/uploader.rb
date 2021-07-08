@@ -115,7 +115,12 @@ module RSpec::Buildkite::Insights
               json = JSON.parse(response.body)
 
               if (socket_url = json["cable"]) && (channel = json["channel"])
-                RSpec::Buildkite::Insights.session = Session.new(socket_url, authorization_header, channel)
+                RSpec::Buildkite::Insights.session = Session.new(
+                  socket_url,
+                  authorization_header,
+                  channel,
+                  timeout: RSpec::Buildkite::Insights.connection_timeout
+                )
               end
             end
           end

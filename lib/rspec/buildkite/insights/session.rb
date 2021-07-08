@@ -1,11 +1,12 @@
 # frozen_string_literal: true
 
 require_relative "socket_connection"
+require_relative "timedout_queue"
 
 module RSpec::Buildkite::Insights
   class Session
-    def initialize(url, authorization_header, channel)
-      @queue = Queue.new
+    def initialize(url, authorization_header, channel, timeout:)
+      @queue = TimedoutQueue.new(timeout)
       @channel = channel
 
       @socket = SocketConnection.new(self, url, {
