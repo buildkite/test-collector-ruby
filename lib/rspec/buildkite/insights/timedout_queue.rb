@@ -17,10 +17,14 @@ module RSpec::Buildkite::Insights
 
       @mutex.synchronize do
         loop do
+          begin
+            return @queue.pop(true)
+          rescue ThreadError
+            # server not sending us data yet
+          end
+
           if (to_finish_at - now) <= 0
             raise RSpec::Buildkite::Insights::TimeoutError, "Waited #{@timeout} seconds"
-          else
-            return @queue.pop
           end
         end
       end
