@@ -13,10 +13,11 @@ module RSpec::Buildkite::Insights
         "Authorization" => authorization_header,
       })
 
-      if verify_welcome(pop_with_timeout)
-        @socket.transmit({ "command" => "subscribe", "identifier" => @channel })
-        verify_confirm(pop_with_timeout)
-      end
+      return unless verify_welcome(pop_with_timeout)
+
+      @socket.transmit({ "command" => "subscribe", "identifier" => @channel })
+
+      verify_confirm(pop_with_timeout)
     end
 
     def connected(socket)
@@ -47,6 +48,7 @@ module RSpec::Buildkite::Insights
       timeout! { @queue.pop }
     rescue RSpec::Buildkite::Insights::TimeoutError
       $stderr.puts "RSpec Buildkite Insights timed out. Please get in touch with support@buildkite.com with the following information: #{@channel.inspect}"
+      nil
     end
 
     def timeout!
