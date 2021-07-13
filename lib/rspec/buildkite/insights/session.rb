@@ -4,10 +4,9 @@ require_relative "socket_connection"
 
 module RSpec::Buildkite::Insights
   class Session
-    def initialize(url, authorization_header, channel, timeout:)
+    def initialize(url, authorization_header, channel)
       @queue = Queue.new
       @channel = channel
-      @timeout = timeout
 
       @socket = SocketConnection.new(self, url, {
         "Authorization" => authorization_header,
@@ -52,7 +51,7 @@ module RSpec::Buildkite::Insights
     end
 
     def timeout!
-      Timeout.timeout(timeout, RSpec::Buildkite::Insights::TimeoutError, "Waited #{timeout} seconds") do
+      Timeout.timeout(30, RSpec::Buildkite::Insights::TimeoutError, "Waited #{timeout} seconds") do
         yield
       end
     end

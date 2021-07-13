@@ -11,14 +11,4 @@ RSpec.describe RSpec::Buildkite::Insights do
     expect(insights.url).to eq "https://insights-api.buildkite.com/v1/uploads"
     expect(insights.filename).to be nil
   end
-
-  it "connection timeout defaults to 30s and configurable" do
-    insights = RSpec::Buildkite::Insights
-
-    expect(insights.connection_timeout).to eq(30)
-
-    insights.connection_timeout = 60
-
-    expect(insights.connection_timeout).to eq(60)
-  end
 end

@@ -16,14 +16,12 @@ module RSpec::Buildkite::Insights
     attr_accessor :url
     attr_accessor :uploader
     attr_accessor :session
-    attr_accessor :connection_timeout
   end
 
-  def self.configure(token: nil, url: nil, filename: nil, connection_timeout: nil)
+  def self.configure(token: nil, url: nil, filename: nil)
     self.api_token = token || ENV["BUILDKITE_INSIGHTS_TOKEN"]
     self.url = url || DEFAULT_URL
     self.filename = filename
-    self.connection_timeout = connection_timeout || 30
 
     require_relative "insights/uploader"
 
