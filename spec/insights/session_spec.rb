@@ -3,7 +3,7 @@
 require "rspec/buildkite/insights/session"
 
 RSpec.describe RSpec::Buildkite::Insights::Session do
-  def new_seesion
+  def new_session
     RSpec::Buildkite::Insights::Session.new(
       "ws://insights.localhost/_cable",
        %(Token token="test"),
@@ -16,6 +16,6 @@ RSpec.describe RSpec::Buildkite::Insights::Session do
     fake_connection = double
     allow(RSpec::Buildkite::Insights::SocketConnection).to receive(:new) { fake_connection }
 
-    expect { new_seesion }.to raise_error(RSpec::Buildkite::Insights::TimeoutError)
+    expect { new_session }.to raise_error(RSpec::Buildkite::Insights::TimeoutError)
   end
 end
