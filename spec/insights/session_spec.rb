@@ -1,6 +1,5 @@
 # frozen_string_literal: true
 
-require "websocket"
 require "rspec/buildkite/insights/session"
 
 RSpec.describe RSpec::Buildkite::Insights::Session do
