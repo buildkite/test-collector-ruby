@@ -1,23 +1,23 @@
 # frozen_string_literal: true
 
 require_relative "socket_connection"
-require_relative "timedout_queue"
 
 module RSpec::Buildkite::Insights
   class Session
     def initialize(url, authorization_header, channel, timeout:)
-      @queue = TimedoutQueue.new(timeout)
+      @queue = Queue.new
       @channel = channel
+      @timeout = timeout
 
       @socket = SocketConnection.new(self, url, {
         "Authorization" => authorization_header,
       })
 
-      verify_welcome(@queue.pop)
+      timeout! { verify_welcome(@queue.pop) }
 
       @socket.transmit({ "command" => "subscribe", "identifier" => @channel })
 
-      verify_confirm(@queue.pop)
+      timeout! { verify_confirm(@queue.pop) }
     end
 
     def connected(socket)
@@ -41,6 +41,14 @@ module RSpec::Buildkite::Insights
     end
 
     private
+
+    attr_reader :timeout
+
+    def timeout!
+      Timeout.timeout(timeout, RSpec::Buildkite::Insights::TimeoutError, "Waited #{timeout} seconds") do
+        yield
+      end
+    end
 
     def verify_welcome(welcome)
       unless welcome == { "type" => "welcome" }
