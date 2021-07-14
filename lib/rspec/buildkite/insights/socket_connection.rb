@@ -51,6 +51,8 @@ module RSpec::Buildkite::Insights
 
       @version = handshake.version
 
+      # Setting up a new thread that listens on the socket, and processes incoming
+      # comms from the server
       @thread = Thread.new do
         frame = WebSocket::Frame::Incoming::Client.new
 
@@ -64,12 +66,15 @@ module RSpec::Buildkite::Insights
       rescue EOFError
         @session.disconnected(self)
         disconnect
+      rescue IOError, ThreadError
+        # FIXME: uhhhhhhh.... these errors are being thrown by how we do the disconnect
       end
 
       @session.connected(self)
     end
 
     def transmit(data, type: :text)
+      # this line prevents us from calling disconnect twice
       return if @socket.nil?
 
       raw_data = data.to_json
@@ -89,9 +94,8 @@ module RSpec::Buildkite::Insights
 
     def disconnect
       @socket.close
+      @thread&.join
       @socket = nil
-
-      @thread&.kill
     end
   end
 end
