@@ -1,9 +1,12 @@
 # frozen_string_literal: true
 
+require "timeout"
+
 require_relative "insights/version"
 
 module RSpec::Buildkite::Insights
   class Error < StandardError; end
+  class TimeoutError < ::Timeout::Error; end
 
   DEFAULT_URL = "https://insights-api.buildkite.com/v1/uploads"
 
