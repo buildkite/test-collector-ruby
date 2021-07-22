@@ -124,6 +124,8 @@ module RSpec::Buildkite::Insights
         config.around(:each) do |example|
           tracer = RSpec::Buildkite::Insights::Tracer.new
 
+          # The _buildkite prefix here is added as a safeguard against name collisions
+          # as we are in the main thread
           Thread.current[:_buildkite_tracer] = tracer
           example.run
           Thread.current[:_buildkite_tracer] = nil
@@ -135,17 +137,9 @@ module RSpec::Buildkite::Insights
         end
 
         config.after(:suite) do
-          if filename = RSpec::Buildkite::Insights.filename
-            data_set = { results: RSpec::Buildkite::Insights.uploader.traces.map(&:as_json) }
-
-            File.open(filename, "wb") do |f|
-              gz = Zlib::GzipWriter.new(f)
-              gz.write(data_set.to_json)
-              gz.close
-            end
-          end
-
-          RSpec::Buildkite::Insights.uploader = RSpec::Buildkite::Insights.session = nil
+          # This needs the lonely operater as the session will be nil
+          # if auth against the API token fails
+          RSpec::Buildkite::Insights.session&.close
         end
       end
 
