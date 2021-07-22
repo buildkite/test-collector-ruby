@@ -94,7 +94,7 @@ module RSpec::Buildkite::Insights
 
     def disconnect
       @socket.close
-      @thread&.join
+      @thread&.join unless @thread == Thread.current
       @socket = nil
     end
   end
