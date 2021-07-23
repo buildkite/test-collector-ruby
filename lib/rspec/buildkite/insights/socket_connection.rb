@@ -6,23 +6,33 @@ require "json"
 
 module RSpec::Buildkite::Insights
   class SocketConnection
+    class HandshakeError < StandardError; end
+    class SocketError < StandardError; end
+
     def initialize(session, url, headers)
       uri = URI.parse(url)
       @session = session
       protocol = "http"
-      socket = TCPSocket.new(uri.host, uri.port || (uri.scheme == "wss" ? 443 : 80))
 
-      if uri.scheme == "wss"
-        ctx = OpenSSL::SSL::SSLContext.new
-        protocol = "https"
+      begin
+        socket = TCPSocket.new(uri.host, uri.port || (uri.scheme == "wss" ? 443 : 80))
 
-        # FIXME: Are any of these needed / not defaults?
-        #ctx.min_version = :TLS1_2
-        #ctx.verify_mode = OpenSSL::SSL::VERIFY_PEER
-        #ctx.cert_store = OpenSSL::X509::Store.new.tap(&:set_default_paths)
+        if uri.scheme == "wss"
+          ctx = OpenSSL::SSL::SSLContext.new
+          protocol = "https"
 
-        socket = OpenSSL::SSL::SSLSocket.new(socket, ctx)
-        socket.connect
+          # FIXME: Are any of these needed / not defaults?
+          #ctx.min_version = :TLS1_2
+          #ctx.verify_mode = OpenSSL::SSL::VERIFY_PEER
+          #ctx.cert_store = OpenSSL::X509::Store.new.tap(&:set_default_paths)
+
+          socket = OpenSSL::SSL::SSLSocket.new(socket, ctx)
+          socket.connect
+        end
+      rescue
+        # We are rescuing all here, as there are a range of Errno errors that could be
+        # raised when we fail to establish a TCP connection
+        raise SocketError
       end
 
       @socket = socket
@@ -38,14 +48,17 @@ module RSpec::Buildkite::Insights
         end
       end
 
+      # The errors below are raised when we establish the TCP connection, but get back
+      # an error, i.e. in dev we can still connect to puma-dev while nginx isn't
+      # running, or in prod we can hit a load balancer while app is down
       unless handshake.valid?
         case handshake.error
         when Exception, String
-          raise handshake.error
+          raise HandshakeError.new(handshake.error)
         when nil
-          raise "Invalid handshake"
+          raise HandshakeError.new("Invalid handshake")
         else
-          raise handshake.error.inspect
+          raise HandshakeError.new(handshake.error.inspect)
         end
       end
 
@@ -66,11 +79,10 @@ module RSpec::Buildkite::Insights
       rescue EOFError
         @session.disconnected(self)
         disconnect
-      rescue IOError, ThreadError
-        # FIXME: uhhhhhhh.... these errors are being thrown by how we do the disconnect
+      rescue IOError
+        # Listen thread raises: stream closed in another thread (IOError) cos it get joined by the main thread
+        puts "ioerror raised from #{Thread.current}"
       end
-
-      @session.connected(self)
     end
 
     def transmit(data, type: :text)
@@ -93,7 +105,7 @@ module RSpec::Buildkite::Insights
     private
 
     def disconnect
-      @socket.close
+      @socket&.close
       @thread&.join unless @thread == Thread.current
       @socket = nil
     end

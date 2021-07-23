@@ -6,60 +6,63 @@ module RSpec::Buildkite::Insights
   class Session
     # Picked 75 as the magic timeout number as it's longer than the TCP timeout of 60s 🤷‍♀️
     CONFIRMATION_TIMEOUT = 75
+    MAX_RECONNECTION_ATTEMPTS = 3
+    WAIT_BETWEEN_RECONNECTIONS = 5
+
+    class RejectedSubscription < StandardError; end
 
     def initialize(url, authorization_header, channel)
       @queue = Queue.new
       @channel = channel
 
-      # We store the unconfirmed_idents to check against confirmations sent by the server.
-      # As this resource is accessed in the main thread, and also the socket listen thread,
-      # we need a Mutex to protect access to this resource, and a ConditionVariable to
-      # coordinate between threads.
       @unconfirmed_idents = {}
-      @mutex = Mutex.new
+      @idents_mutex = Mutex.new
       @empty = ConditionVariable.new
+      @closing = false
+      @reconnection_mutex = Mutex.new
 
-      @socket = SocketConnection.new(self, url, {
-        "Authorization" => authorization_header,
-      })
+      @url = url
+      @authorization_header = authorization_header
 
-      wait_for_welcome
-
-      @socket.transmit({
-        "command" => "subscribe",
-        "identifier" => @channel
-      })
-
-      wait_for_confirm
+      connect
     end
 
-    def connected(socket)
-      # Some of the initialize code will probably be moved here once we implement reconnect
-    end
-
-    def disconnected(_socket)
-      # Want to reconnect here if there are any unconfirmed_idents. We trust that the
-      # server has thrown out whatever it had in flight and it expects the insight gem
-      # to reconnect
+    def disconnected(socket)
+      reconnection_count = 0
+      @reconnection_mutex.synchronize do
+        return unless socket == @socket
+        begin
+          reconnection_count += 1
+          connect
+        rescue SocketConnection::HandshakeError, RejectedSubscription, TimeoutError, SocketConnection::SocketError => e
+          if reconnection_count > MAX_RECONNECTION_ATTEMPTS
+            raise e
+          else
+            sleep(WAIT_BETWEEN_RECONNECTIONS)
+            retry
+          end
+        end
+      end
+      retransmit
     end
 
     def close()
+      @closing = true
+
       # Because the server only sends us confirmations after every 10mb of
       # data it uploads to S3, we'll never get confirmation of the
       # identifiers of the last upload part unless we send an explicit finish,
       # to which the server will respond with the last bits of data
       send_eot
 
-      @mutex.synchronize do
+      @idents_mutex.synchronize do
         # Here, we sleep for 75 seconds while waiting for the server to confirm the last idents.
         # We are woken up when the unconfirmed_idents is empty, and given back the mutex to
         # continue operation.
-        @empty.wait(@mutex, CONFIRMATION_TIMEOUT) unless @unconfirmed_idents.empty?
+        @empty.wait(@idents_mutex, CONFIRMATION_TIMEOUT) unless @unconfirmed_idents.empty?
       end
 
-      # 🤷‍♀️ I guess then we always disconnect cos we can't wait
-      # forever? Perhaps when we implement reconnect, we'll do
-      # one retry here, and then quit
+      # Then we always disconnect cos we can't wait forever? 🤷‍♀️
       @socket.close
     end
 
@@ -73,6 +76,8 @@ module RSpec::Buildkite::Insights
         # Push these two messages onto the queue, so that we block on waiting for the
         # initializing phase to complete
         @queue.push(data)
+      when "reject_subscription"
+        raise RejectedSubscription
       else
         process_message(data)
       end
@@ -81,33 +86,49 @@ module RSpec::Buildkite::Insights
     def write_result(result)
       result_as_json = result.as_json
 
-      @socket.transmit({
-        "identifier" => @channel,
-        "command" => "message",
-        "data" => {
-          "action" => "record_results",
-          "results" => [result_as_json]
-          }.to_json
-        })
-
       add_unconfirmed_idents(result.example.id, result_as_json)
+
+      transmit_results([result_as_json])
     end
 
     def unconfirmed_idents_count
-      @mutex.synchronize do
+      @idents_mutex.synchronize do
         @unconfirmed_idents.count
       end
     end
 
     private
 
+    def transmit_results(results_as_json)
+      @socket.transmit({
+        "identifier" => @channel,
+        "command" => "message",
+        "data" => {
+          "action" => "record_results",
+          "results" => results_as_json
+          }.to_json
+        })
+    end
+
+    def connect
+      @socket = SocketConnection.new(self, @url, {
+        "Authorization" => @authorization_header,
+      })
+
+      wait_for_welcome
+
+      @socket.transmit({
+        "command" => "subscribe",
+        "identifier" => @channel
+      })
+
+      wait_for_confirm
+    end
+
     def pop_with_timeout
       Timeout.timeout(30, RSpec::Buildkite::Insights::TimeoutError, "Waited 30 seconds") do
         @queue.pop
       end
-    rescue RSpec::Buildkite::Insights::TimeoutError
-      $stderr.puts "RSpec Buildkite Insights timed out. Please get in touch with support@buildkite.com with the following information: #{@channel.inspect}"
-      nil
     end
 
     def wait_for_welcome
@@ -127,14 +148,15 @@ module RSpec::Buildkite::Insights
     end
 
     def add_unconfirmed_idents(ident, data)
-      @mutex.synchronize do
+      @idents_mutex.synchronize do
         @unconfirmed_idents[ident] = data
       end
     end
 
     def remove_unconfirmed_idents(idents)
       return if idents.empty?
-      @mutex.synchronize do
+
+      @idents_mutex.synchronize do
         # Remove received idents from unconfirmed_idents
         idents.each { |key| @unconfirmed_idents.delete(key) }
 
@@ -170,6 +192,15 @@ module RSpec::Buildkite::Insights
       else
         # unhandled message
       end
+    end
+
+    def retransmit
+      data = @idents_mutex.synchronize do
+        @unconfirmed_idents.values
+      end
+
+      transmit_results(data) unless data.empty?
+      send_eot if @closing
     end
   end
 end
