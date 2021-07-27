@@ -25,6 +25,9 @@ module RSpec::Buildkite::Insights
       @authorization_header = authorization_header
 
       connect
+    rescue TimeoutError => e
+      $stderr.puts "rspec-buildkite-insights could not establish an initial connection with Buildkite. Please contact support."
+      raise e
     end
 
     def disconnected(socket)
@@ -36,6 +39,7 @@ module RSpec::Buildkite::Insights
           connect
         rescue SocketConnection::HandshakeError, RejectedSubscription, TimeoutError, SocketConnection::SocketError => e
           if reconnection_count > MAX_RECONNECTION_ATTEMPTS
+            $stderr.puts "rspec-buildkite-insights experienced a disconnection and could not reconnect to Buildkite due to #{e.message}. Please contact support."
             raise e
           else
             sleep(WAIT_BETWEEN_RECONNECTIONS)
