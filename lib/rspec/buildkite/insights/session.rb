@@ -33,7 +33,17 @@ module RSpec::Buildkite::Insights
     def disconnected(socket)
       reconnection_count = 0
       @reconnection_mutex.synchronize do
+        # When the first thread detects a disconnection, it calls the disconnect method
+        # with the current socket. This thread grabs the reconnection mutex and does the
+        # reconnection, which then updates the value of @socket.
+        #
+        # At some point in that process, the second thread would have detected the
+        # disconnection too, and it also calls it with the current socket. However, the
+        # second thread can't run the reconnection code because of the mutex. By the
+        # time the mutex is released, the value of @socket has been refreshed, and so
+        # the second thread returns early and does not reattempt the reconnection.
         return unless socket == @socket
+
         begin
           reconnection_count += 1
           connect
@@ -203,7 +213,10 @@ module RSpec::Buildkite::Insights
         @unconfirmed_idents.values
       end
 
+      # send the contents of the buffer, unless it's empty
       transmit_results(data) unless data.empty?
+      # if we were disconnected in the closing phase, then resend the EOT
+      # message so the server can persist the last upload part
       send_eot if @closing
     end
   end
