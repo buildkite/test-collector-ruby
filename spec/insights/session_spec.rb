@@ -93,15 +93,17 @@ RSpec.describe "RSpec::Buildkite::Insights::Session" do
 
   describe "#write_result" do
     let(:fake_trace) { instance_double("RSpec::Buildkite::Insights::Uploader::Trace") }
+    let(:fake_trace_id) { "33569b01-4180-4416-9631-c25d370a4c96" }
     let(:trace_json) do
       {
+        id: fake_trace_id,
         identifier: "./spec/insights/session_spec.rb[1:2]"
       }.to_json
     end
 
     before do
       allow(fake_trace).to receive(:as_json).and_return(trace_json)
-      allow(fake_trace).to receive_message_chain(:example, :id).and_return("./spec/insights/session_spec.rb[1:2]")
+      allow(fake_trace).to receive(:id).and_return(fake_trace_id)
     end
 
     it "sends the result to the server" do
