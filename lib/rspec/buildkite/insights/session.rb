@@ -100,7 +100,7 @@ module RSpec::Buildkite::Insights
     def write_result(result)
       result_as_json = result.as_json
 
-      add_unconfirmed_idents(result.example.id, result_as_json)
+      add_unconfirmed_idents(result.id, result_as_json)
 
       transmit_results([result_as_json])
     end

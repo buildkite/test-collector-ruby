@@ -22,8 +22,10 @@ module RSpec::Buildkite::Insights
   class Uploader
     class Trace
       attr_accessor :example
-      attr_reader :history
+      attr_reader :id, :history
+
       def initialize(example, history)
+        @id = SecureRandom.uuid
         @example = example
         @history = history
       end
@@ -47,6 +49,7 @@ module RSpec::Buildkite::Insights
 
       def as_json
         {
+          id: @id,
           scope: example.example_group.metadata[:full_description],
           name: example.description,
           identifier: example.id,
