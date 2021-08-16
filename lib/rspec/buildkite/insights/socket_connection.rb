@@ -79,8 +79,7 @@ module RSpec::Buildkite::Insights
         @session.disconnected(self)
         disconnect
       rescue IOError
-        # Listen thread raises: stream closed in another thread (IOError) cos it get joined by the main thread
-        puts "ioerror raised from #{Thread.current}"
+        # This is fine to ignore
       end
     end
 
