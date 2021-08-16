@@ -21,10 +21,9 @@ module RSpec::Buildkite::Insights
           ctx = OpenSSL::SSL::SSLContext.new
           protocol = "https"
 
-          # FIXME: Are any of these needed / not defaults?
-          #ctx.min_version = :TLS1_2
-          #ctx.verify_mode = OpenSSL::SSL::VERIFY_PEER
-          #ctx.cert_store = OpenSSL::X509::Store.new.tap(&:set_default_paths)
+          ctx.min_version = :TLS1_2
+          ctx.verify_mode = OpenSSL::SSL::VERIFY_PEER
+          ctx.cert_store = OpenSSL::X509::Store.new.tap(&:set_default_paths)
 
           socket = OpenSSL::SSL::SSLSocket.new(socket, ctx)
           socket.connect
