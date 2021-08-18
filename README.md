@@ -9,7 +9,7 @@ Add the gem to your Gemfile:
 ```ruby
 group :test do
   # ...
-  gem "rspec-buildkite"
+  gem "rspec-buildkite-insights"
 end
 ```
 
