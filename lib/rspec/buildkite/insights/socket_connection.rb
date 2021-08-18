@@ -21,10 +21,9 @@ module RSpec::Buildkite::Insights
           ctx = OpenSSL::SSL::SSLContext.new
           protocol = "https"
 
-          # FIXME: Are any of these needed / not defaults?
-          #ctx.min_version = :TLS1_2
-          #ctx.verify_mode = OpenSSL::SSL::VERIFY_PEER
-          #ctx.cert_store = OpenSSL::X509::Store.new.tap(&:set_default_paths)
+          ctx.min_version = :TLS1_2
+          ctx.verify_mode = OpenSSL::SSL::VERIFY_PEER
+          ctx.cert_store = OpenSSL::X509::Store.new.tap(&:set_default_paths)
 
           socket = OpenSSL::SSL::SSLSocket.new(socket, ctx)
           socket.connect
@@ -77,11 +76,12 @@ module RSpec::Buildkite::Insights
           end
         end
       rescue EOFError
-        @session.disconnected(self)
-        disconnect
+        if @socket
+          @session.disconnected(self)
+          disconnect
+        end
       rescue IOError
-        # Listen thread raises: stream closed in another thread (IOError) cos it get joined by the main thread
-        puts "ioerror raised from #{Thread.current}"
+        # This is fine to ignore
       end
     end
 
@@ -93,6 +93,7 @@ module RSpec::Buildkite::Insights
       frame = WebSocket::Frame::Outgoing::Client.new(data: raw_data, type: :text, version: @version)
       @socket.write(frame.to_s)
     rescue Errno::EPIPE
+      return unless @socket
       @session.disconnected(self)
       disconnect
     end
@@ -105,9 +106,10 @@ module RSpec::Buildkite::Insights
     private
 
     def disconnect
-      @socket&.close
-      @thread&.join unless @thread == Thread.current
+      socket = @socket
       @socket = nil
+      socket&.close
+      @thread&.join unless @thread == Thread.current
     end
   end
 end

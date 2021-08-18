@@ -30,19 +30,19 @@ module RSpec::Buildkite::Insights
       raise e
     end
 
-    def disconnected(socket)
+    def disconnected(connection)
       reconnection_count = 0
       @reconnection_mutex.synchronize do
         # When the first thread detects a disconnection, it calls the disconnect method
-        # with the current socket. This thread grabs the reconnection mutex and does the
-        # reconnection, which then updates the value of @socket.
+        # with the current connection. This thread grabs the reconnection mutex and does the
+        # reconnection, which then updates the value of @connection.
         #
         # At some point in that process, the second thread would have detected the
-        # disconnection too, and it also calls it with the current socket. However, the
+        # disconnection too, and it also calls it with the current connection. However, the
         # second thread can't run the reconnection code because of the mutex. By the
-        # time the mutex is released, the value of @socket has been refreshed, and so
+        # time the mutex is released, the value of @connection has been refreshed, and so
         # the second thread returns early and does not reattempt the reconnection.
-        return unless socket == @socket
+        return unless connection == @connection
 
         begin
           reconnection_count += 1
@@ -77,10 +77,10 @@ module RSpec::Buildkite::Insights
       end
 
       # Then we always disconnect cos we can't wait forever? 🤷‍♀️
-      @socket.close
+      @connection.close
     end
 
-    def handle(_socket, data)
+    def handle(_connection, data)
       data = JSON.parse(data)
       case data["type"]
       when "ping"
@@ -114,7 +114,7 @@ module RSpec::Buildkite::Insights
     private
 
     def transmit_results(results_as_json)
-      @socket.transmit({
+      @connection.transmit({
         "identifier" => @channel,
         "command" => "message",
         "data" => {
@@ -125,13 +125,13 @@ module RSpec::Buildkite::Insights
     end
 
     def connect
-      @socket = SocketConnection.new(self, @url, {
+      @connection = SocketConnection.new(self, @url, {
         "Authorization" => @authorization_header,
       })
 
       wait_for_welcome
 
-      @socket.transmit({
+      @connection.transmit({
         "command" => "subscribe",
         "identifier" => @channel
       })
@@ -187,7 +187,7 @@ module RSpec::Buildkite::Insights
     def send_eot
       # Expect server to respond with data of indentifiers last upload part
 
-      @socket.transmit({
+      @connection.transmit({
         "identifier" => @channel,
         "command" => "message",
         "data" => {
