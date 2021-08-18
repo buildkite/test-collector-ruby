@@ -100,6 +100,7 @@ module RSpec::Buildkite::Insights
             contact_uri = URI.parse(RSpec::Buildkite::Insights.url)
 
             http = Net::HTTP.new(contact_uri.host, contact_uri.port)
+            http.keep_alive_timeout = 30
             http.use_ssl = contact_uri.scheme == "https"
 
             authorization_header = "Token token=\"#{RSpec::Buildkite::Insights.api_token}\""
