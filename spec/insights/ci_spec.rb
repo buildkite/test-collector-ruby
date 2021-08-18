@@ -16,6 +16,7 @@ RSpec.describe "RSpec::Buildkite::Insights::CI" do
     end
 
     it "not running on Buildkite" do
+      fake_env("BUILDKITE", nil)
       allow(SecureRandom).to receive(:uuid) { "845ac829-2ab3-4bbb-9e24-3529755a6d37" }
       result = RSpec::Buildkite::Insights::CI.env
 
