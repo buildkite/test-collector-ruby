@@ -3,6 +3,7 @@
 require "rspec/core"
 require "rspec/expectations"
 
+require "net/http"
 require "openssl"
 require "websocket"
 
@@ -89,6 +90,17 @@ module RSpec::Buildkite::Insights
       @traces ||= []
     end
 
+    REQUEST_EXCEPTIONS = [
+      URI::InvalidURIError,
+      Net::HTTPBadResponse,
+      Net::HTTPHeaderSyntaxError,
+      Net::ReadTimeout,
+      Net::OpenTimeout,
+      OpenSSL::SSL::SSLError,
+      OpenSSL::SSL::SSLErrorWaitReadable,
+      EOFError
+    ]
+
     def self.configure
       RSpec::Buildkite::Insights.uploader = self
 
@@ -112,7 +124,11 @@ module RSpec::Buildkite::Insights
               run_env: CI.env
             }.to_json
 
-            response = http.request(contact)
+            response = begin
+              http.request(contact)
+            rescue *REQUEST_EXCEPTIONS => e
+              puts "Error communicating with the server: #{e.message}"
+            end
 
             if response.is_a?(Net::HTTPSuccess)
               json = JSON.parse(response.body)
