@@ -13,6 +13,24 @@ RSpec.describe "RSpec::Buildkite::Insights::CI" do
 
     before do
       allow(ENV).to receive(:[]).and_call_original
+    end
+
+    it "not running on Buildkite" do
+      allow(SecureRandom).to receive(:uuid) { "845ac829-2ab3-4bbb-9e24-3529755a6d37" }
+      result = RSpec::Buildkite::Insights::CI.env
+
+      expect(result).to match({
+        "CI" => "buildkite",
+        "key" => "845ac829-2ab3-4bbb-9e24-3529755a6d37",
+        "url" => nil,
+        "branch" => nil,
+        "commit_sha" => nil,
+        "number" => nil,
+        "job_id" => nil
+      })
+    end
+
+    it "returns env" do
       fake_env("BUILDKITE", "true")
       fake_env("BUILDKITE_BUILD_ID", build_uuid)
       fake_env("BUILDKITE_BUILD_URL", build_url)
@@ -20,9 +38,7 @@ RSpec.describe "RSpec::Buildkite::Insights::CI" do
       fake_env("BUILDKITE_COMMIT", commit_sha)
       fake_env("BUILDKITE_BUILD_NUMBER", number)
       fake_env("BUILDKITE_JOB_ID", job_id)
-    end
 
-    it "returns env" do
       result = RSpec::Buildkite::Insights::CI.env
 
       expect(result).to match({
