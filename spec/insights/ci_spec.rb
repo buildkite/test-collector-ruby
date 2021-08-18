@@ -3,15 +3,37 @@
 require "rspec/buildkite/insights/ci"
 
 RSpec.describe "RSpec::Buildkite::Insights::CI" do
-  describe ".key" do
-    it "returns random uuid if we cant detect CI" do
-      uuid = "a8959bf2-e0af-4829-a029-97999f1b09d6"
-      allow(SecureRandom).to receive(:uuid) { uuid }
+  describe ".env" do
+    let(:build_uuid) { "b8959ui2-l0dk-4829-i029-97999t1e09d6" }
+    let(:build_url) { "https://buildkite.com/buildkite/buildkite/builds/1234" }
+    let(:branch) { "main" }
+    let(:commit_sha) { "3683a9a92ec0f3055849cd5488e8e9347c6e2878" }
+    let(:number) { "4242" }
+    let(:job_id) { "j3459ui2-l0dk-4829-i029-97999t1e09d6" }
 
+    before do
+      allow(ENV).to receive(:[]).and_call_original
+      fake_env("BUILDKITE", "true")
+      fake_env("BUILDKITE_BUILD_ID", build_uuid)
+      fake_env("BUILDKITE_BUILD_URL", build_url)
+      fake_env("BUILDKITE_BRANCH", branch)
+      fake_env("BUILDKITE_COMMIT", commit_sha)
+      fake_env("BUILDKITE_BUILD_NUMBER", number)
+      fake_env("BUILDKITE_JOB_ID", job_id)
+    end
+
+    it "returns env" do
       result = RSpec::Buildkite::Insights::CI.env
 
-      expect(result["CI"]).to be nil
-      expect(result["key"]).to eq uuid
+      expect(result).to match({
+        "CI" => "buildkite",
+        "key" => build_uuid,
+        "url" => build_url,
+        "branch" => branch,
+        "commit_sha" => commit_sha,
+        "number" => number,
+        "job_id" => job_id
+      })
     end
   end
 end
