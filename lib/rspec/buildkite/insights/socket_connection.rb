@@ -92,7 +92,7 @@ module RSpec::Buildkite::Insights
       raw_data = data.to_json
       frame = WebSocket::Frame::Outgoing::Client.new(data: raw_data, type: :text, version: @version)
       @socket.write(frame.to_s)
-    rescue Errno::EPIPE
+    rescue Errno::EPIPE, OpenSSL::SSL::SSLError => e
       return unless @socket
       @session.disconnected(self)
       disconnect
