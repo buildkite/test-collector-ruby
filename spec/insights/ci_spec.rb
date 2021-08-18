@@ -21,13 +21,8 @@ RSpec.describe "RSpec::Buildkite::Insights::CI" do
       result = RSpec::Buildkite::Insights::CI.env
 
       expect(result).to match({
-        "CI" => "buildkite",
-        "key" => "845ac829-2ab3-4bbb-9e24-3529755a6d37",
-        "url" => nil,
-        "branch" => nil,
-        "commit_sha" => nil,
-        "number" => nil,
-        "job_id" => nil
+        "CI" => nil,
+        "key" => "845ac829-2ab3-4bbb-9e24-3529755a6d37"
       })
     end
 
