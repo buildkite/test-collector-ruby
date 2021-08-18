@@ -27,7 +27,6 @@ module RSpec::Buildkite::Insights
       connect
     rescue TimeoutError => e
       $stderr.puts "rspec-buildkite-insights could not establish an initial connection with Buildkite. Please contact support."
-      raise e
     end
 
     def disconnected(connection)
