@@ -9,6 +9,7 @@ RSpec.describe "RSpec::Buildkite::Insights::CI" do
     let(:branch) { "main" }
     let(:commit_sha) { "3683a9a92ec0f3055849cd5488e8e9347c6e2878" }
     let(:number) { "4242" }
+    let(:job_id) { "j3459ui2-l0dk-4829-i029-97999t1e09d6" }
 
     before do
       allow(ENV).to receive(:[]).and_call_original
@@ -18,6 +19,7 @@ RSpec.describe "RSpec::Buildkite::Insights::CI" do
       fake_env("BUILDKITE_BRANCH", branch)
       fake_env("BUILDKITE_COMMIT", commit_sha)
       fake_env("BUILDKITE_BUILD_NUMBER", number)
+      fake_env("BUILDKITE_JOB_ID", job_id)
     end
 
     it "returns env" do
@@ -30,6 +32,7 @@ RSpec.describe "RSpec::Buildkite::Insights::CI" do
         "branch" => branch,
         "commit_sha" => commit_sha,
         "number" => number,
+        "job_id" => job_id
       })
     end
   end

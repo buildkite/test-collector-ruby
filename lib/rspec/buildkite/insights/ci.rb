@@ -9,6 +9,7 @@ module RSpec::Buildkite::Insights::CI
       "branch" => ENV["BUILDKITE_BRANCH"],
       "commit_sha" => ENV["BUILDKITE_COMMIT"],
       "number" => ENV["BUILDKITE_BUILD_NUMBER"],
+      "job_id" => ENV["BUILDKITE_JOB_ID"]
     }
   end
 end
