@@ -34,6 +34,8 @@ RSpec.describe "RSpec::Buildkite::Insights::Uploader" do
   it "make sure a suite can set up Insights" do
     result = execute_example_suite
 
+    p result
+
     expect(result).to include "0 failures"
     expect(result).not_to include "An error occurred"
   end
