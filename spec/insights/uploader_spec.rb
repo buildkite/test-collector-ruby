@@ -23,16 +23,18 @@ RSpec.describe "RSpec::Buildkite::Insights::Uploader" do
     output.string
   end
 
+  # Returns a string contains the result of
+  #   cd example && bundle exec rspec
   def execute_example_suite
-    command = ["bundle", "exec", "rspec"]
+    command = ["bundle exec rspec"]
 
     safe_pty(command, chdir: EXAMPLE_DIR)
   end
 
-  it "runs example suite" do
-    fake_http = double("fake_http")
-    allow_any_instance_of(Net::HTTP).to receive(:new) { fake_http }
+  it "make sure a suite can set up Insights" do
+    result = execute_example_suite
 
-    execute_example_suite
+    expect(result).to include "0 failures"
+    expect(result).not_to include "An error occurred"
   end
 end
