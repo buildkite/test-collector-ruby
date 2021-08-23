@@ -1,4 +1,4 @@
-# RSpec Buildkite Insights
+# RSpec Buildkite Analytics
 
 This gem collects data about your test suite's performance and reliability, and allows you to see trends and insights about your test suite over time ✨
 
@@ -9,13 +9,13 @@ Add the gem to your Gemfile:
 ```ruby
 group :test do
   # ...
-  gem "rspec-buildkite-insights"
+  gem "rspec-buildkite-analytics"
 end
 ```
 
 Configure your API key:
 ```ruby
-RSpec::Buildkite::Insights.configure do |config|
+RSpec::Buildkite::Analytics.configure do |config|
   config.suite_key = "........"
   # other config
 end
@@ -28,7 +28,7 @@ $ bundle
 
 Lastly, commit and push your changes to start analysing your tests:
 ```
-$ git commit -m "Add Buildkite Test Insights client"
+$ git commit -m "Add Buildkite Test Analytics client"
 $ git push
 ```
 

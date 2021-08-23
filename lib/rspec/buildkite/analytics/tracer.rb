@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-module RSpec::Buildkite::Insights
+module RSpec::Buildkite::Analytics
   class Tracer
     class Span
       attr_accessor :section, :start_at, :end_at, :detail, :children

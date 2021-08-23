@@ -2,7 +2,7 @@
 
 require "securerandom"
 
-module RSpec::Buildkite::Insights::CI
+module RSpec::Buildkite::Analytics::CI
   def self.env
     if ENV["BUILDKITE"]
       {

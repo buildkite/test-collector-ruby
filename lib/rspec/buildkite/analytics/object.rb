@@ -1,10 +1,10 @@
 # frozen_string_literal: true
 
-module RSpec::Buildkite::Insights
+module RSpec::Buildkite::Analytics
   class Object
     module CustomObjectSleep
       def sleep(duration)
-        tracer = RSpec::Buildkite::Insights::Uploader.tracer
+        tracer = RSpec::Buildkite::Analytics::Uploader.tracer
         tracer&.enter("sleep")
 
         super

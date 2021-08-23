@@ -1,15 +1,15 @@
 # frozen_string_literal: true
 
-require "rspec/buildkite/insights/session"
-require "rspec/buildkite/insights/socket_connection"
+require "rspec/buildkite/analytics/session"
+require "rspec/buildkite/analytics/socket_connection"
 
-RSpec.describe "RSpec::Buildkite::Insights::Session" do
-  let(:socket_double) { instance_double("RSpec::Buildkite::Insights::SocketConnection") }
-  let(:session) { RSpec::Buildkite::Insights::Session.new("fake_url", "fake_auth", "fake_channel") }
+RSpec.describe "RSpec::Buildkite::Analytics::Session" do
+  let(:socket_double) { instance_double("RSpec::Buildkite::Analytics::SocketConnection") }
+  let(:session) { RSpec::Buildkite::Analytics::Session.new("fake_url", "fake_auth", "fake_channel") }
 
   before do
     # mock the SocketConnection new method to send the welcome message
-    allow(RSpec::Buildkite::Insights::SocketConnection).to receive(:new) { |session, _, _|
+    allow(RSpec::Buildkite::Analytics::SocketConnection).to receive(:new) { |session, _, _|
       @session = session
       @session.handle(socket_double, {"type"=> "welcome"}.to_json)
       socket_double
@@ -21,24 +21,24 @@ RSpec.describe "RSpec::Buildkite::Insights::Session" do
       "identifier" => "fake_channel"
     }) { @session.handle(socket_double, {"type"=> "confirm_subscription", "identifier"=> "fake_channel"}.to_json) }
 
-    stub_const("RSpec::Buildkite::Insights::Session::WAIT_BETWEEN_RECONNECTIONS", 0)
-    stub_const("RSpec::Buildkite::Insights::Session::CONFIRMATION_TIMEOUT", 5)
+    stub_const("RSpec::Buildkite::Analytics::Session::WAIT_BETWEEN_RECONNECTIONS", 0)
+    stub_const("RSpec::Buildkite::Analytics::Session::CONFIRMATION_TIMEOUT", 5)
   end
 
   describe "#handle" do
     it "processes confirmations from the server" do
-      session.send(:add_unconfirmed_idents, "./spec/insights/session_spec.rb[1:1]", {"hi"=> "thing"})
+      session.send(:add_unconfirmed_idents, "./spec/analytics/session_spec.rb[1:1]", {"hi"=> "thing"})
 
       expect(session.unconfirmed_idents_count).to be 1
-      session.handle(socket_double, {"type"=> "message", "identifier"=> "fake_channel", "message" => {"confirm"=> ["./spec/insights/session_spec.rb[1:1]"]}}.to_json)
+      session.handle(socket_double, {"type"=> "message", "identifier"=> "fake_channel", "message" => {"confirm"=> ["./spec/analytics/session_spec.rb[1:1]"]}}.to_json)
       expect(session.unconfirmed_idents_count).to be 0
     end
   end
 
   describe "#close" do
     it "waits until the unconfirmed_idents is empty" do
-      session.send(:add_unconfirmed_idents, "./spec/insights/session_spec.rb[1:1]", {"hi"=> "thing"})
-      session.send(:add_unconfirmed_idents, "./spec/insights/session_spec.rb[1:2]", {"hi"=> "thing"})
+      session.send(:add_unconfirmed_idents, "./spec/analytics/session_spec.rb[1:1]", {"hi"=> "thing"})
+      session.send(:add_unconfirmed_idents, "./spec/analytics/session_spec.rb[1:2]", {"hi"=> "thing"})
 
       expect(socket_double).to receive(:transmit).with({
         "command" => "message",
@@ -46,7 +46,7 @@ RSpec.describe "RSpec::Buildkite::Insights::Session" do
         "data" => {
           "action" => "end_of_transmission"
         }.to_json
-      }) { Thread.new do sleep(1); session.handle(socket_double, {"type"=> "message", "identifier"=> "fake_channel", "message" => {"confirm"=> ["./spec/insights/session_spec.rb[1:1]", "./spec/insights/session_spec.rb[1:2]"]}}.to_json) end }
+      }) { Thread.new do sleep(1); session.handle(socket_double, {"type"=> "message", "identifier"=> "fake_channel", "message" => {"confirm"=> ["./spec/analytics/session_spec.rb[1:1]", "./spec/analytics/session_spec.rb[1:2]"]}}.to_json) end }
 
       expect(socket_double).to receive(:close)
       expect(session.instance_variable_get(:@empty)).to receive(:wait).and_call_original
@@ -70,8 +70,8 @@ RSpec.describe "RSpec::Buildkite::Insights::Session" do
     end
 
     it "waits for multiple confirmation messages from server" do
-      session.send(:add_unconfirmed_idents, "./spec/insights/session_spec.rb[1:1]", {"hi"=> "thing"})
-      session.send(:add_unconfirmed_idents, "./spec/insights/session_spec.rb[1:2]", {"hi"=> "thing"})
+      session.send(:add_unconfirmed_idents, "./spec/analytics/session_spec.rb[1:1]", {"hi"=> "thing"})
+      session.send(:add_unconfirmed_idents, "./spec/analytics/session_spec.rb[1:2]", {"hi"=> "thing"})
 
       expect(socket_double).to receive(:transmit).with({
         "command" => "message",
@@ -79,7 +79,7 @@ RSpec.describe "RSpec::Buildkite::Insights::Session" do
         "data" => {
           "action" => "end_of_transmission"
         }.to_json
-      }) { Thread.new do sleep(1); session.handle(socket_double, {"type"=> "message", "identifier"=> "fake_channel", "message" => {"confirm"=> ["./spec/insights/session_spec.rb[1:2]"]}}.to_json) end; Thread.new do sleep(2); session.handle(socket_double, {"type"=> "message", "identifier"=> "fake_channel", "message" => {"confirm"=> ["./spec/insights/session_spec.rb[1:2]"]}}.to_json) end}
+      }) { Thread.new do sleep(1); session.handle(socket_double, {"type"=> "message", "identifier"=> "fake_channel", "message" => {"confirm"=> ["./spec/analytics/session_spec.rb[1:2]"]}}.to_json) end; Thread.new do sleep(2); session.handle(socket_double, {"type"=> "message", "identifier"=> "fake_channel", "message" => {"confirm"=> ["./spec/analytics/session_spec.rb[1:2]"]}}.to_json) end}
 
       expect(session.instance_variable_get(:@empty)).to receive(:wait).and_call_original
 
@@ -92,12 +92,12 @@ RSpec.describe "RSpec::Buildkite::Insights::Session" do
   end
 
   describe "#write_result" do
-    let(:fake_trace) { instance_double("RSpec::Buildkite::Insights::Uploader::Trace") }
+    let(:fake_trace) { instance_double("RSpec::Buildkite::Analytics::Uploader::Trace") }
     let(:fake_trace_id) { "33569b01-4180-4416-9631-c25d370a4c96" }
     let(:trace_json) do
       {
         id: fake_trace_id,
-        identifier: "./spec/insights/session_spec.rb[1:2]"
+        identifier: "./spec/analytics/session_spec.rb[1:2]"
       }.to_json
     end
 
@@ -141,21 +141,21 @@ RSpec.describe "RSpec::Buildkite::Insights::Session" do
     it "does a reconnect and redoes the socket" do
       session.disconnected(socket_double)
 
-      expect(RSpec::Buildkite::Insights::SocketConnection).to have_received(:new).twice
+      expect(RSpec::Buildkite::Analytics::SocketConnection).to have_received(:new).twice
     end
 
     it "retries reconnection if it gets a handshake error" do
       # stub connection so that it is successful the first time, then raises an error,
       # and then is successful again
       call_count = 0
-      allow(RSpec::Buildkite::Insights::SocketConnection).to receive(:new) { |session, _, _|
+      allow(RSpec::Buildkite::Analytics::SocketConnection).to receive(:new) { |session, _, _|
         call_count += 1
         if call_count.odd?
           @session = session
           @session.handle(socket_double, {"type"=> "welcome"}.to_json)
           socket_double
         else
-          raise RSpec::Buildkite::Insights::SocketConnection::HandshakeError
+          raise RSpec::Buildkite::Analytics::SocketConnection::HandshakeError
         end
       }
 
@@ -164,7 +164,7 @@ RSpec.describe "RSpec::Buildkite::Insights::Session" do
       # This expectation is for 3 times because the socket connects initially, then
       # after disconnection there is one connection attempt that throws an error,
       # and then the retry of the connection is successful
-      expect(RSpec::Buildkite::Insights::SocketConnection)
+      expect(RSpec::Buildkite::Analytics::SocketConnection)
         .to have_received(:new).exactly(3).times
     end
 
@@ -172,14 +172,14 @@ RSpec.describe "RSpec::Buildkite::Insights::Session" do
       # stub connection so that it is successful the first time, then raises an error,
       # and then is successful again
       call_count = 0
-      allow(RSpec::Buildkite::Insights::SocketConnection).to receive(:new) { |session, _, _|
+      allow(RSpec::Buildkite::Analytics::SocketConnection).to receive(:new) { |session, _, _|
         call_count += 1
         if call_count.odd?
           @session = session
           @session.handle(socket_double, {"type"=> "welcome"}.to_json)
           socket_double
         else
-          raise RSpec::Buildkite::Insights::SocketConnection::SocketError
+          raise RSpec::Buildkite::Analytics::SocketConnection::SocketError
         end
       }
 
@@ -188,7 +188,7 @@ RSpec.describe "RSpec::Buildkite::Insights::Session" do
       # This expectation is for 3 times because the socket connects initially, then
       # after disconnection there is one connection attempt that throws an error,
       # and then the retry of the connection is successful
-      expect(RSpec::Buildkite::Insights::SocketConnection)
+      expect(RSpec::Buildkite::Analytics::SocketConnection)
         .to have_received(:new).exactly(3).times
     end
 
@@ -204,7 +204,7 @@ RSpec.describe "RSpec::Buildkite::Insights::Session" do
           if call_count.odd?
             @session.handle(socket_double, {"type"=> "confirm_subscription", "identifier"=> "fake_channel"}.to_json)
           else
-            raise RSpec::Buildkite::Insights::Session::RejectedSubscription
+            raise RSpec::Buildkite::Analytics::Session::RejectedSubscription
           end
       }
 
@@ -213,7 +213,7 @@ RSpec.describe "RSpec::Buildkite::Insights::Session" do
       # This expectation is for 3 times because the socket connects initially, then
       # after disconnection there is one connection attempt that throws an error,
       # and then the retry of the connection is successful
-      expect(RSpec::Buildkite::Insights::SocketConnection)
+      expect(RSpec::Buildkite::Analytics::SocketConnection)
         .to have_received(:new).exactly(3).times
     end
 
@@ -225,7 +225,7 @@ RSpec.describe "RSpec::Buildkite::Insights::Session" do
         call_count += 1
         case call_count
         when 1
-          raise RSpec::Buildkite::Insights::TimeoutError
+          raise RSpec::Buildkite::Analytics::TimeoutError
         when 2
           { "type" => "welcome" }
         when 3
@@ -238,12 +238,12 @@ RSpec.describe "RSpec::Buildkite::Insights::Session" do
       # This expectation is for 3 times because the socket connects initially, then
       # after disconnection there is one connection attempt that throws an error,
       # and then the retry of the connection is successful
-      expect(RSpec::Buildkite::Insights::SocketConnection)
+      expect(RSpec::Buildkite::Analytics::SocketConnection)
         .to have_received(:new).exactly(3).times
     end
 
     it "retransmits if there are unconfirmed idents in the buffer" do
-      session.send(:add_unconfirmed_idents, "./spec/insights/session_spec.rb[1:1]", {"identifier"=> "./spec/insights/session_spec.rb[1:1]", "hi"=> "thing"})
+      session.send(:add_unconfirmed_idents, "./spec/analytics/session_spec.rb[1:1]", {"identifier"=> "./spec/analytics/session_spec.rb[1:1]", "hi"=> "thing"})
 
       expect(socket_double).to receive(:transmit)
         .with({
@@ -252,7 +252,7 @@ RSpec.describe "RSpec::Buildkite::Insights::Session" do
           "data" => {
             "action" => "record_results",
             "results" => [{
-              "identifier"=> "./spec/insights/session_spec.rb[1:1]",
+              "identifier"=> "./spec/analytics/session_spec.rb[1:1]",
               "hi" => "thing"
             }]}.to_json
         })
@@ -282,7 +282,7 @@ RSpec.describe "RSpec::Buildkite::Insights::Session" do
     end
 
     it "resends idents followed by eot if tests have finished" do
-      session.send(:add_unconfirmed_idents, "./spec/insights/session_spec.rb[1:1]", {"identifier"=> "./spec/insights/session_spec.rb[1:1]", "hi"=> "thing"})
+      session.send(:add_unconfirmed_idents, "./spec/analytics/session_spec.rb[1:1]", {"identifier"=> "./spec/analytics/session_spec.rb[1:1]", "hi"=> "thing"})
 
       # In this test the order of operations is:
       # 1. first eot is sent, spawn a new thread to simulate the disconnect
@@ -301,7 +301,7 @@ RSpec.describe "RSpec::Buildkite::Insights::Session" do
           "data" => {
             "action" => "record_results",
             "results" => [{
-              "identifier"=> "./spec/insights/session_spec.rb[1:1]",
+              "identifier"=> "./spec/analytics/session_spec.rb[1:1]",
               "hi" => "thing"
             }]}.to_json
         })
@@ -327,8 +327,8 @@ RSpec.describe "RSpec::Buildkite::Insights::Session" do
             "identifier"=> "fake_channel",
             "message" => {
               "confirm"=> [
-                "./spec/insights/session_spec.rb[1:1]",
-                "./spec/insights/session_spec.rb[1:2]"
+                "./spec/analytics/session_spec.rb[1:1]",
+                "./spec/analytics/session_spec.rb[1:2]"
             ]}
           }.to_json)
         end
@@ -341,7 +341,7 @@ RSpec.describe "RSpec::Buildkite::Insights::Session" do
 
     it "raises error if it can't reconnect after 3 goes" do
       call_count = 0
-      allow(RSpec::Buildkite::Insights::SocketConnection).to receive(:new) { |session, _, _|
+      allow(RSpec::Buildkite::Analytics::SocketConnection).to receive(:new) { |session, _, _|
         call_count += 1
         # let the initial connection be successful
         if call_count == 1
@@ -350,14 +350,14 @@ RSpec.describe "RSpec::Buildkite::Insights::Session" do
           socket_double
         else
           # every other connection attempt will raise an error
-          raise RSpec::Buildkite::Insights::SocketConnection::SocketError
+          raise RSpec::Buildkite::Analytics::SocketConnection::SocketError
         end
       }
 
-      expect { session.disconnected(socket_double) }.to raise_error(RSpec::Buildkite::Insights::SocketConnection::SocketError)
+      expect { session.disconnected(socket_double) }.to raise_error(RSpec::Buildkite::Analytics::SocketConnection::SocketError)
 
       # This expectation is for 5 times because the socket connects initially, then it has 3 retries, then on the fourth retry the error is thrown
-      expect(RSpec::Buildkite::Insights::SocketConnection).to have_received(:new).exactly(5).times
+      expect(RSpec::Buildkite::Analytics::SocketConnection).to have_received(:new).exactly(5).times
     end
   end
 end

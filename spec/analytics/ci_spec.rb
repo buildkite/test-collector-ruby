@@ -1,8 +1,8 @@
 # frozen_string_literal: true
 
-require "rspec/buildkite/insights/ci"
+require "rspec/buildkite/analytics/ci"
 
-RSpec.describe "RSpec::Buildkite::Insights::CI" do
+RSpec.describe "RSpec::Buildkite::Analytics::CI" do
   describe ".env" do
     let(:build_uuid) { "b8959ui2-l0dk-4829-i029-97999t1e09d6" }
     let(:build_url) { "https://buildkite.com/buildkite/buildkite/builds/1234" }
@@ -18,7 +18,7 @@ RSpec.describe "RSpec::Buildkite::Insights::CI" do
     it "not running on Buildkite" do
       fake_env("BUILDKITE", nil)
       allow(SecureRandom).to receive(:uuid) { "845ac829-2ab3-4bbb-9e24-3529755a6d37" }
-      result = RSpec::Buildkite::Insights::CI.env
+      result = RSpec::Buildkite::Analytics::CI.env
 
       expect(result).to match({
         "CI" => nil,
@@ -35,7 +35,7 @@ RSpec.describe "RSpec::Buildkite::Insights::CI" do
       fake_env("BUILDKITE_BUILD_NUMBER", number)
       fake_env("BUILDKITE_JOB_ID", job_id)
 
-      result = RSpec::Buildkite::Insights::CI.env
+      result = RSpec::Buildkite::Analytics::CI.env
 
       expect(result).to match({
         "CI" => "buildkite",

@@ -19,7 +19,7 @@ require "active_support/notifications"
 
 require "securerandom"
 
-module RSpec::Buildkite::Insights
+module RSpec::Buildkite::Analytics
   class Uploader
     class Trace
       attr_accessor :example
@@ -102,19 +102,19 @@ module RSpec::Buildkite::Insights
     ]
 
     def self.configure
-      RSpec::Buildkite::Insights.uploader = self
+      RSpec::Buildkite::Analytics.uploader = self
 
       RSpec.configure do |config|
         config.before(:suite) do
-          config.add_formatter RSpec::Buildkite::Insights::Reporter
+          config.add_formatter RSpec::Buildkite::Analytics::Reporter
 
-          if RSpec::Buildkite::Insights.api_token
-            contact_uri = URI.parse(RSpec::Buildkite::Insights.url)
+          if RSpec::Buildkite::Analytics.api_token
+            contact_uri = URI.parse(RSpec::Buildkite::Analytics.url)
 
             http = Net::HTTP.new(contact_uri.host, contact_uri.port)
             http.use_ssl = contact_uri.scheme == "https"
 
-            authorization_header = "Token token=\"#{RSpec::Buildkite::Insights.api_token}\""
+            authorization_header = "Token token=\"#{RSpec::Buildkite::Analytics.api_token}\""
 
             contact = Net::HTTP::Post.new(contact_uri.path, {
               "Authorization" => authorization_header,
@@ -134,14 +134,14 @@ module RSpec::Buildkite::Insights
               json = JSON.parse(response.body)
 
               if (socket_url = json["cable"]) && (channel = json["channel"])
-                RSpec::Buildkite::Insights.session = Session.new(socket_url, authorization_header, channel)
+                RSpec::Buildkite::Analytics.session = Session.new(socket_url, authorization_header, channel)
               end
             end
           end
         end
 
         config.around(:each) do |example|
-          tracer = RSpec::Buildkite::Insights::Tracer.new
+          tracer = RSpec::Buildkite::Analytics::Tracer.new
 
           # The _buildkite prefix here is added as a safeguard against name collisions
           # as we are in the main thread
@@ -151,19 +151,19 @@ module RSpec::Buildkite::Insights
 
           tracer.finalize
 
-          trace = RSpec::Buildkite::Insights::Uploader::Trace.new(example, tracer.history)
-          RSpec::Buildkite::Insights.uploader.traces << trace
+          trace = RSpec::Buildkite::Analytics::Uploader::Trace.new(example, tracer.history)
+          RSpec::Buildkite::Analytics.uploader.traces << trace
         end
 
         config.after(:suite) do
           # This needs the lonely operater as the session will be nil
           # if auth against the API token fails
-          RSpec::Buildkite::Insights.session&.close
+          RSpec::Buildkite::Analytics.session&.close
         end
       end
 
-      RSpec::Buildkite::Insights::Network.configure
-      RSpec::Buildkite::Insights::Object.configure
+      RSpec::Buildkite::Analytics::Network.configure
+      RSpec::Buildkite::Analytics::Object.configure
 
       ActiveSupport::Notifications.subscribe("sql.active_record") do |name, start, finish, id, payload|
         tracer&.backfill(:sql, finish - start, **{ query: payload[:sql] })

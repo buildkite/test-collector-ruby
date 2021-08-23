@@ -1,21 +1,21 @@
 # frozen_string_literal: true
 
-require_relative "lib/rspec/buildkite/insights/version"
+require_relative "lib/rspec/buildkite/analytics/version"
 
 Gem::Specification.new do |spec|
-  spec.name          = "rspec-buildkite-insights"
-  spec.version       = RSpec::Buildkite::Insights::VERSION
+  spec.name          = "rspec-buildkite-analytics"
+  spec.version       = RSpec::Buildkite::Analytics::VERSION
   spec.authors       = ["Buildkite"]
   spec.email         = ["hello@buildkite.com"]
 
-  spec.summary       = "Track execution of specs and report to Buildkite Insights"
+  spec.summary       = "Track execution of specs and report to Buildkite Analytics"
   spec.homepage      = "https://buildkite.com"
   spec.required_ruby_version = Gem::Requirement.new(">= 2.3.0")
 
   spec.metadata["allowed_push_host"] = "http://example.com"
 
   spec.metadata["homepage_uri"] = spec.homepage
-  spec.metadata["source_code_uri"] = "https://github.com/buildkite/rspec-buildkite-insights"
+  spec.metadata["source_code_uri"] = "https://github.com/buildkite/rspec-buildkite-analytics"
 
   # Specify which files should be added to the gem when it is released.
   # The `git ls-files -z` loads the files in the RubyGem that have been added into git.
