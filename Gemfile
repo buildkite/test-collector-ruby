@@ -2,7 +2,7 @@
 
 source "https://rubygems.org"
 
-# Specify your gem's dependencies in rspec-buildkite-insights.gemspec
+# Specify your gem's dependencies in rspec-buildkite-analytics.gemspec
 gemspec
 
 gem "rake", "~> 13.0"

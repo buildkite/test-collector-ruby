@@ -2,7 +2,7 @@
 
 module RSpec
   module Buildkite
-    module Insights
+    module Analytics
       VERSION = "0.2.0"
     end
   end

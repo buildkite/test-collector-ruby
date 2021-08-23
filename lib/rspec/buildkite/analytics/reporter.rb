@@ -1,4 +1,4 @@
-module RSpec::Buildkite::Insights
+module RSpec::Buildkite::Analytics
   class Reporter
     RSpec::Core::Formatters.register self, :example_passed, :example_failed, :example_pending
 
@@ -8,13 +8,13 @@ module RSpec::Buildkite::Insights
 
     def handle_example(notification)
       example = notification.example
-      trace = RSpec::Buildkite::Insights.uploader.traces.find do |trace|
+      trace = RSpec::Buildkite::Analytics.uploader.traces.find do |trace|
         example.id == trace.example.id
       end
 
       if trace
         trace.example = example
-        RSpec::Buildkite::Insights.session&.write_result(trace)
+        RSpec::Buildkite::Analytics.session&.write_result(trace)
       end
     end
 

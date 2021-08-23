@@ -1,12 +1,12 @@
 # frozen_string_literal: true
 
 require "websocket"
-require "rspec/buildkite/insights/session"
-require "rspec/buildkite/insights/socket_connection"
+require "rspec/buildkite/analytics/session"
+require "rspec/buildkite/analytics/socket_connection"
 
-RSpec.describe "RSpec::Buildkite::Insights::SocketConnection" do
-  let(:session_double) { instance_double("RSpec::Buildkite::Insights::Session") }
-  let(:socket_connection) { RSpec::Buildkite::Insights::SocketConnection.new(session_double, "fake_url", {}) }
+RSpec.describe "RSpec::Buildkite::Analytics::SocketConnection" do
+  let(:session_double) { instance_double("RSpec::Buildkite::Analytics::Session") }
+  let(:socket_connection) { RSpec::Buildkite::Analytics::SocketConnection.new(session_double, "fake_url", {}) }
   let(:ssl_socket_double) { instance_double("OpenSSL::SSL::SSLSocket") }
   let(:tcp_socket_double) { instance_double("TCPSocket") }
   let(:handshake_double) { instance_double("WebSocket::Handshake::Client") }

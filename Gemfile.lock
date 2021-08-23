@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    rspec-buildkite-insights (0.2.0)
+    rspec-buildkite-analytics (0.2.0)
       activesupport
       rspec-core
       rspec-expectations
@@ -46,7 +46,7 @@ PLATFORMS
 DEPENDENCIES
   rake (~> 13.0)
   rspec (~> 3.0)
-  rspec-buildkite-insights!
+  rspec-buildkite-analytics!
 
 BUNDLED WITH
    2.2.20

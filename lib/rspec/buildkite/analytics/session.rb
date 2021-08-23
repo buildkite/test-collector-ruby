@@ -2,7 +2,7 @@
 
 require_relative "socket_connection"
 
-module RSpec::Buildkite::Insights
+module RSpec::Buildkite::Analytics
   class Session
     # Picked 75 as the magic timeout number as it's longer than the TCP timeout of 60s 🤷‍♀️
     CONFIRMATION_TIMEOUT = 75
@@ -26,7 +26,7 @@ module RSpec::Buildkite::Insights
 
       connect
     rescue TimeoutError => e
-      $stderr.puts "rspec-buildkite-insights could not establish an initial connection with Buildkite. Please contact support."
+      $stderr.puts "rspec-buildkite-analytics could not establish an initial connection with Buildkite. Please contact support."
     end
 
     def disconnected(connection)
@@ -48,7 +48,7 @@ module RSpec::Buildkite::Insights
           connect
         rescue SocketConnection::HandshakeError, RejectedSubscription, TimeoutError, SocketConnection::SocketError => e
           if reconnection_count > MAX_RECONNECTION_ATTEMPTS
-            $stderr.puts "rspec-buildkite-insights experienced a disconnection and could not reconnect to Buildkite due to #{e.message}. Please contact support."
+            $stderr.puts "rspec-buildkite-analytics experienced a disconnection and could not reconnect to Buildkite due to #{e.message}. Please contact support."
             raise e
           else
             sleep(WAIT_BETWEEN_RECONNECTIONS)
@@ -139,7 +139,7 @@ module RSpec::Buildkite::Insights
     end
 
     def pop_with_timeout
-      Timeout.timeout(30, RSpec::Buildkite::Insights::TimeoutError, "Waited 30 seconds") do
+      Timeout.timeout(30, RSpec::Buildkite::Analytics::TimeoutError, "Waited 30 seconds") do
         @queue.pop
       end
     end
