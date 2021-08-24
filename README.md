@@ -32,6 +32,9 @@ $ git commit -m "Add Buildkite Test Analytics client"
 $ git push
 ```
 
+## Contributing
+Bug reports and pull requests are welcome on GitHub at https://github.com/buildkite/rspec-buildkite-analytics.
+
 ## License
 
 The gem is available as open source under the terms of the [MIT License](https://opensource.org/licenses/MIT).
