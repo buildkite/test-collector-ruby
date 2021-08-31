@@ -130,12 +130,18 @@ module RSpec::Buildkite::Analytics
               puts "Error communicating with the server: #{e.message}"
             end
 
-            if response.is_a?(Net::HTTPSuccess)
+            case response.code
+            when "401"
+              puts "Invalid Suite API key. Please double check your Suite API key."
+            when "200", "201"
               json = JSON.parse(response.body)
 
               if (socket_url = json["cable"]) && (channel = json["channel"])
                 RSpec::Buildkite::Analytics.session = Session.new(socket_url, authorization_header, channel)
               end
+            else
+              request_id = response.to_hash["x-request-id"]
+              puts "Unknown error. Please contact support with this request ID `#{request_id}` support+analytics@buildkite.com."
             end
           else
             puts "No Suite API key provided. You can get the API key from your Suite settings page."
