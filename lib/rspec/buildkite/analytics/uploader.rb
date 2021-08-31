@@ -141,7 +141,7 @@ module RSpec::Buildkite::Analytics
               end
             else
               request_id = response.to_hash["x-request-id"]
-              puts "Unknown error. Please contact support with this request ID `#{request_id}` support+analytics@buildkite.com."
+              puts "Unknown error. If this error persists, please contact support+analytics@buildkite.com with this request ID `#{request_id}`."
             end
           else
             puts "No Suite API key provided. You can get the API key from your Suite settings page."
