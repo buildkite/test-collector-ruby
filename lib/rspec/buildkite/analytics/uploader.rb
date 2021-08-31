@@ -137,6 +137,8 @@ module RSpec::Buildkite::Analytics
                 RSpec::Buildkite::Analytics.session = Session.new(socket_url, authorization_header, channel)
               end
             end
+          else
+            puts "No Suite API key provided. You can get the API key from your Suite settings page."
           end
         end
 
