@@ -133,7 +133,7 @@ module RSpec::Buildkite::Analytics
             case response.code
             when "401"
               puts "Invalid Suite API key. Please double check your Suite API key."
-            when "200", "201"
+            when "200"
               json = JSON.parse(response.body)
 
               if (socket_url = json["cable"]) && (channel = json["channel"])
