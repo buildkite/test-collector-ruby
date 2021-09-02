@@ -4,6 +4,8 @@ require "securerandom"
 
 module RSpec::Buildkite::Analytics::CI
   def self.env
+    puts "⭐️ #{ENV["BUILDKITE_MESSAGE"]}"
+
     if ENV["BUILDKITE"]
       {
         "CI" => "buildkite",
