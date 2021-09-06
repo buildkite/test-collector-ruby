@@ -120,6 +120,18 @@ module RSpec::Buildkite::Analytics
               "Authorization" => authorization_header,
               "Content-Type" => "application/json",
             })
+
+            puts "🌙"*50
+            puts %(BUILDKITE: #{ENV["BUILDKITE"]})
+            puts %(BUILDKITE_BUILD_ID: #{ENV["BUILDKITE_BUILD_ID"]})
+            puts %(BUILDKITE_BUILD_URL: #{ENV["BUILDKITE_BUILD_URL"]})
+            puts %(BUILDKITE_BRANCH: #{ENV["BUILDKITE_BRANCH"]})
+            puts %(BUILDKITE_COMMIT: #{ENV["BUILDKITE_COMMIT"]})
+            puts %(BUILDKITE_BUILD_NUMBER: #{ENV["BUILDKITE_BUILD_NUMBER"]})
+            puts %(BUILDKITE_JOB_ID: #{ENV["BUILDKITE_JOB_ID"]})
+            puts %(BUILDKITE_MESSAGE: #{ENV["BUILDKITE_MESSAGE"]})
+            puts "🌙"*50
+
             contact.body = {
               run_env: CI.env
             }.to_json
