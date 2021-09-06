@@ -16,14 +16,27 @@ RSpec.describe "RSpec::Buildkite::Analytics::CI" do
       allow(ENV).to receive(:[]).and_call_original
     end
 
-    it "not running on Buildkite" do
+    it "BUILDKITE ENVs not set" do
       fake_env("BUILDKITE", nil)
+      fake_env("BUILDKITE_BUILD_ID", nil)
+      fake_env("BUILDKITE_BUILD_URL", nil)
+      fake_env("BUILDKITE_BRANCH", nil)
+      fake_env("BUILDKITE_COMMIT", nil)
+      fake_env("BUILDKITE_BUILD_NUMBER", nil)
+      fake_env("BUILDKITE_JOB_ID", nil)
+      fake_env("BUILDKITE_MESSAGE", nil)
       allow(SecureRandom).to receive(:uuid) { "845ac829-2ab3-4bbb-9e24-3529755a6d37" }
       result = RSpec::Buildkite::Analytics::CI.env
 
       expect(result).to match({
         "CI" => nil,
-        "key" => "845ac829-2ab3-4bbb-9e24-3529755a6d37"
+        "key" => "845ac829-2ab3-4bbb-9e24-3529755a6d37",
+        "url" => nil,
+        "branch" => nil,
+        "commit_sha" => nil,
+        "number" => nil,
+        "job_id" => nil,
+        "message" => nil
       })
     end
 
