@@ -60,7 +60,31 @@ RSpec.describe "RSpec::Buildkite::Analytics::CI" do
         "commit_sha" => commit_sha,
         "number" => number,
         "job_id" => job_id,
-        "message" => message
+        "message" => "Merge pull request #1 from buildkite/branch"
+      })
+    end
+
+    it "works with windows-style newline" do
+      fake_env("BUILDKITE", "true")
+      fake_env("BUILDKITE_BUILD_ID", build_uuid)
+      fake_env("BUILDKITE_BUILD_URL", build_url)
+      fake_env("BUILDKITE_BRANCH", branch)
+      fake_env("BUILDKITE_COMMIT", commit_sha)
+      fake_env("BUILDKITE_BUILD_NUMBER", number)
+      fake_env("BUILDKITE_JOB_ID", job_id)
+      fake_env("BUILDKITE_MESSAGE", message.sub("\n", "\r\n"))
+
+      result = RSpec::Buildkite::Analytics::CI.env
+
+      expect(result).to match({
+        "CI" => "buildkite",
+        "key" => build_uuid,
+        "url" => build_url,
+        "branch" => branch,
+        "commit_sha" => commit_sha,
+        "number" => number,
+        "job_id" => job_id,
+        "message" => "Merge pull request #1 from buildkite/branch"
       })
     end
   end

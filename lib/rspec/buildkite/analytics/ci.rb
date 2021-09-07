@@ -4,6 +4,9 @@ require "securerandom"
 
 module RSpec::Buildkite::Analytics::CI
   def self.env
+    message = ENV["BUILDKITE_MESSAGE"]
+    message = message.split(/(\n)|(\r\n)/).first if message
+
     env = {
       "CI" => ENV["BUILDKITE"] ? "buildkite" : nil,
       "key" => ENV["BUILDKITE_BUILD_ID"] || SecureRandom.uuid,
@@ -12,7 +15,7 @@ module RSpec::Buildkite::Analytics::CI
       "commit_sha" => ENV["BUILDKITE_COMMIT"],
       "number" => ENV["BUILDKITE_BUILD_NUMBER"],
       "job_id" => ENV["BUILDKITE_JOB_ID"],
-      "message" => ENV["BUILDKITE_MESSAGE"]
+      "message" => message
     }
   end
 end
