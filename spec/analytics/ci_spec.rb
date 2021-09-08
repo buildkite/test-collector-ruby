@@ -14,34 +14,7 @@ RSpec.describe "RSpec::Buildkite::Analytics::CI" do
 
     before do
       allow(ENV).to receive(:[]).and_call_original
-    end
 
-    it "BUILDKITE ENVs not set" do
-      fake_env("BUILDKITE", nil)
-      fake_env("BUILDKITE_BUILD_ID", nil)
-      fake_env("BUILDKITE_BUILD_URL", nil)
-      fake_env("BUILDKITE_BRANCH", nil)
-      fake_env("BUILDKITE_COMMIT", nil)
-      fake_env("BUILDKITE_BUILD_NUMBER", nil)
-      fake_env("BUILDKITE_JOB_ID", nil)
-      fake_env("BUILDKITE_MESSAGE", nil)
-      allow(SecureRandom).to receive(:uuid) { "845ac829-2ab3-4bbb-9e24-3529755a6d37" }
-      result = RSpec::Buildkite::Analytics::CI.env
-
-      expect(result).to match({
-        "CI" => nil,
-        "key" => "845ac829-2ab3-4bbb-9e24-3529755a6d37",
-        "url" => nil,
-        "branch" => nil,
-        "commit_sha" => nil,
-        "number" => nil,
-        "job_id" => nil,
-        "message" => nil
-      })
-    end
-
-    it "returns env" do
-      fake_env("BUILDKITE", "true")
       fake_env("BUILDKITE_BUILD_ID", build_uuid)
       fake_env("BUILDKITE_BUILD_URL", build_url)
       fake_env("BUILDKITE_BRANCH", branch)
@@ -49,19 +22,44 @@ RSpec.describe "RSpec::Buildkite::Analytics::CI" do
       fake_env("BUILDKITE_BUILD_NUMBER", number)
       fake_env("BUILDKITE_JOB_ID", job_id)
       fake_env("BUILDKITE_MESSAGE", message)
+    end
 
-      result = RSpec::Buildkite::Analytics::CI.env
+    context "when BUILDKITE_BUILD_ID is set" do
+      before do
+        fake_env("BUILDKITE_BUILD_ID", build_uuid)
+      end
 
-      expect(result).to match({
-        "CI" => "buildkite",
-        "key" => build_uuid,
-        "url" => build_url,
-        "branch" => branch,
-        "commit_sha" => commit_sha,
-        "number" => number,
-        "job_id" => job_id,
-        "message" => message
-      })
+      it "returns all env" do
+        result = RSpec::Buildkite::Analytics::CI.env
+
+        expect(result).to match({
+          "CI" => "buildkite",
+          "key" => build_uuid,
+          "url" => build_url,
+          "branch" => branch,
+          "commit_sha" => commit_sha,
+          "number" => number,
+          "job_id" => job_id,
+          "message" => message
+        })
+      end
+    end
+
+    context "when BUILDKITE_BUILD_ID is not set" do
+      before do
+        allow(SecureRandom).to receive(:uuid) { "845ac829-2ab3-4bbb-9e24-3529755a6d37" }
+
+        fake_env("BUILDKITE_BUILD_ID", nil)
+      end
+
+      it "only returns the key" do
+        result = RSpec::Buildkite::Analytics::CI.env
+
+        expect(result).to match({
+          "CI" => nil,
+          "key" => "845ac829-2ab3-4bbb-9e24-3529755a6d37"
+        })
+      end
     end
   end
 end
