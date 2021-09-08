@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    rspec-buildkite-analytics (0.3.2)
+    rspec-buildkite-analytics (0.3.3)
       activesupport (>= 5.2, <= 7.0)
       rspec-core (~> 3.10)
       rspec-expectations (~> 3.10)
