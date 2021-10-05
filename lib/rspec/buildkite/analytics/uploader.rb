@@ -139,6 +139,8 @@ module RSpec::Buildkite::Analytics
               if (socket_url = json["cable"]) && (channel = json["channel"])
                 RSpec::Buildkite::Analytics.session = Session.new(socket_url, authorization_header, channel)
               end
+            when "503"
+              puts "Service Temporarily Unavailable. Please check https://buildkitestatus.com and try again later."
             else
               request_id = response.to_hash["x-request-id"]
               puts "Unknown error. If this error persists, please contact support+analytics@buildkite.com with this request ID `#{request_id}`."
