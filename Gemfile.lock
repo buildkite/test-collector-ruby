@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    rspec-buildkite-analytics (0.3.3)
+    rspec-buildkite-analytics (0.3.4)
       activesupport (>= 5.2, <= 7.0)
       rspec-core (~> 3.10)
       rspec-expectations (~> 3.10)
@@ -49,4 +49,4 @@ DEPENDENCIES
   rspec-buildkite-analytics!
 
 BUNDLED WITH
-   2.2.20
+   2.2.22

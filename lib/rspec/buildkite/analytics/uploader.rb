@@ -127,12 +127,12 @@ module RSpec::Buildkite::Analytics
             response = begin
               http.request(contact)
             rescue *REQUEST_EXCEPTIONS => e
-              puts "Error communicating with the server: #{e.message}"
+              puts "Buildkite Test Analytics: Error communicating with the server: #{e.message}"
             end
 
             case response.code
             when "401"
-              puts "Invalid Suite API key. Please double check your Suite API key."
+              puts "Buildkite Test Analytics: Invalid Suite API key. Please double check your Suite API key."
             when "200"
               json = JSON.parse(response.body)
 
@@ -141,10 +141,10 @@ module RSpec::Buildkite::Analytics
               end
             else
               request_id = response.to_hash["x-request-id"]
-              puts "Unknown error. If this error persists, please contact support+analytics@buildkite.com with this request ID `#{request_id}`."
+              puts "Buildkite Test Analytics: Unknown error. If this error persists, please contact support+analytics@buildkite.com with this request ID `#{request_id}`."
             end
           else
-            puts "No Suite API key provided. You can get the API key from your Suite settings page."
+            puts "Buildkite Test Analytics: No Suite API key provided. You can get the API key from your Suite settings page."
           end
         end
 
