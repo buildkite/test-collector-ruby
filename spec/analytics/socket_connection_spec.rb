@@ -47,5 +47,21 @@ RSpec.describe "RSpec::Buildkite::Analytics::SocketConnection" do
       expect(session_double).to  receive(:disconnected)
       socket_connection.transmit("hi")
     end
+
+    it "calls disconnected if it gets an IndexError" do
+      write_call_count = 0
+      allow(ssl_socket_double).to receive(:write) {
+        write_call_count += 1
+        # the first write is part of the handshaking process, so let it succeed
+        if write_call_count == 1
+          nil
+        else
+          raise IndexError
+        end
+      }
+
+      expect(session_double).to  receive(:disconnected)
+      socket_connection.transmit("hi")
+    end
   end
 end
