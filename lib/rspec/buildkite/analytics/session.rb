@@ -10,6 +10,7 @@ module RSpec::Buildkite::Analytics
     WAIT_BETWEEN_RECONNECTIONS = 5
 
     class RejectedSubscription < StandardError; end
+    class InitialConnectionFailure < StandardError; end
 
     def initialize(url, authorization_header, channel)
       @queue = Queue.new
@@ -25,8 +26,8 @@ module RSpec::Buildkite::Analytics
       @authorization_header = authorization_header
 
       connect
-    rescue TimeoutError => e
-      $stderr.puts "rspec-buildkite-analytics could not establish an initial connection with Buildkite. Please contact support."
+    rescue TimeoutError, InitialConnectionFailure => e
+      $stderr.puts "rspec-buildkite-analytics could not establish an initial connection with Buildkite due to #{e.message}. You may be missing some data for this test suite, please contact support."
     end
 
     def disconnected(connection)
@@ -138,25 +139,25 @@ module RSpec::Buildkite::Analytics
       wait_for_confirm
     end
 
-    def pop_with_timeout
-      Timeout.timeout(30, RSpec::Buildkite::Analytics::TimeoutError, "Waited 30 seconds") do
+    def pop_with_timeout(message_type)
+      Timeout.timeout(30, RSpec::Buildkite::Analytics::TimeoutError, "Timeout: Waited 30 seconds for #{message_type}") do
         @queue.pop
       end
     end
 
     def wait_for_welcome
-      welcome = pop_with_timeout
+      welcome = pop_with_timeout("welcome")
 
       if welcome && welcome != { "type" => "welcome" }
-        raise "Not a welcome: #{welcome.inspect}"
+        raise InitialConnectionFailure.new("Wrong message received, expected a welcome, but received: #{welcome.inspect}")
       end
     end
 
     def wait_for_confirm
-      confirm = pop_with_timeout
+      confirm = pop_with_timeout("confirm")
 
       if confirm && confirm != { "type" => "confirm_subscription", "identifier" => @channel }
-        raise "Not a confirm: #{confirm.inspect}"
+        raise InitialConnectionFailure.new("Wrong message received, expected a confirm, but received: #{confirm.inspect}")
       end
     end
 

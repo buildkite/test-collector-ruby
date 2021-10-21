@@ -25,6 +25,21 @@ RSpec.describe "RSpec::Buildkite::Analytics::Session" do
     stub_const("RSpec::Buildkite::Analytics::Session::CONFIRMATION_TIMEOUT", 5)
   end
 
+  describe "#initalize" do
+    before do
+      # mock the SocketConnection new method to send the confirm message, when it should be sending the welcome
+      allow(RSpec::Buildkite::Analytics::SocketConnection).to receive(:new) { |session, _, _|
+        @session = session
+        @session.handle(socket_double, {"type"=> "confirm_subscription"}.to_json)
+        socket_double
+      }
+    end
+
+    it "does not raise errors if there is a problem in initialization" do
+      expect{session}.not_to raise_error
+    end
+  end
+
   describe "#handle" do
     it "processes confirmations from the server" do
       session.send(:add_unconfirmed_idents, "./spec/analytics/session_spec.rb[1:1]", {"hi"=> "thing"})
