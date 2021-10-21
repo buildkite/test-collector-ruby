@@ -82,6 +82,16 @@ module RSpec::Buildkite::Analytics
         end
       rescue IOError
         # This is fine to ignore
+      rescue IndexError
+        # I don't like that we're doing this but I think it's the best of the options
+        #
+        # This relates to this issue https://github.com/ruby/openssl/issues/452
+        # A fix for it has been released but the repercussions of overriding
+        # the OpenSSL version in the stdlib seem worse than catching this error here.
+        if @socket
+          @session.disconnected(self)
+          disconnect
+        end
       end
     end
 
@@ -96,6 +106,16 @@ module RSpec::Buildkite::Analytics
       return unless @socket
       @session.disconnected(self)
       disconnect
+    rescue IndexError
+      # I don't like that we're doing this but I think it's the best of the options
+      #
+      # This relates to this issue https://github.com/ruby/openssl/issues/452
+      # A fix for it has been released but the repercussions of overriding
+      # the OpenSSL version in the stdlib seem worse than catching this error here.
+      if @socket
+        @session.disconnected(self)
+        disconnect
+      end
     end
 
     def close
