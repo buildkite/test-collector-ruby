@@ -3,7 +3,7 @@
 module RSpec
   module Buildkite
     module Analytics
-      VERSION = "0.3.4"
+      VERSION = "0.3.5"
     end
   end
 end
