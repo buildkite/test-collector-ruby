@@ -15,10 +15,7 @@ end
 
 Configure your API key:
 ```ruby
-RSpec::Buildkite::Analytics.configure do |config|
-  config.suite_key = "........"
-  # other config
-end
+RSpec::Buildkite::Analytics.configure(token: "........")
 ```
 
 Run bundler to install the gem and update your `Gemfile.lock`:
