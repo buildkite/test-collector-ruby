@@ -2,6 +2,8 @@ module RSpec::Buildkite::Analytics
   class Reporter
     RSpec::Core::Formatters.register self, :example_passed, :example_failed, :example_pending
 
+    attr_reader :output
+
     def initialize(output)
       @output = output
     end
