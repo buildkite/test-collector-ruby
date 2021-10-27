@@ -29,6 +29,8 @@ RSpec.describe "RSpec::Buildkite::Analytics::SocketConnection" do
 
     allow(WebSocket::Frame::Outgoing::Client).to receive(:new).and_return(frame_double)
     allow(frame_double).to receive(:to_s).and_return("hi")
+
+    allow(session_double).to receive_message_chain("logger.write").with(anything).and_return(nil)
   end
 
   describe "#transmit" do
@@ -44,7 +46,7 @@ RSpec.describe "RSpec::Buildkite::Analytics::SocketConnection" do
         end
       }
 
-      expect(session_double).to  receive(:disconnected)
+      expect(session_double).to receive(:disconnected)
       socket_connection.transmit("hi")
     end
 
@@ -60,7 +62,7 @@ RSpec.describe "RSpec::Buildkite::Analytics::SocketConnection" do
         end
       }
 
-      expect(session_double).to  receive(:disconnected)
+      expect(session_double).to receive(:disconnected)
       socket_connection.transmit("hi")
     end
   end

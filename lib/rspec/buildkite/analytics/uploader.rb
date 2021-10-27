@@ -164,9 +164,20 @@ module RSpec::Buildkite::Analytics
         end
 
         config.after(:suite) do
-          # This needs the lonely operater as the session will be nil
-          # if auth against the API token fails
-          RSpec::Buildkite::Analytics.session&.close
+          if RSpec::Buildkite::Analytics.session.present?
+            RSpec::Buildkite::Analytics.session.close
+
+            # Write the debug file, if debug mode is enabled
+            if RSpec::Buildkite::Analytics.debug_enabled
+              filename = "#{RSpec::Buildkite::Analytics.debug_filepath}/bk-analytics-#{DateTime.current.strftime("%F-%R:%S")}-#{ENV["BUILDKITE_JOB_ID"]}.log.gz"
+
+              File.open(filename, "wb") do |f|
+                gz = Zlib::GzipWriter.new(f)
+                gz.puts(RSpec::Buildkite::Analytics.session.logger.to_array)
+                gz.close
+              end
+            end
+          end
         end
       end
 

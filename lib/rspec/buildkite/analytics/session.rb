@@ -12,6 +12,28 @@ module RSpec::Buildkite::Analytics
     class RejectedSubscription < StandardError; end
     class InitialConnectionFailure < StandardError; end
 
+    class Logger
+      def initialize
+        @log = Queue.new
+      end
+
+      def write(str)
+        @log << "#{Time.now.strftime("%F-%R:%S.%9N")} #{Thread.current} #{str}"
+      end
+
+      def to_array
+        # This empty check is important cos calling pop on a Queue is blocking until
+        # it's not empty
+        if @log.empty?
+          []
+        else
+          Array.new(@log.size) { @log.pop }
+        end
+      end
+    end
+
+    attr_reader :logger
+
     def initialize(url, authorization_header, channel)
       @queue = Queue.new
       @channel = channel
@@ -24,6 +46,8 @@ module RSpec::Buildkite::Analytics
 
       @url = url
       @authorization_header = authorization_header
+
+      @logger = Logger.new
 
       connect
     rescue TimeoutError, InitialConnectionFailure => e
@@ -43,16 +67,19 @@ module RSpec::Buildkite::Analytics
         # time the mutex is released, the value of @connection has been refreshed, and so
         # the second thread returns early and does not reattempt the reconnection.
         return unless connection == @connection
+        @logger.write("starting reconnection")
 
         begin
           reconnection_count += 1
           connect
         rescue SocketConnection::HandshakeError, RejectedSubscription, TimeoutError, SocketConnection::SocketError => e
+          @logger.write("failed reconnection attempt #{reconnection_count} due to #{e}")
           if reconnection_count > MAX_RECONNECTION_ATTEMPTS
             $stderr.puts "rspec-buildkite-analytics experienced a disconnection and could not reconnect to Buildkite due to #{e.message}. Please contact support."
             raise e
           else
             sleep(WAIT_BETWEEN_RECONNECTIONS)
+            @logger.write("retrying reconnection")
             retry
           end
         end
@@ -62,6 +89,7 @@ module RSpec::Buildkite::Analytics
 
     def close()
       @closing = true
+      @logger.write("closing socket connection")
 
       # Because the server only sends us confirmations after every 10mb of
       # data it uploads to S3, we'll never get confirmation of the
@@ -70,6 +98,7 @@ module RSpec::Buildkite::Analytics
       send_eot
 
       @idents_mutex.synchronize do
+        @logger.write("waiting for last confirm")
         # Here, we sleep for 75 seconds while waiting for the server to confirm the last idents.
         # We are woken up when the unconfirmed_idents is empty, and given back the mutex to
         # continue operation.
@@ -78,6 +107,7 @@ module RSpec::Buildkite::Analytics
 
       # Then we always disconnect cos we can't wait forever? 🤷‍♀️
       @connection.close
+      @logger.write("socket connection closed")
     end
 
     def handle(_connection, data)
@@ -86,11 +116,14 @@ module RSpec::Buildkite::Analytics
       when "ping"
         # In absence of other message, the server sends us a ping every 3 seconds
         # We are currently not doing anything with these
+        @logger.write("received ping")
       when "welcome", "confirm_subscription"
         # Push these two messages onto the queue, so that we block on waiting for the
         # initializing phase to complete
         @queue.push(data)
+      @logger.write("received #{data['type']}")
       when "reject_subscription"
+        @logger.write("received rejected_subscription")
         raise RejectedSubscription
       else
         process_message(data)
@@ -103,6 +136,8 @@ module RSpec::Buildkite::Analytics
       add_unconfirmed_idents(result.id, result_as_json)
 
       transmit_results([result_as_json])
+
+      @logger.write("transmitted #{result.id}")
     end
 
     def unconfirmed_idents_count
@@ -125,6 +160,8 @@ module RSpec::Buildkite::Analytics
     end
 
     def connect
+      @logger.write("starting socket connection process")
+
       @connection = SocketConnection.new(self, @url, {
         "Authorization" => @authorization_header,
       })
@@ -137,6 +174,8 @@ module RSpec::Buildkite::Analytics
       })
 
       wait_for_confirm
+
+      @logger.write("connected")
     end
 
     def pop_with_timeout(message_type)
@@ -174,6 +213,8 @@ module RSpec::Buildkite::Analytics
         # Remove received idents from unconfirmed_idents
         idents.each { |key| @unconfirmed_idents.delete(key) }
 
+        @logger.write("received confirm for indentifiers: #{idents.join(", ")}")
+
         # This @empty ConditionVariable broadcasts every time that @unconfirmed_idents is
         # empty, which will happen about every 10mb of data as that's when the server
         # sends back confirmations.
@@ -194,6 +235,8 @@ module RSpec::Buildkite::Analytics
           "action" => "end_of_transmission"
         }.to_json
       })
+
+      @logger.write("transmitted EOT")
     end
 
     def process_message(data)
@@ -205,6 +248,7 @@ module RSpec::Buildkite::Analytics
         remove_unconfirmed_idents(data["message"]["confirm"])
       else
         # unhandled message
+        @logger.write("received unhandled message #{data["message"]}")
       end
     end
 
@@ -214,7 +258,11 @@ module RSpec::Buildkite::Analytics
       end
 
       # send the contents of the buffer, unless it's empty
-      transmit_results(data) unless data.empty?
+      unless data.empty?
+        @logger.write("retransmitting data")
+        transmit_results(data)
+      end
+
       # if we were disconnected in the closing phase, then resend the EOT
       # message so the server can persist the last upload part
       send_eot if @closing
