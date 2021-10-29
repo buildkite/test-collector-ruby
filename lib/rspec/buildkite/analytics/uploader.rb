@@ -65,7 +65,7 @@ module RSpec::Buildkite::Analytics
       private
 
       def generate_file_name(example)
-        file_path_regex = /^(.*?\.rb)/
+        file_path_regex = /^(.*?\.(rb|feature))/
         identifier_file_name = example.id[file_path_regex]
         location_file_name = example.location[file_path_regex]
 
