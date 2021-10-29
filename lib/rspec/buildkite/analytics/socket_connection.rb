@@ -75,7 +75,7 @@ module RSpec::Buildkite::Analytics
             @session.handle(self, data.data)
           end
         end
-      rescue EOFError
+      rescue EOFError, Errno::ECONNRESET
         if @socket
           @session.disconnected(self)
           disconnect
@@ -102,7 +102,7 @@ module RSpec::Buildkite::Analytics
       raw_data = data.to_json
       frame = WebSocket::Frame::Outgoing::Client.new(data: raw_data, type: :text, version: @version)
       @socket.write(frame.to_s)
-    rescue Errno::EPIPE, OpenSSL::SSL::SSLError => e
+    rescue Errno::EPIPE, Errno::ECONNRESET, OpenSSL::SSL::SSLError => e
       return unless @socket
       @session.disconnected(self)
       disconnect
