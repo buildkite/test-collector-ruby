@@ -13,7 +13,7 @@ module RSpec::Buildkite::Analytics
       uri = URI.parse(url)
       @session = session
       protocol = "http"
-
+      @socket_mutex = Mutex.new
       begin
         socket = TCPSocket.new(uri.host, uri.port || (uri.scheme == "wss" ? 443 : 80))
 
@@ -126,10 +126,12 @@ module RSpec::Buildkite::Analytics
     private
 
     def disconnect
-      socket = @socket
-      @socket = nil
-      socket&.close
-      @thread&.join unless @thread == Thread.current
+      @socket_mutex.synchronize do
+        socket = @socket
+        @socket = nil
+        socket&.close
+        @thread&.join unless @thread == Thread.current
+      end
     end
   end
 end
