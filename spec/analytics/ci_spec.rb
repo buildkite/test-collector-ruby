@@ -11,6 +11,7 @@ RSpec.describe "RSpec::Buildkite::Analytics::CI" do
     let(:number) { "4242" }
     let(:job_id) { "j3459ui2-l0dk-4829-i029-97999t1e09d6" }
     let(:message) { "Merge pull request #1 from buildkite/branch\n commit title" }
+    let(:debug) { "true" }
 
     before do
       allow(ENV).to receive(:[]).and_call_original
@@ -22,6 +23,7 @@ RSpec.describe "RSpec::Buildkite::Analytics::CI" do
       fake_env("BUILDKITE_BUILD_NUMBER", number)
       fake_env("BUILDKITE_JOB_ID", job_id)
       fake_env("BUILDKITE_MESSAGE", message)
+      fake_env("BUILDKITE_ANALYTICS_DEBUG_ENABLED", debug)
     end
 
     context "when BUILDKITE_BUILD_ID is set" do
@@ -40,7 +42,8 @@ RSpec.describe "RSpec::Buildkite::Analytics::CI" do
           "commit_sha" => commit_sha,
           "number" => number,
           "job_id" => job_id,
-          "message" => message
+          "message" => message,
+          "debug" => debug
         })
       end
     end
@@ -52,12 +55,13 @@ RSpec.describe "RSpec::Buildkite::Analytics::CI" do
         fake_env("BUILDKITE_BUILD_ID", nil)
       end
 
-      it "only returns the key" do
+      it "returns the key and debug" do
         result = RSpec::Buildkite::Analytics::CI.env
 
         expect(result).to match({
           "CI" => nil,
-          "key" => "845ac829-2ab3-4bbb-9e24-3529755a6d37"
+          "key" => "845ac829-2ab3-4bbb-9e24-3529755a6d37",
+          "debug" => debug
         })
       end
     end
