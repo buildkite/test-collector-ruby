@@ -9,9 +9,11 @@ module RSpec::Buildkite::Analytics
     class HandshakeError < StandardError; end
     class SocketError < StandardError; end
 
-    def initialize(session, url, headers)
+    SOCKET_READ_TIMEOUT_SECONDS = 0.1
+    SOCKET_READ_UPTO_BYTES = 4096
+
+    def initialize(url, headers)
       uri = URI.parse(url)
-      @session = session
       protocol = "http"
 
       begin
@@ -63,41 +65,30 @@ module RSpec::Buildkite::Analytics
 
       @version = handshake.version
 
-      # Setting up a new thread that listens on the socket, and processes incoming
-      # comms from the server
-      @thread = Thread.new do
-        @session.logger.write("listening in on socket")
-        frame = WebSocket::Frame::Incoming::Client.new
+      @frame = WebSocket::Frame::Incoming::Client.new
+    end
 
-        while @socket
-          frame << @socket.readpartial(4096)
+    # If a new message from the server is available, read it from the socket. Otherwise return
+    # nil. This won't block waiting for a message.
+    def next_message
+      # TODO why would there be no socket?
+      raise "oh no, no socket" if @socket.nil?
 
-          while data = frame.next
-            @session.handle(self, data.data)
-          end
-        end
-      rescue EOFError, Errno::ECONNRESET => e
-        @session.logger.write("#{e}")
-        if @socket
-          @session.logger.write("attempting disconnected flow")
-          @session.disconnected(self)
-          disconnect
-        end
-      rescue IOError
-        # This is fine to ignore
-        @session.logger.write("IOError")
-      rescue IndexError
-        # I don't like that we're doing this but I think it's the best of the options
-        #
-        # This relates to this issue https://github.com/ruby/openssl/issues/452
-        # A fix for it has been released but the repercussions of overriding
-        # the OpenSSL version in the stdlib seem worse than catching this error here.
-        @session.logger.write("IndexError")
-        if @socket
-          @session.logger.write("attempting disconnected flow")
-          @session.disconnected(self)
-          disconnect
-        end
+      if data = @frame.next
+        return JSON.parse(data.data)
+      end
+
+      ready = IO.select([@socket], nil, nil, SOCKET_READ_TIMEOUT_SECONDS)
+
+      # IO.readpartial will block if no data is ready to read, so only call it when IO.select has
+      # said there's data waiting for us. We're read *up to* the requested number of bytes if they're
+      # available, but won't wait for exactly that many
+      if ready
+        @frame << @socket.readpartial(SOCKET_READ_UPTO_BYTES)
+      end
+
+      if data = @frame.next
+        return JSON.parse(data.data)
       end
     end
 
@@ -111,20 +102,7 @@ module RSpec::Buildkite::Analytics
     rescue Errno::EPIPE, Errno::ECONNRESET, OpenSSL::SSL::SSLError => e
       return unless @socket
       @session.logger.write("got #{e}, attempting disconnected flow")
-      @session.disconnected(self)
       disconnect
-    rescue IndexError
-      # I don't like that we're doing this but I think it's the best of the options
-      #
-      # This relates to this issue https://github.com/ruby/openssl/issues/452
-      # A fix for it has been released but the repercussions of overriding
-      # the OpenSSL version in the stdlib seem worse than catching this error here.
-      @session.logger.write("IndexError")
-      if @socket
-        @session.logger.write("attempting disconnected flow")
-        @session.disconnected(self)
-        disconnect
-      end
     end
 
     def close
@@ -140,7 +118,6 @@ module RSpec::Buildkite::Analytics
       socket = @socket
       @socket = nil
       socket&.close
-      @thread&.join unless @thread == Thread.current
     end
   end
 end
