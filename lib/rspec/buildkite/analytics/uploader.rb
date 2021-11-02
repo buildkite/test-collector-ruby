@@ -162,23 +162,6 @@ module RSpec::Buildkite::Analytics
           trace = RSpec::Buildkite::Analytics::Uploader::Trace.new(example, tracer.history)
           RSpec::Buildkite::Analytics.uploader.traces << trace
         end
-
-        config.after(:suite) do
-          if RSpec::Buildkite::Analytics.session.present?
-            RSpec::Buildkite::Analytics.session.close
-
-            # Write the debug file, if debug mode is enabled
-            if RSpec::Buildkite::Analytics.debug_enabled
-              filename = "#{RSpec::Buildkite::Analytics.debug_filepath}/bk-analytics-#{DateTime.current.strftime("%F-%R:%S")}-#{ENV["BUILDKITE_JOB_ID"]}.log.gz"
-
-              File.open(filename, "wb") do |f|
-                gz = Zlib::GzipWriter.new(f)
-                gz.puts(RSpec::Buildkite::Analytics.session.logger.to_array)
-                gz.close
-              end
-            end
-          end
-        end
       end
 
       RSpec::Buildkite::Analytics::Network.configure

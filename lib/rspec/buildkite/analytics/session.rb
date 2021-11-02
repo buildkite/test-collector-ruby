@@ -87,8 +87,9 @@ module RSpec::Buildkite::Analytics
       retransmit
     end
 
-    def close()
+    def close(examples_count)
       @closing = true
+      @examples_count = examples_count
       @logger.write("closing socket connection")
 
       # Because the server only sends us confirmations after every 10mb of
@@ -232,7 +233,8 @@ module RSpec::Buildkite::Analytics
         "identifier" => @channel,
         "command" => "message",
         "data" => {
-          "action" => "end_of_transmission"
+          "action" => "end_of_transmission",
+          "examples_count" => @examples_count.to_json
         }.to_json
       })
 
