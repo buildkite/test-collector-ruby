@@ -162,12 +162,6 @@ module RSpec::Buildkite::Analytics
           trace = RSpec::Buildkite::Analytics::Uploader::Trace.new(example, tracer.history)
           RSpec::Buildkite::Analytics.uploader.traces << trace
         end
-
-        config.after(:suite) do
-          # This needs the lonely operater as the session will be nil
-          # if auth against the API token fails
-          RSpec::Buildkite::Analytics.session&.close
-        end
       end
 
       RSpec::Buildkite::Analytics::Network.configure

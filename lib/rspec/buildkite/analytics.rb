@@ -15,11 +15,15 @@ module RSpec::Buildkite::Analytics
     attr_accessor :url
     attr_accessor :uploader
     attr_accessor :session
+    attr_accessor :debug_enabled
+    attr_accessor :debug_filepath
   end
 
-  def self.configure(token: nil, url: nil)
+  def self.configure(token: nil, url: nil, debug_enabled: false, debug_filepath: nil)
     self.api_token = token || ENV["BUILDKITE_ANALYTICS_TOKEN"]
     self.url = url || DEFAULT_URL
+    self.debug_enabled = debug_enabled || !!(ENV["BUILDKITE_ANALYTICS_DEBUG_ENABLED"])
+    self.debug_filepath = debug_filepath || ENV["BUILDKITE_ANALYTICS_DEBUG_FILEPATH"]
 
     require_relative "analytics/uploader"
 

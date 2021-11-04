@@ -6,6 +6,14 @@ require "rspec/buildkite/analytics/socket_connection"
 RSpec.describe "RSpec::Buildkite::Analytics::Session" do
   let(:socket_double) { instance_double("RSpec::Buildkite::Analytics::SocketConnection") }
   let(:session) { RSpec::Buildkite::Analytics::Session.new("fake_url", "fake_auth", "fake_channel") }
+  let(:examples_count) do
+    {
+      examples: 3,
+      failed: 0,
+      pending: 0,
+      errors_outside_examples: 0
+    }
+  end
 
   before do
     # mock the SocketConnection new method to send the welcome message
@@ -59,14 +67,15 @@ RSpec.describe "RSpec::Buildkite::Analytics::Session" do
         "command" => "message",
         "identifier" => "fake_channel",
         "data" => {
-          "action" => "end_of_transmission"
+          "action" => "end_of_transmission",
+          "examples_count" => examples_count.to_json
         }.to_json
       }) { Thread.new do sleep(1); session.handle(socket_double, {"type"=> "message", "identifier"=> "fake_channel", "message" => {"confirm"=> ["./spec/analytics/session_spec.rb[1:1]", "./spec/analytics/session_spec.rb[1:2]"]}}.to_json) end }
 
       expect(socket_double).to receive(:close)
       expect(session.instance_variable_get(:@empty)).to receive(:wait).and_call_original
 
-      session.close()
+      session.close(examples_count)
     end
 
     it "doesn't wait if the unconfirmed_idents is already empty" do
@@ -74,14 +83,15 @@ RSpec.describe "RSpec::Buildkite::Analytics::Session" do
         "command" => "message",
         "identifier" => "fake_channel",
         "data" => {
-          "action" => "end_of_transmission"
+          "action" => "end_of_transmission",
+          "examples_count" => examples_count.to_json
         }.to_json
       })
 
       expect(socket_double).to receive(:close)
       expect(session.instance_variable_get(:@empty)).not_to receive(:wait)
 
-      session.close()
+      session.close(examples_count)
     end
 
     it "waits for multiple confirmation messages from server" do
@@ -92,7 +102,8 @@ RSpec.describe "RSpec::Buildkite::Analytics::Session" do
         "command" => "message",
         "identifier" => "fake_channel",
         "data" => {
-          "action" => "end_of_transmission"
+          "action" => "end_of_transmission",
+          "examples_count" => examples_count.to_json
         }.to_json
       }) { Thread.new do sleep(1); session.handle(socket_double, {"type"=> "message", "identifier"=> "fake_channel", "message" => {"confirm"=> ["./spec/analytics/session_spec.rb[1:2]"]}}.to_json) end; Thread.new do sleep(2); session.handle(socket_double, {"type"=> "message", "identifier"=> "fake_channel", "message" => {"confirm"=> ["./spec/analytics/session_spec.rb[1:2]"]}}.to_json) end}
 
@@ -102,7 +113,7 @@ RSpec.describe "RSpec::Buildkite::Analytics::Session" do
 
       expect(socket_double).to receive(:close)
 
-      session.close()
+      session.close(examples_count)
     end
   end
 
@@ -328,7 +339,8 @@ RSpec.describe "RSpec::Buildkite::Analytics::Session" do
         "command" => "message",
         "identifier" => "fake_channel",
         "data" => {
-          "action" => "end_of_transmission"
+          "action" => "end_of_transmission",
+          "examples_count" => examples_count.to_json
         }.to_json
       }).twice {
         call_count += 1
@@ -351,7 +363,7 @@ RSpec.describe "RSpec::Buildkite::Analytics::Session" do
 
       expect(socket_double).to receive(:close)
 
-      session.close
+      session.close(examples_count)
     end
 
     it "raises error if it can't reconnect after 3 goes" do

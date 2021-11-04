@@ -66,6 +66,7 @@ module RSpec::Buildkite::Analytics
       # Setting up a new thread that listens on the socket, and processes incoming
       # comms from the server
       @thread = Thread.new do
+        @session.logger.write("listening in on socket")
         frame = WebSocket::Frame::Incoming::Client.new
 
         while @socket
@@ -75,20 +76,25 @@ module RSpec::Buildkite::Analytics
             @session.handle(self, data.data)
           end
         end
-      rescue EOFError, Errno::ECONNRESET
+      rescue EOFError, Errno::ECONNRESET => e
+        @session.logger.write("#{e}")
         if @socket
+          @session.logger.write("attempting disconnected flow")
           @session.disconnected(self)
           disconnect
         end
       rescue IOError
         # This is fine to ignore
+        @session.logger.write("IOError")
       rescue IndexError
         # I don't like that we're doing this but I think it's the best of the options
         #
         # This relates to this issue https://github.com/ruby/openssl/issues/452
         # A fix for it has been released but the repercussions of overriding
         # the OpenSSL version in the stdlib seem worse than catching this error here.
+        @session.logger.write("IndexError")
         if @socket
+          @session.logger.write("attempting disconnected flow")
           @session.disconnected(self)
           disconnect
         end
@@ -104,6 +110,7 @@ module RSpec::Buildkite::Analytics
       @socket.write(frame.to_s)
     rescue Errno::EPIPE, Errno::ECONNRESET, OpenSSL::SSL::SSLError => e
       return unless @socket
+      @session.logger.write("got #{e}, attempting disconnected flow")
       @session.disconnected(self)
       disconnect
     rescue IndexError
@@ -112,13 +119,16 @@ module RSpec::Buildkite::Analytics
       # This relates to this issue https://github.com/ruby/openssl/issues/452
       # A fix for it has been released but the repercussions of overriding
       # the OpenSSL version in the stdlib seem worse than catching this error here.
+      @session.logger.write("IndexError")
       if @socket
+        @session.logger.write("attempting disconnected flow")
         @session.disconnected(self)
         disconnect
       end
     end
 
     def close
+      @session.logger.write("socket close")
       transmit(nil, type: :close)
       disconnect
     end
@@ -126,6 +136,7 @@ module RSpec::Buildkite::Analytics
     private
 
     def disconnect
+      @session.logger.write("socket disconnect")
       socket = @socket
       @socket = nil
       socket&.close
