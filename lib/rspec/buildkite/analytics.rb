@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "timeout"
+require "tmpdir"
 
 require_relative "analytics/version"
 
@@ -23,7 +24,7 @@ module RSpec::Buildkite::Analytics
     self.api_token = token || ENV["BUILDKITE_ANALYTICS_TOKEN"]
     self.url = url || DEFAULT_URL
     self.debug_enabled = debug_enabled || !!(ENV["BUILDKITE_ANALYTICS_DEBUG_ENABLED"])
-    self.debug_filepath = debug_filepath || ENV["BUILDKITE_ANALYTICS_DEBUG_FILEPATH"]
+    self.debug_filepath = debug_filepath || ENV["BUILDKITE_ANALYTICS_DEBUG_FILEPATH"] || Dir.tmpdir
 
     require_relative "analytics/uploader"
 
