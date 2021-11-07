@@ -1,3 +1,5 @@
+require "time"
+
 module RSpec::Buildkite::Analytics
   class Reporter
     RSpec::Core::Formatters.register self, :example_passed, :example_failed, :example_pending, :dump_summary
@@ -33,7 +35,7 @@ module RSpec::Buildkite::Analytics
 
         # Write the debug file, if debug mode is enabled
         if RSpec::Buildkite::Analytics.debug_enabled
-          filename = "#{RSpec::Buildkite::Analytics.debug_filepath}/bk-analytics-#{DateTime.current.strftime("%F-%R:%S")}-#{ENV["BUILDKITE_JOB_ID"]}.log.gz"
+          filename = "#{RSpec::Buildkite::Analytics.debug_filepath}/bk-analytics-#{Time.now.strftime("%F-%R:%S")}-#{ENV["BUILDKITE_JOB_ID"]}.log.gz"
 
           File.open(filename, "wb") do |f|
             gz = Zlib::GzipWriter.new(f)
