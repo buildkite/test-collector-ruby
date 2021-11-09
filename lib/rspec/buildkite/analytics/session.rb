@@ -40,6 +40,7 @@ module RSpec::Buildkite::Analytics
 
       @unconfirmed_idents = {}
       @idents_mutex = Mutex.new
+      @send_queue = Queue.new
       @empty = ConditionVariable.new
       @closing = false
       @reconnection_mutex = Mutex.new
@@ -108,6 +109,8 @@ module RSpec::Buildkite::Analytics
 
       # Then we always disconnect cos we can't wait forever? 🤷‍♀️
       @connection.close
+      # We kill the write thread cos it's got a while loop in it, so it won't finish otherwise
+      @write_thread.kill
       @logger.write("socket connection closed")
     end
 
@@ -132,13 +135,9 @@ module RSpec::Buildkite::Analytics
     end
 
     def write_result(result)
-      result_as_json = result.as_json
+      queue_and_track_result(result.id, result.as_json)
 
-      add_unconfirmed_idents(result.id, result_as_json)
-
-      transmit_results([result_as_json])
-
-      @logger.write("transmitted #{result.id}")
+      @logger.write("added #{result.id} to send queue")
     end
 
     def unconfirmed_idents_count
@@ -148,17 +147,6 @@ module RSpec::Buildkite::Analytics
     end
 
     private
-
-    def transmit_results(results_as_json)
-      @connection.transmit({
-        "identifier" => @channel,
-        "command" => "message",
-        "data" => {
-          "action" => "record_results",
-          "results" => results_as_json
-          }.to_json
-        })
-    end
 
     def connect
       @logger.write("starting socket connection process")
@@ -177,6 +165,29 @@ module RSpec::Buildkite::Analytics
       wait_for_confirm
 
       @logger.write("connected")
+
+      @write_thread = Thread.new do
+        @logger.write("hello from write thread")
+        # Pretty sure this eternal loop is fine cos the call to queue.pop is blocking
+        loop do
+          data = @send_queue.pop
+          message_type = data["action"]
+          @connection.transmit({
+            "identifier" => @channel,
+            "command" => "message",
+            "data" => data.to_json
+          })
+
+          if RSpec::Buildkite::Analytics.debug_enabled
+            data = JSON.parse(message["data"])
+            message_type = data["action"]
+            ids = if message_type == "record_results"
+              data["results"].map { |result| result["id"] }
+            end
+            @logger.write("transmitted #{message_type} #{ids}")
+          end
+        end
+      end
     end
 
     def pop_with_timeout(message_type)
@@ -201,9 +212,16 @@ module RSpec::Buildkite::Analytics
       end
     end
 
-    def add_unconfirmed_idents(ident, data)
+    def queue_and_track_result(ident, result_as_json)
       @idents_mutex.synchronize do
-        @unconfirmed_idents[ident] = data
+        @unconfirmed_idents[ident] = result_as_json
+
+        data = {
+          "action" => "record_results",
+          "results" => [result_as_json]
+        }
+
+        @send_queue << data
       end
     end
 
@@ -228,17 +246,22 @@ module RSpec::Buildkite::Analytics
 
     def send_eot
       # Expect server to respond with data of indentifiers last upload part
+      data = {
+        "action" => "end_of_transmission",
+        "examples_count" => @examples_count.to_json
+      }
 
-      @connection.transmit({
-        "identifier" => @channel,
-        "command" => "message",
-        "data" => {
-          "action" => "end_of_transmission",
-          "examples_count" => @examples_count.to_json
-        }.to_json
-      })
+      # We grab the idents mutex here (even though we aren't modifying idents)
+      # because the idents array needs to stay in sync with messages
+      # that are put on the send queue. There just isn't any
+      # corresponding ident to track here, but we still grab the
+      # mutex in case there were any last results to be added
+      # to the queue
+      @idents_mutex.synchronize do
+        @send_queue << data
+      end
 
-      @logger.write("transmitted EOT")
+      @logger.write("added EOT to send queue")
     end
 
     def process_message(data)
@@ -254,9 +277,20 @@ module RSpec::Buildkite::Analytics
       end
     end
 
-    def retransmit
-      data = @idents_mutex.synchronize do
-        @unconfirmed_idents.values
+    def queue_retransmit_message
+      @idents_mutex.synchronize do
+        results = @unconfirmed_idents.values
+
+        # queue the contents of the buffer, unless it's empty
+        unless results.empty?
+          data = {
+            "action" => "record_results",
+            "results" => results.to_json
+          }
+
+          @logger.write("retransmitted results #{@unconfirmed_idents.keys}")
+          @send_queue << data
+        end
       end
 
       # send the contents of the buffer, unless it's empty
