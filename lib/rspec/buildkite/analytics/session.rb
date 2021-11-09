@@ -35,7 +35,7 @@ module RSpec::Buildkite::Analytics
     attr_reader :logger
 
     def initialize(url, authorization_header, channel)
-      @queue = Queue.new
+      @establish_subscription_queue = Queue.new
       @channel = channel
 
       @unconfirmed_idents = {}
@@ -121,7 +121,7 @@ module RSpec::Buildkite::Analytics
       when "welcome", "confirm_subscription"
         # Push these two messages onto the queue, so that we block on waiting for the
         # initializing phase to complete
-        @queue.push(data)
+        @establish_subscription_queue.push(data)
       @logger.write("received #{data['type']}")
       when "reject_subscription"
         @logger.write("received rejected_subscription")
@@ -181,7 +181,7 @@ module RSpec::Buildkite::Analytics
 
     def pop_with_timeout(message_type)
       Timeout.timeout(30, RSpec::Buildkite::Analytics::TimeoutError, "Timeout: Waited 30 seconds for #{message_type}") do
-        @queue.pop
+        @establish_subscription_queue.pop
       end
     end
 
