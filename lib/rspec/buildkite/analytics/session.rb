@@ -43,6 +43,8 @@ module RSpec::Buildkite::Analytics
       @send_queue = Queue.new
       @empty = ConditionVariable.new
       @closing = false
+      @eot_queued = false
+      @eot_queued_mutex = Mutex.new
       @reconnection_mutex = Mutex.new
 
       @url = url
@@ -56,7 +58,6 @@ module RSpec::Buildkite::Analytics
     end
 
     def disconnected(connection)
-      reconnection_count = 0
       @reconnection_mutex.synchronize do
         # When the first thread detects a disconnection, it calls the disconnect method
         # with the current connection. This thread grabs the reconnection mutex and does the
@@ -69,6 +70,8 @@ module RSpec::Buildkite::Analytics
         # the second thread returns early and does not reattempt the reconnection.
         return unless connection == @connection
         @logger.write("starting reconnection")
+
+        reconnection_count = 0
 
         begin
           reconnection_count += 1
@@ -101,7 +104,9 @@ module RSpec::Buildkite::Analytics
 
       @idents_mutex.synchronize do
         @logger.write("waiting for last confirm")
-        # Here, we sleep for 75 seconds while waiting for the server to confirm the last idents.
+        # Here, we sleep for 75 seconds while waiting for the send
+        # queue to be drained and for the server to confirm the last
+        # idents.
         # We are woken up when the unconfirmed_idents is empty, and given back the mutex to
         # continue operation.
         @empty.wait(@idents_mutex, CONFIRMATION_TIMEOUT) unless @unconfirmed_idents.empty?
@@ -110,7 +115,7 @@ module RSpec::Buildkite::Analytics
       # Then we always disconnect cos we can't wait forever? 🤷‍♀️
       @connection.close
       # We kill the write thread cos it's got a while loop in it, so it won't finish otherwise
-      @write_thread.kill
+      @write_thread&.kill
       @logger.write("socket connection closed")
     end
 
@@ -166,12 +171,32 @@ module RSpec::Buildkite::Analytics
 
       @logger.write("connected")
 
+      # As this connect method can be called multiple times in the
+      # reconnection process, kill prev write threads (if any) before
+      # setting up the new one
+      @write_thread&.kill
+
       @write_thread = Thread.new do
         @logger.write("hello from write thread")
         # Pretty sure this eternal loop is fine cos the call to queue.pop is blocking
         loop do
           data = @send_queue.pop
           message_type = data["action"]
+
+          if message_type == "end_of_transmission"
+            # Because of the unpredictable sequencing between the test suite finishing
+            # (EOT gets queued) and disconnections happening (retransmit results gets
+            # queued), we don't want to send an EOT before any retransmits are sent.
+            if @send_queue.length > 0
+              @send_queue << data
+              @logger.write("putting eot at back of queue")
+              next
+            end
+            @eot_queued_mutex.synchronize do
+              @eot_queued = false
+            end
+          end
+
           @connection.transmit({
             "identifier" => @channel,
             "command" => "message",
@@ -182,7 +207,12 @@ module RSpec::Buildkite::Analytics
             data = JSON.parse(message["data"])
             message_type = data["action"]
             ids = if message_type == "record_results"
-              data["results"].map { |result| result["id"] }
+              if data["results"].is_a?(Array)
+                data["results"].map { |result| result["id"] }
+              else
+                results = JSON.parse(data["results"])
+                results.map { |result| result["id"] }
+              end
             end
             @logger.write("transmitted #{message_type} #{ids}")
           end
@@ -240,28 +270,29 @@ module RSpec::Buildkite::Analytics
         #
         # However, there aren't any threads waiting on this signal until after we
         # send the EOT message, so the prior broadcasts shouldn't do anything.
-        @empty.broadcast if @unconfirmed_idents.empty?
+        if @unconfirmed_idents.empty?
+          @empty.broadcast
+          @logger.write("broadcast empty")
+        else
+          @logger.write("still waiting on confirm for #{@unconfirmed_idents.keys}")
+        end
       end
     end
 
     def send_eot
-      # Expect server to respond with data of indentifiers last upload part
-      data = {
-        "action" => "end_of_transmission",
-        "examples_count" => @examples_count.to_json
-      }
+      @eot_queued_mutex.synchronize do
+        return if @eot_queued
+        # Expect server to respond with data of indentifiers last upload part
+        data = {
+          "action" => "end_of_transmission",
+          "examples_count" => @examples_count.to_json
+        }
 
-      # We grab the idents mutex here (even though we aren't modifying idents)
-      # because the idents array needs to stay in sync with messages
-      # that are put on the send queue. There just isn't any
-      # corresponding ident to track here, but we still grab the
-      # mutex in case there were any last results to be added
-      # to the queue
-      @idents_mutex.synchronize do
         @send_queue << data
-      end
+        @eot_queued = true
 
-      @logger.write("added EOT to send queue")
+        @logger.write("added EOT to send queue")
+      end
     end
 
     def process_message(data)
@@ -277,7 +308,7 @@ module RSpec::Buildkite::Analytics
       end
     end
 
-    def queue_retransmit_message
+    def retransmit
       @idents_mutex.synchronize do
         results = @unconfirmed_idents.values
 
@@ -288,19 +319,11 @@ module RSpec::Buildkite::Analytics
             "results" => results.to_json
           }
 
-          @logger.write("retransmitted results #{@unconfirmed_idents.keys}")
           @send_queue << data
+          @logger.write("queueing up retransmitted results #{@unconfirmed_idents.keys}")
         end
       end
 
-      # send the contents of the buffer, unless it's empty
-      unless data.empty?
-        @logger.write("retransmitting data")
-        transmit_results(data)
-      end
-
-      # if we were disconnected in the closing phase, then resend the EOT
-      # message so the server can persist the last upload part
       send_eot if @closing
     end
   end

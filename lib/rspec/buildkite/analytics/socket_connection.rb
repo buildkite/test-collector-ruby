@@ -110,6 +110,7 @@ module RSpec::Buildkite::Analytics
       @socket.write(frame.to_s)
     rescue Errno::EPIPE, Errno::ECONNRESET, OpenSSL::SSL::SSLError => e
       return unless @socket
+      return if type == :close
       @session.logger.write("got #{e}, attempting disconnected flow")
       @session.disconnected(self)
       disconnect
