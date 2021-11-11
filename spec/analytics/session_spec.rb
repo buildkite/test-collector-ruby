@@ -50,7 +50,7 @@ RSpec.describe "RSpec::Buildkite::Analytics::Session" do
 
   describe "#handle" do
     it "processes confirmations from the server" do
-      session.send(:add_unconfirmed_idents, "./spec/analytics/session_spec.rb[1:1]", {"hi"=> "thing"})
+      session.send(:queue_and_track_result, "./spec/analytics/session_spec.rb[1:1]", {"hi"=> "thing"})
 
       expect(session.unconfirmed_idents_count).to be 1
       session.handle(socket_double, {"type"=> "message", "identifier"=> "fake_channel", "message" => {"confirm"=> ["./spec/analytics/session_spec.rb[1:1]"]}}.to_json)
@@ -60,8 +60,16 @@ RSpec.describe "RSpec::Buildkite::Analytics::Session" do
 
   describe "#close" do
     it "waits until the unconfirmed_idents is empty" do
-      session.send(:add_unconfirmed_idents, "./spec/analytics/session_spec.rb[1:1]", {"hi"=> "thing"})
-      session.send(:add_unconfirmed_idents, "./spec/analytics/session_spec.rb[1:2]", {"hi"=> "thing"})
+      session.send(:queue_and_track_result, "./spec/analytics/session_spec.rb[1:1]", {"hi"=> "thing"})
+
+      expect(socket_double).to receive(:transmit).with({
+        "command" => "message",
+        "identifier" => "fake_channel",
+        "data" => {
+          "action" => "record_results",
+          "results" => [{"hi"=> "thing"}]
+        }.to_json
+      })
 
       expect(socket_double).to receive(:transmit).with({
         "command" => "message",
@@ -79,39 +87,8 @@ RSpec.describe "RSpec::Buildkite::Analytics::Session" do
     end
 
     it "doesn't wait if the unconfirmed_idents is already empty" do
-      expect(socket_double).to receive(:transmit).with({
-        "command" => "message",
-        "identifier" => "fake_channel",
-        "data" => {
-          "action" => "end_of_transmission",
-          "examples_count" => examples_count.to_json
-        }.to_json
-      })
-
       expect(socket_double).to receive(:close)
       expect(session.instance_variable_get(:@empty)).not_to receive(:wait)
-
-      session.close(examples_count)
-    end
-
-    it "waits for multiple confirmation messages from server" do
-      session.send(:add_unconfirmed_idents, "./spec/analytics/session_spec.rb[1:1]", {"hi"=> "thing"})
-      session.send(:add_unconfirmed_idents, "./spec/analytics/session_spec.rb[1:2]", {"hi"=> "thing"})
-
-      expect(socket_double).to receive(:transmit).with({
-        "command" => "message",
-        "identifier" => "fake_channel",
-        "data" => {
-          "action" => "end_of_transmission",
-          "examples_count" => examples_count.to_json
-        }.to_json
-      }) { Thread.new do sleep(1); session.handle(socket_double, {"type"=> "message", "identifier"=> "fake_channel", "message" => {"confirm"=> ["./spec/analytics/session_spec.rb[1:2]"]}}.to_json) end; Thread.new do sleep(2); session.handle(socket_double, {"type"=> "message", "identifier"=> "fake_channel", "message" => {"confirm"=> ["./spec/analytics/session_spec.rb[1:2]"]}}.to_json) end}
-
-      expect(session.instance_variable_get(:@empty)).to receive(:wait).and_call_original
-
-      expect(session).to receive(:remove_unconfirmed_idents).exactly(2).times
-
-      expect(socket_double).to receive(:close)
 
       session.close(examples_count)
     end
@@ -132,30 +109,16 @@ RSpec.describe "RSpec::Buildkite::Analytics::Session" do
       allow(fake_trace).to receive(:id).and_return(fake_trace_id)
     end
 
-    it "sends the result to the server" do
-      expect(socket_double).to receive(:transmit).with({
-        "identifier" => "fake_channel",
-        "command" => "message",
-        "data" => {
-          "action" => "record_results",
-          "results" => [trace_json]
-          }.to_json
-      })
+    it "puts the result in the send queue" do
+      expect(session.instance_variable_get(:@send_queue).size).to eq 0
 
       session.write_result(fake_trace)
+
+      expect(session.instance_variable_get(:@send_queue).size).to eq 1
     end
 
-    it "stores the sent result" do
+    it "stores the sent result in unconfirmed idents" do
       expect(session.unconfirmed_idents_count).to eq 0
-
-      expect(socket_double).to receive(:transmit).with({
-        "identifier" => "fake_channel",
-        "command" => "message",
-        "data" => {
-          "action" => "record_results",
-          "results" => [trace_json]
-          }.to_json
-      })
 
       session.write_result(fake_trace)
 
@@ -269,21 +232,12 @@ RSpec.describe "RSpec::Buildkite::Analytics::Session" do
     end
 
     it "retransmits if there are unconfirmed idents in the buffer" do
-      session.send(:add_unconfirmed_idents, "./spec/analytics/session_spec.rb[1:1]", {"identifier"=> "./spec/analytics/session_spec.rb[1:1]", "hi"=> "thing"})
-
-      expect(socket_double).to receive(:transmit)
-        .with({
-          "command" => "message",
-          "identifier" => "fake_channel",
-          "data" => {
-            "action" => "record_results",
-            "results" => [{
-              "identifier"=> "./spec/analytics/session_spec.rb[1:1]",
-              "hi" => "thing"
-            }]}.to_json
-        })
+      session.instance_variable_set(:@unconfirmed_idents, {"./spec/analytics/session_spec.rb[1:1]" => {"hi"=> "thing"}})
+      expect(session.instance_variable_get(:@send_queue).size).to eq 0
 
       session.disconnected(socket_double)
+
+      expect(session.instance_variable_get(:@send_queue).size).to eq 1
     end
 
     it "doesn't retransmit if there are no unconfirmed idents" do
@@ -305,65 +259,6 @@ RSpec.describe "RSpec::Buildkite::Analytics::Session" do
       })
 
       session.disconnected(socket_double)
-    end
-
-    it "resends idents followed by eot if tests have finished" do
-      session.send(:add_unconfirmed_idents, "./spec/analytics/session_spec.rb[1:1]", {"identifier"=> "./spec/analytics/session_spec.rb[1:1]", "hi"=> "thing"})
-
-      # In this test the order of operations is:
-      # 1. first eot is sent, spawn a new thread to simulate the disconnect
-      # 2. disconnect thread will send the unconfirmed idents
-      # 3. disconnect thread will send another eot, and the server will respond with confirm
-      # 4. socket closes
-      #
-      # However due to the way that the responses need to be mocked on the
-      # methods, they don't appear in the order above
-
-      # resend idents
-      expect(socket_double).to receive(:transmit)
-        .with({
-          "command" => "message",
-          "identifier" => "fake_channel",
-          "data" => {
-            "action" => "record_results",
-            "results" => [{
-              "identifier"=> "./spec/analytics/session_spec.rb[1:1]",
-              "hi" => "thing"
-            }]}.to_json
-        })
-
-      # mocking eot response
-      call_count = 0
-      # expect transmit to be called twice
-      expect(socket_double).to receive(:transmit).with({
-        "command" => "message",
-        "identifier" => "fake_channel",
-        "data" => {
-          "action" => "end_of_transmission",
-          "examples_count" => examples_count.to_json
-        }.to_json
-      }).twice {
-        call_count += 1
-        if call_count == 1
-          # simulate getting a disconnected socket after sending first eot
-          Thread.new do session.disconnected(socket_double) end
-        else
-          # respond to the second eot with confirmation of idents
-          session.handle(socket_double, {
-            "type"=> "message",
-            "identifier"=> "fake_channel",
-            "message" => {
-              "confirm"=> [
-                "./spec/analytics/session_spec.rb[1:1]",
-                "./spec/analytics/session_spec.rb[1:2]"
-            ]}
-          }.to_json)
-        end
-      }
-
-      expect(socket_double).to receive(:close)
-
-      session.close(examples_count)
     end
 
     it "raises error if it can't reconnect after 3 goes" do
