@@ -120,15 +120,15 @@ RSpec.describe "RSpec::Buildkite::Analytics::Session" do
   describe "#write_result" do
     let(:fake_trace) { instance_double("RSpec::Buildkite::Analytics::Uploader::Trace") }
     let(:fake_trace_id) { "33569b01-4180-4416-9631-c25d370a4c96" }
-    let(:trace_json) do
+    let(:trace_hash) do
       {
         id: fake_trace_id,
         identifier: "./spec/analytics/session_spec.rb[1:2]"
-      }.to_json
+      }
     end
 
     before do
-      allow(fake_trace).to receive(:as_json).and_return(trace_json)
+      allow(fake_trace).to receive(:as_hash).and_return(trace_hash)
       allow(fake_trace).to receive(:id).and_return(fake_trace_id)
     end
 
@@ -383,7 +383,7 @@ RSpec.describe "RSpec::Buildkite::Analytics::Session" do
 
       expect { session.disconnected(socket_double) }.to raise_error(RSpec::Buildkite::Analytics::SocketConnection::SocketError)
 
-      # This expectation is for 5 times because the socket connects initially, then it has 3 retries, then on the fourth retry the error is thrown
+      # This expectation is for 5 times because the socket connects initially, then it has 2 retries, then on the fourth retry the error is thrown
       expect(RSpec::Buildkite::Analytics::SocketConnection).to have_received(:new).exactly(5).times
     end
   end

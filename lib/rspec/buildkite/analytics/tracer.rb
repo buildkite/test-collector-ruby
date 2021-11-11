@@ -13,15 +13,15 @@ module RSpec::Buildkite::Analytics
         @children = []
       end
 
-      def as_json
+      def as_hash
         {
           section: section,
           start_at: start_at,
           end_at: end_at,
           duration: end_at - start_at,
           detail: detail,
-          children: children.map(&:as_json),
-        }
+          children: children.map(&:as_hash),
+        }.with_indifferent_access
       end
     end
 
@@ -57,7 +57,7 @@ module RSpec::Buildkite::Analytics
     end
 
     def history
-      @top.as_json
+      @top.as_hash
     end
   end
 end

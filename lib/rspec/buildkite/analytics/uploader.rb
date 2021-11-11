@@ -48,7 +48,7 @@ module RSpec::Buildkite::Analytics
         end
       end
 
-      def as_json
+      def as_hash
         {
           id: @id,
           scope: example.example_group.metadata[:full_description],
@@ -59,7 +59,7 @@ module RSpec::Buildkite::Analytics
           result: result_state,
           failure: failure_message,
           history: history,
-        }
+        }.with_indifferent_access
       end
 
       private

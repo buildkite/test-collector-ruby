@@ -140,7 +140,7 @@ module RSpec::Buildkite::Analytics
     end
 
     def write_result(result)
-      queue_and_track_result(result.id, result.as_json)
+      queue_and_track_result(result.id, result.as_hash)
 
       @logger.write("added #{result.id} to send queue")
     end
@@ -204,15 +204,8 @@ module RSpec::Buildkite::Analytics
           })
 
           if RSpec::Buildkite::Analytics.debug_enabled
-            data = JSON.parse(message["data"])
-            message_type = data["action"]
             ids = if message_type == "record_results"
-              if data["results"].is_a?(Array)
-                data["results"].map { |result| result["id"] }
-              else
-                results = JSON.parse(data["results"])
-                results.map { |result| result["id"] }
-              end
+              data["results"].map { |result| result["id"] }
             end
             @logger.write("transmitted #{message_type} #{ids}")
           end
@@ -242,13 +235,13 @@ module RSpec::Buildkite::Analytics
       end
     end
 
-    def queue_and_track_result(ident, result_as_json)
+    def queue_and_track_result(ident, result_as_hash)
       @idents_mutex.synchronize do
-        @unconfirmed_idents[ident] = result_as_json
+        @unconfirmed_idents[ident] = result_as_hash
 
         data = {
           "action" => "record_results",
-          "results" => [result_as_json]
+          "results" => [result_as_hash]
         }
 
         @send_queue << data
@@ -316,7 +309,7 @@ module RSpec::Buildkite::Analytics
         unless results.empty?
           data = {
             "action" => "record_results",
-            "results" => results.to_json
+            "results" => results
           }
 
           @send_queue << data
@@ -324,6 +317,8 @@ module RSpec::Buildkite::Analytics
         end
       end
 
+      # if we were disconnected in the closing phase, then resend the EOT
+      # message so the server can persist the last upload part
       send_eot if @closing
     end
   end
