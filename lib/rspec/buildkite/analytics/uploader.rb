@@ -144,7 +144,9 @@ module RSpec::Buildkite::Analytics
               puts "rspec-buildkite-analytics could not establish an initial connection with Buildkite. You may be missing some data for this test suite, please contact support."
             end
           else
-            puts "Buildkite Test Analytics: No Suite API key provided. You can get the API key from your Suite settings page."
+            if !!ENV["BUILDKITE_BUILD_ID"]
+              puts "Buildkite Test Analytics: No Suite API key provided. You can get the API key from your Suite settings page."
+            end
           end
         end
 
