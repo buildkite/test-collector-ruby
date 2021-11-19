@@ -1,0 +1,33 @@
+AllCops:
+  TargetRubyVersion: 2.7.2
+
+  # Exclude all non-app code
+  Exclude:
+    - "bin/**/*"
+
+# This is a complicated gem so I am disabling a lot of the
+# complexity related cops 
+Metrics/AbcSize:
+  Enabled: false
+
+Metrics/ClassLength:
+  Enabled: false
+
+Metrics/CyclomaticComplexity:
+  Enabled: false
+
+Metrics/MethodLength:
+  Enabled: false
+
+Metrics/PerceivedComplexity:
+  Enabled: false
+
+Metrics/BlockLength:
+  Enabled: false
+
+# Double quotes fine
+Style/StringLiterals:
+  Enabled: false
+
+Style/Documentation:
+  Enabled: false
