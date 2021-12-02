@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "active_support/core_ext/hash/indifferent_access"
+
 module RSpec::Buildkite::Analytics
   class Tracer
     class Span
