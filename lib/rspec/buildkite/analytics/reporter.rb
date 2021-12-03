@@ -18,6 +18,7 @@ module RSpec::Buildkite::Analytics
 
       if trace
         trace.example = example
+        trace.failure_reason, trace.failure_expanded = failure_info(notification) if example.execution_result.status == :failed
         RSpec::Buildkite::Analytics.session&.write_result(trace)
       end
     end
@@ -45,9 +46,54 @@ module RSpec::Buildkite::Analytics
         end
       end
     end
- 
+
     alias_method :example_passed, :handle_example
     alias_method :example_failed, :handle_example
     alias_method :example_pending, :handle_example
+
+    private
+
+    def failure_info(notification)
+      failure_expanded = []
+
+      if notification.exception.class == RSpec::Expectations::MultipleExpectationsNotMetError
+        failure_reason = notification.exception.summary
+        notification.exception.all_exceptions.each do |exception|
+          # an example with multiple failures doesn't give us a
+          # separate message lines and backtrace object to send, so
+          # I've reached into RSpec internals and duplicated the
+          # construction of these
+          message_lines = RSpec::Core::Formatters::ExceptionPresenter.new(exception, notification.example).colorized_message_lines
+
+          failure_expanded << {
+            expanded: format_message_lines(message_lines),
+            backtrace:  RSpec.configuration.backtrace_formatter.format_backtrace(exception.backtrace)
+          }
+        end
+      else
+        failure_reason = strip_diff_colors(notification.colorized_message_lines[0])
+
+        # the second line is always whitespace padding
+        message_lines = notification.colorized_message_lines[2..]
+
+        failure_expanded << {
+          expanded:  format_message_lines(message_lines),
+          backtrace: notification.formatted_backtrace
+        }
+      end
+
+      return failure_reason, failure_expanded
+    end
+
+    def format_message_lines(message_lines)
+      message_lines.map! { |l| strip_diff_colors(l) }
+      # the last line is sometimes blank, depending on the error reported
+      message_lines.pop if message_lines.last.blank?
+      message_lines
+    end
+
+    def strip_diff_colors(string)
+      string.gsub(/\e\[([;\d]+)?m/, '')
+    end
   end
 end
