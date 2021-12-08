@@ -22,22 +22,15 @@ require "securerandom"
 module RSpec::Buildkite::Analytics
   class Uploader
     class Trace
-      attr_accessor :example
+      attr_accessor :example, :failure_reason, :failure_expanded
       attr_reader :id, :history
 
       def initialize(example, history)
         @id = SecureRandom.uuid
         @example = example
         @history = history
-      end
-
-      def failure_message
-        case example.exception
-        when RSpec::Expectations::ExpectationNotMetError
-          example.exception.message
-        when Exception
-          "#{example.exception.class}: #{example.exception.message}"
-        end
+        @failure_reason = nil
+        @failure_expanded = []
       end
 
       def result_state
@@ -57,9 +50,10 @@ module RSpec::Buildkite::Analytics
           location: example.location,
           file_name: generate_file_name(example),
           result: result_state,
-          failure: failure_message,
+          failure_reason: failure_reason,
+          failure_expanded: failure_expanded,
           history: history,
-        }.with_indifferent_access
+        }.with_indifferent_access.compact
       end
 
       private
