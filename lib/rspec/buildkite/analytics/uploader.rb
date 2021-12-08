@@ -115,7 +115,8 @@ module RSpec::Buildkite::Analytics
               "Content-Type" => "application/json",
             })
             contact.body = {
-              run_env: CI.env
+              run_env: CI.env,
+              format: "websocket"
             }.to_json
 
             response = begin
