@@ -53,10 +53,15 @@ module RSpec::Buildkite::Analytics
 
     private
 
+    MULTIPLE_ERRORS = [
+      RSpec::Expectations::MultipleExpectationsNotMetError,
+      RSpec::Core::MultipleExceptionError
+    ]
+
     def failure_info(notification)
       failure_expanded = []
 
-      if notification.exception.class == RSpec::Expectations::MultipleExpectationsNotMetError
+      if RSpec::Buildkite::Analytics::Reporter::MULTIPLE_ERRORS.include?(notification.exception.class)
         failure_reason = notification.exception.summary
         notification.exception.all_exceptions.each do |exception|
           # an example with multiple failures doesn't give us a
@@ -71,10 +76,8 @@ module RSpec::Buildkite::Analytics
           }
         end
       else
-        failure_reason = strip_diff_colors(notification.colorized_message_lines[0])
-
-        # the second line is always whitespace padding
-        message_lines = notification.colorized_message_lines[2..]
+        message_lines = notification.colorized_message_lines
+        failure_reason = strip_diff_colors(message_lines.shift)
 
         failure_expanded << {
           expanded:  format_message_lines(message_lines),
@@ -87,6 +90,8 @@ module RSpec::Buildkite::Analytics
 
     def format_message_lines(message_lines)
       message_lines.map! { |l| strip_diff_colors(l) }
+      # the first line is sometimes blank, depending on the error reported
+      message_lines.shift if message_lines.first.blank?
       # the last line is sometimes blank, depending on the error reported
       message_lines.pop if message_lines.last.blank?
       message_lines
