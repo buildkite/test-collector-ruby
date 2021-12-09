@@ -53,10 +53,15 @@ module RSpec::Buildkite::Analytics
 
     private
 
+    MULTIPLE_ERRORS = [
+      RSpec::Expectations::MultipleExpectationsNotMetError,
+      RSpec::Core::MultipleExceptionError
+    ]
+
     def failure_info(notification)
       failure_expanded = []
 
-      if notification.exception.class == RSpec::Expectations::MultipleExpectationsNotMetError
+      if RSpec::Buildkite::Analytics::Reporter::MULTIPLE_ERRORS.include?(notification.exception.class)
         failure_reason = notification.exception.summary
         notification.exception.all_exceptions.each do |exception|
           # an example with multiple failures doesn't give us a
