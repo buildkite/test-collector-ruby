@@ -76,10 +76,8 @@ module RSpec::Buildkite::Analytics
           }
         end
       else
-        failure_reason = strip_diff_colors(notification.colorized_message_lines[0])
-
-        # the second line is always whitespace padding
-        message_lines = notification.colorized_message_lines[2..]
+        message_lines = notification.colorized_message_lines
+        failure_reason = strip_diff_colors(message_lines.shift)
 
         failure_expanded << {
           expanded:  format_message_lines(message_lines),
@@ -92,6 +90,8 @@ module RSpec::Buildkite::Analytics
 
     def format_message_lines(message_lines)
       message_lines.map! { |l| strip_diff_colors(l) }
+      # the first line is sometimes blank, depending on the error reported
+      message_lines.shift if message_lines.first.blank?
       # the last line is sometimes blank, depending on the error reported
       message_lines.pop if message_lines.last.blank?
       message_lines
