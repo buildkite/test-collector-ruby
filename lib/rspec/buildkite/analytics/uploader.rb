@@ -125,6 +125,8 @@ module RSpec::Buildkite::Analytics
               puts "Buildkite Test Analytics: Error communicating with the server: #{e.message}"
             end
 
+            return unless response
+
             case response.code
             when "401"
               puts "Buildkite Test Analytics: Invalid Suite API key. Please double check your Suite API key."
