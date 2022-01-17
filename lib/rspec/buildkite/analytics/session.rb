@@ -170,8 +170,10 @@ module RSpec::Buildkite::Analytics
       wait_for_confirm
 
       @logger.write("connected")
+    end
 
-      # As this connect method can be called multiple times in the
+    def init_write_thread
+      # As this method can be called multiple times in the
       # reconnection process, kill prev write threads (if any) before
       # setting up the new one
       @write_thread&.kill
