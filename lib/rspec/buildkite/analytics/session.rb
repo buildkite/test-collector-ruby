@@ -76,7 +76,8 @@ module RSpec::Buildkite::Analytics
         begin
           reconnection_count += 1
           connect
-        rescue SocketConnection::HandshakeError, RejectedSubscription, TimeoutError, SocketConnection::SocketError => e
+          init_write_thread
+        rescue SocketConnection::HandshakeError, RejectedSubscription, TimeoutError, InitialConnectionFailure, SocketConnection::SocketError => e
           @logger.write("failed reconnection attempt #{reconnection_count} due to #{e}")
           if reconnection_count > MAX_RECONNECTION_ATTEMPTS
             $stderr.puts "rspec-buildkite-analytics experienced a disconnection and could not reconnect to Buildkite due to #{e.message}. Please contact support."
