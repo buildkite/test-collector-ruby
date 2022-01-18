@@ -58,9 +58,9 @@ module RSpec::Buildkite::Analytics
         reconnection_count += 1
         connect
       rescue TimeoutError, InitialConnectionFailure => e
-        @logger.write("failed initial connection attempt #{reconnection_count} due to #{e}")
+        @logger.write("rspec-buildkite-analytics could not establish an initial connection with Buildkite due to #{e}. Attempting retry #{reconnection_count} of #{MAX_RECONNECTION_ATTEMPTS}...")
         if reconnection_count > MAX_RECONNECTION_ATTEMPTS
-          $stderr.puts "rspec-buildkite-analytics could not establish an initial connection with Buildkite due to #{e.message}. You may be missing some data for this test suite, please contact support if this issue persists."
+          $stderr.puts "rspec-buildkite-analytics could not establish an initial connection with Buildkite due to #{e.message} after #{MAX_RECONNECTION_ATTEMPTS} attempts. You may be missing some data for this test suite, please contact support if this issue persists."
         else
           sleep(WAIT_BETWEEN_RECONNECTIONS)
           @logger.write("retrying reconnection")
