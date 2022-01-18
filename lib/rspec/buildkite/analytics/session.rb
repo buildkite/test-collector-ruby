@@ -52,9 +52,22 @@ module RSpec::Buildkite::Analytics
 
       @logger = Logger.new
 
-      connect
-    rescue TimeoutError, InitialConnectionFailure => e
-      $stderr.puts "rspec-buildkite-analytics could not establish an initial connection with Buildkite due to #{e.message}. You may be missing some data for this test suite, please contact support."
+      reconnection_count = 0
+
+      begin
+        reconnection_count += 1
+        connect
+      rescue TimeoutError, InitialConnectionFailure => e
+        @logger.write("rspec-buildkite-analytics could not establish an initial connection with Buildkite due to #{e}. Attempting retry #{reconnection_count} of #{MAX_RECONNECTION_ATTEMPTS}...")
+        if reconnection_count > MAX_RECONNECTION_ATTEMPTS
+          $stderr.puts "rspec-buildkite-analytics could not establish an initial connection with Buildkite due to #{e.message} after #{MAX_RECONNECTION_ATTEMPTS} attempts. You may be missing some data for this test suite, please contact support if this issue persists."
+        else
+          sleep(WAIT_BETWEEN_RECONNECTIONS)
+          @logger.write("retrying reconnection")
+          retry
+        end
+      end
+      init_write_thread
     end
 
     def disconnected(connection)
@@ -76,7 +89,8 @@ module RSpec::Buildkite::Analytics
         begin
           reconnection_count += 1
           connect
-        rescue SocketConnection::HandshakeError, RejectedSubscription, TimeoutError, SocketConnection::SocketError => e
+          init_write_thread
+        rescue SocketConnection::HandshakeError, RejectedSubscription, TimeoutError, InitialConnectionFailure, SocketConnection::SocketError => e
           @logger.write("failed reconnection attempt #{reconnection_count} due to #{e}")
           if reconnection_count > MAX_RECONNECTION_ATTEMPTS
             $stderr.puts "rspec-buildkite-analytics experienced a disconnection and could not reconnect to Buildkite due to #{e.message}. Please contact support."
@@ -170,8 +184,10 @@ module RSpec::Buildkite::Analytics
       wait_for_confirm
 
       @logger.write("connected")
+    end
 
-      # As this connect method can be called multiple times in the
+    def init_write_thread
+      # As this method can be called multiple times in the
       # reconnection process, kill prev write threads (if any) before
       # setting up the new one
       @write_thread&.kill
