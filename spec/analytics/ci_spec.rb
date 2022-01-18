@@ -12,6 +12,7 @@ RSpec.describe "RSpec::Buildkite::Analytics::CI" do
     let(:job_id) { "j3459ui2-l0dk-4829-i029-97999t1e09d6" }
     let(:message) { "Merge pull request #1 from buildkite/branch\n commit title" }
     let(:debug) { "true" }
+    let(:version) { RSpec::Buildkite::Analytics::VERSION }
 
     before do
       allow(ENV).to receive(:[]).and_call_original
@@ -43,7 +44,8 @@ RSpec.describe "RSpec::Buildkite::Analytics::CI" do
           "number" => number,
           "job_id" => job_id,
           "message" => message,
-          "debug" => debug
+          "debug" => debug,
+          "version" => version
         })
       end
     end
@@ -61,7 +63,8 @@ RSpec.describe "RSpec::Buildkite::Analytics::CI" do
         expect(result).to match({
           "CI" => nil,
           "key" => "845ac829-2ab3-4bbb-9e24-3529755a6d37",
-          "debug" => debug
+          "debug" => debug,
+          "version" => version
         })
       end
     end
