@@ -14,13 +14,15 @@ module RSpec::Buildkite::Analytics::CI
         "number" => ENV["BUILDKITE_BUILD_NUMBER"],
         "job_id" => ENV["BUILDKITE_JOB_ID"],
         "message" => ENV["BUILDKITE_MESSAGE"],
-        "debug" => ENV["BUILDKITE_ANALYTICS_DEBUG_ENABLED"]
+        "debug" => ENV["BUILDKITE_ANALYTICS_DEBUG_ENABLED"],
+        "version" => RSpec::Buildkite::Analytics::VERSION
       }
     else
       {
         "CI" => nil,
         "key" => SecureRandom.uuid,
-        "debug" => ENV["BUILDKITE_ANALYTICS_DEBUG_ENABLED"]
+        "debug" => ENV["BUILDKITE_ANALYTICS_DEBUG_ENABLED"],
+        "version" => RSpec::Buildkite::Analytics::VERSION
       }
     end
   end
