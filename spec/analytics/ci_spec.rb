@@ -13,6 +13,7 @@ RSpec.describe "RSpec::Buildkite::Analytics::CI" do
     let(:message) { "Merge pull request #1 from buildkite/branch\n commit title" }
     let(:debug) { "true" }
     let(:version) { RSpec::Buildkite::Analytics::VERSION }
+    let(:name) { RSpec::Buildkite::Analytics::NAME }
 
     before do
       allow(ENV).to receive(:[]).and_call_original
@@ -45,7 +46,8 @@ RSpec.describe "RSpec::Buildkite::Analytics::CI" do
           "job_id" => job_id,
           "message" => message,
           "debug" => debug,
-          "version" => version
+          "version" => version,
+          "collector" => name
         })
       end
     end
@@ -64,7 +66,8 @@ RSpec.describe "RSpec::Buildkite::Analytics::CI" do
           "CI" => nil,
           "key" => "845ac829-2ab3-4bbb-9e24-3529755a6d37",
           "debug" => debug,
-          "version" => version
+          "version" => version,
+          "collector" => name
         })
       end
     end
