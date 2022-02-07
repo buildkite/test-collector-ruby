@@ -30,4 +30,10 @@ module RSpec::Buildkite::Analytics
 
     self::Uploader.configure
   end
+
+  def self.annotate(content)
+    tracer = RSpec::Buildkite::Analytics::Uploader.tracer
+    tracer&.enter("annotation", **{ content: content })
+    tracer&.leave
+  end
 end
