@@ -28,4 +28,7 @@ Gem::Specification.new do |spec|
   spec.add_dependency "rspec-core", '~> 3.10'
   spec.add_dependency "rspec-expectations", '~> 3.10'
   spec.add_dependency "websocket", '~> 1.2'
+
+  spec.add_development_dependency "rspec-core", '~> 3.10'
+  spec.add_development_dependency "rspec-expectations", '~> 3.10'
 end
