@@ -1,8 +1,5 @@
 # frozen_string_literal: true
 
-require "rspec/core"
-require "rspec/expectations"
-
 require "net/http"
 require "openssl"
 require "websocket"
@@ -11,7 +8,6 @@ require_relative "tracer"
 require_relative "network"
 require_relative "object"
 require_relative "session"
-require_relative "reporter"
 require_relative "ci"
 
 require "active_support"
@@ -41,6 +37,8 @@ module RSpec::Buildkite::Analytics
         end
       end
 
+      # FIXME: RSpec specific, maybe create a different uploader for minitest?
+      # Or just extract this part out to a seperate class ?
       def as_hash
         {
           id: @id,
@@ -115,7 +113,7 @@ module RSpec::Buildkite::Analytics
 
         response = begin
           http.request(contact)
-        rescue *RSpec::Buildkite::Analytics::REQUEST_EXCEPTIONS => e
+        rescue *RSpec::Buildkite::Analytics::Uploader::REQUEST_EXCEPTIONS => e
           puts "Buildkite Test Analytics: Error communicating with the server: #{e.message}"
         end
 

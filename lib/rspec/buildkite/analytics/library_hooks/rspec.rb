@@ -2,8 +2,11 @@ require "rspec/core"
 require "rspec/expectations"
 
 require_relative "../uploader"
+require_relative "../reporter"
 
 RSpec::Buildkite::Analytics.uploader = RSpec::Buildkite::Analytics::Uploader
+
+RSpec::Core::Formatters.register(RSpec::Buildkite::Analytics::Reporter, :example_passed, :example_failed, :example_pending, :dump_summary)
 
 RSpec.configure do |config|
   config.before(:suite) do

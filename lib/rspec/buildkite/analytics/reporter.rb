@@ -1,8 +1,9 @@
 require "time"
 
+# FIXME: RSpec specific (maybe not required for minitest) !!!!
+
 module RSpec::Buildkite::Analytics
   class Reporter
-    RSpec::Core::Formatters.register self, :example_passed, :example_failed, :example_pending, :dump_summary
 
     attr_reader :output
 
