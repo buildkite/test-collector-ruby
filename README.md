@@ -1,4 +1,4 @@
-# RSpec Buildkite Analytics
+# RSpec Buildkite Analytics!!
 
 This gem collects data about your test suite's performance and reliability, and allows you to see trends and insights about your test suite over time ✨
 
