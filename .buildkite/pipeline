@@ -1,0 +1,23 @@
+#!/bin/bash
+
+set -euo pipefail
+
+allowed=0
+
+# Build our branch builds
+
+if [[ "$BUILDKITE_PULL_REQUEST" == "false" ]]; then
+  allowed=1
+fi
+
+# Build our Pull Request builds
+if [[ "$BUILDKITE_PULL_REQUEST_REPO" == "git://github.com/buildkite/rspec-buildkite-analytics.git" ]]; then
+  allowed=1
+fi
+
+if [[ "${allowed}" -ne 1 ]]; then
+  (echo -e "steps:\\n  - block: \"Authroize Deploy\"\\n";
+    grep -v "steps:" buildkite.yaml ) | buildkite-agent pipeline upload
+else
+  buildkite-agent pipeline upload
+fi
