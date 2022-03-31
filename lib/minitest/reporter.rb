@@ -19,14 +19,11 @@ module Minitest
       end
 
       if trace
-        # TODO: We can create a generic example class here so that we can use the existing code in the Uploader::Trace as well as 
-
-        print 'Y'
         trace.example = MiniTest::Example.new(result)
         trace.failure_reason, trace.failure_expanded = failure_info(notification) if trace.example.execution_result.status == :failed
         RSpec::Buildkite::Analytics.session&.write_result(trace)
       else
-        # FIXME: we can't seem to find any traces !!!
+        # FIXME: some traces are missing
         print 'F'
       end
     end
