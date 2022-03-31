@@ -213,11 +213,17 @@ module RSpec::Buildkite::Analytics
             end
           end
 
+
+          begin
           @connection.transmit({
             "identifier" => @channel,
             "command" => "message",
             "data" => data.to_json
           })
+          # FIXME: figure out why we get UTF-8 errors here :)
+          rescue JSON::GeneratorError => e
+            puts "JSON FAILED"
+          end
 
           if RSpec::Buildkite::Analytics.debug_enabled
             ids = if message_type == "record_results"
