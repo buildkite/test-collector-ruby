@@ -16,12 +16,12 @@ module BuildkiteMiniTestPlugin
     Thread.current[:_buildkite_tracer] = tracer
   end
 
-  def after_teardown
+  def before_teardown
     super
 
     tracer = Thread.current[:_buildkite_tracer]
     # TODO: seems like setup may not be always called? as tracer is nil sometimes!
-    if tracer.nil?
+    if !tracer.nil?
       Thread.current[:_buildkite_tracer] = nil
       tracer.finalize
 
