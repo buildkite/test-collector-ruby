@@ -20,7 +20,13 @@ module Minitest
 
       if trace
         trace.example = MiniTest::Example.new(result)
-        trace.failure_reason, trace.failure_expanded = failure_info(notification) if trace.example.execution_result.status == :failed
+        if trace.example.execution_result.status == :failed
+          # TODO: figure out what failure_reason and failure_expanded should look like
+          # See: https://buildkite.com/docs/test-analytics/integrations
+          binding.irb
+          trace.failure_reason = trace.example.failure_reason
+          trace.failure_expanded = trace.example.failure_expanded
+        end
         RSpec::Buildkite::Analytics.session&.write_result(trace)
       else
         # FIXME: some traces are missing

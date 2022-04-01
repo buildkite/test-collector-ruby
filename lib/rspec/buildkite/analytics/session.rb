@@ -221,8 +221,11 @@ module RSpec::Buildkite::Analytics
             "data" => data.to_json
           })
           # FIXME: figure out why we get UTF-8 errors here :)
+          # FIXME: maybe it's just the test suite, we may need to replace those out! might be a genuine bug !!!
           rescue JSON::GeneratorError => e
+            # binding.irb
             puts "JSON FAILED"
+            puts data.to_json
           end
 
           if RSpec::Buildkite::Analytics.debug_enabled
