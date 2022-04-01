@@ -21,9 +21,6 @@ module Minitest
       if trace
         trace.example = MiniTest::Example.new(result)
         if trace.example.execution_result.status == :failed
-          # TODO: figure out what failure_reason and failure_expanded should look like
-          # See: https://buildkite.com/docs/test-analytics/integrations
-          binding.irb
           trace.failure_reason = trace.example.failure_reason
           trace.failure_expanded = trace.example.failure_expanded
         end
@@ -37,6 +34,7 @@ module Minitest
 
 
     def report
+      # TODO: Need to flush results here :)
     end
 
     private

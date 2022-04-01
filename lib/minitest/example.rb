@@ -34,5 +34,18 @@ module Minitest
     def description
       @result.name
     end
+
+    def failure_reason
+      @result.failure.message
+    end
+
+    def failure_expanded
+      @result.failures.map do |failure|
+        {
+          expanded: failure.message,
+          backtrace: failure.backtrace,
+        }
+      end
+    end
   end
 end
