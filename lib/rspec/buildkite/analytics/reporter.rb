@@ -11,9 +11,7 @@ module RSpec::Buildkite::Analytics
 
     def handle_example(notification)
       example = notification.example
-      trace = RSpec::Buildkite::Analytics.uploader.traces.find do |trace|
-        example.id == trace.example.id
-      end
+      trace = RSpec::Buildkite::Analytics.uploader.traces[example.id]
 
       if trace
         trace.example = example

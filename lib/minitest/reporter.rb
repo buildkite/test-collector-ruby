@@ -10,12 +10,8 @@ module Minitest
    
     def record(result)
       super
-      id = "#{result.location} [#{source_location(result)}]"
 
-      trace = RSpec::Buildkite::Analytics.uploader.traces.find do |trace|
-        trace_id = "#{trace.example.location} [#{source_location(result)}]"
-        id == trace_id
-      end
+      trace = RSpec::Buildkite::Analytics.uploader.traces[result.source_location]
 
       if trace
         trace.example = MiniTest::Example.new(result)
@@ -50,20 +46,6 @@ module Minitest
             gz.close
           end
         end
-      end
-    end
-
-    private
-
-    # In Our BuildkiteMiniTestPlugin#before_setup and BuildkiteMiniTestPlugin#before_teardown methods we get access to a
-    # Minitest::Test. In our reporter we get access to a result object, the result object has the source location of
-    # the test, but the MiniTest::Test does not, and we need to match them up, this method returns the source location
-    # for both the test and the result objects
-    def source_location(result_or_test)
-      if result_or_test.respond_to?(:source_location)
-        result_or_test.source_location.join(':')
-      else
-        result_or_test.class_name.constantize.instance_method(result_or_test.name).source_location.join(':')
       end
     end
   end

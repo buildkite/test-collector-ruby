@@ -89,7 +89,7 @@ module RSpec::Buildkite::Analytics
     end
 
     def self.traces
-      @traces ||= []
+      @traces ||= {}
     end
 
     REQUEST_EXCEPTIONS = [

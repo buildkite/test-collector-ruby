@@ -25,7 +25,7 @@ module BuildkiteMiniTestPlugin
       tracer.finalize
 
       trace = RSpec::Buildkite::Analytics::Uploader::Trace.new(self, tracer.history)
-      RSpec::Buildkite::Analytics.uploader.traces << trace
+      RSpec::Buildkite::Analytics.uploader.traces[method(name).source_location] = trace
     end
   end
 end
