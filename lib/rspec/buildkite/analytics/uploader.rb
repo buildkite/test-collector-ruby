@@ -40,7 +40,7 @@ module RSpec::Buildkite::Analytics
       # FIXME: RSpec specific, maybe create a different uploader for minitest?
       # Or just extract this part out to a seperate class ?
       def as_hash
-        {
+        strip_invalid_utf8_chars(
           id: @id,
           scope: example.example_group.metadata[:full_description],
           name: example.description,
@@ -51,14 +51,14 @@ module RSpec::Buildkite::Analytics
           failure_reason: failure_reason,
           failure_expanded: failure_expanded,
           history: history,
-        }.with_indifferent_access.compact
+        )
       end
 
       private
 
       def generate_file_name(example)
         file_path_regex = /^(.*?\.(rb|feature))/
-        identifier_file_name = example.id[file_path_regex]
+        identifier_file_name = strip_invalid_utf8_chars(example.id)[file_path_regex]
         location_file_name = example.location[file_path_regex]
 
         if identifier_file_name != location_file_name
@@ -74,6 +74,16 @@ module RSpec::Buildkite::Analytics
           end
         else
           identifier_file_name
+        end
+      end
+
+      def strip_invalid_utf8_chars(object)
+        if(object.is_a?(Hash))
+          Hash[object.map { |key, value| [key, strip_invalid_utf8_chars(value)] }]
+        elsif object.is_a?(Array)
+          object.map { |value| strip_invalid_utf8_chars(value) }
+        elsif object.is_a?(String)
+          object.encode('UTF-8', :invalid => :replace, :undef => :replace)
         end
       end
     end
