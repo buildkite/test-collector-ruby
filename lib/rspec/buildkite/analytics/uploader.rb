@@ -53,7 +53,7 @@ module RSpec::Buildkite::Analytics
           failure_reason: failure_reason,
           failure_expanded: failure_expanded,
           history: history,
-        )
+        ).with_indifferent_access.compact
       end
 
       private
@@ -80,12 +80,14 @@ module RSpec::Buildkite::Analytics
       end
 
       def strip_invalid_utf8_chars(object)
-        if(object.is_a?(Hash))
+        if object.is_a?(Hash)
           Hash[object.map { |key, value| [key, strip_invalid_utf8_chars(value)] }]
         elsif object.is_a?(Array)
           object.map { |value| strip_invalid_utf8_chars(value) }
         elsif object.is_a?(String)
           object.encode('UTF-8', :invalid => :replace, :undef => :replace)
+        else
+          object
         end
       end
     end
