@@ -1,4 +1,4 @@
-puts "loading minitest reporter"
+# frozen_string_literal: true
 
 module Minitest
   class BuildkiteAnalyticsReporter < Minitest::StatisticsReporter
