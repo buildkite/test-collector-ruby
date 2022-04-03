@@ -12,7 +12,9 @@ module Minitest
     end
 
     def id
-      @result.source_location.join(':')
+      location, line_number = @result.source_location
+
+      "#{File.join('./', location.delete_prefix(project_dir))}:#{line_number}"
     end
 
     alias_method :location, :id
@@ -45,6 +47,16 @@ module Minitest
           expanded: failure.message,
           backtrace: failure.backtrace,
         }
+      end
+    end
+
+    private
+
+    def project_dir
+      if defined?(Rails) && Rails.respond_to?(:root)
+        Rails.root
+      else
+        Dir.getwd
       end
     end
   end
