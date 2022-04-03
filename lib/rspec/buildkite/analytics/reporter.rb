@@ -1,7 +1,5 @@
 require "time"
 
-# FIXME: RSpec specific (maybe not required for minitest) !!!!
-
 module RSpec::Buildkite::Analytics
   class Reporter
 

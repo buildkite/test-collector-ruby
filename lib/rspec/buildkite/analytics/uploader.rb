@@ -37,8 +37,6 @@ module RSpec::Buildkite::Analytics
         end
       end
 
-      # FIXME: RSpec specific, maybe create a different uploader for minitest?
-      # Or just extract this part out to a seperate class ?
       def as_hash
         strip_invalid_utf8_chars(
           id: @id,

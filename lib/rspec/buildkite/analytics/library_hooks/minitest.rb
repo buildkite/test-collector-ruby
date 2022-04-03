@@ -20,17 +20,12 @@ module BuildkiteMiniTestPlugin
     super
 
     tracer = Thread.current[:_buildkite_tracer]
-    # TODO: seems like setup may not be always called? as tracer is nil sometimes!
     if !tracer.nil?
       Thread.current[:_buildkite_tracer] = nil
       tracer.finalize
 
-
       trace = RSpec::Buildkite::Analytics::Uploader::Trace.new(self, tracer.history)
       RSpec::Buildkite::Analytics.uploader.traces << trace
-    else
-      # TODO: Figure out which examples aren't running the tracer
-      # print 'W'
     end
   end
 end

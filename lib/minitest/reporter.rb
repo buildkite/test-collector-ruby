@@ -27,9 +27,6 @@ module Minitest
           trace.failure_expanded = trace.example.failure_expanded
         end
         RSpec::Buildkite::Analytics.session&.write_result(trace)
-      else
-        # FIXME: some traces are missing
-        print 'F'
       end
     end
 
