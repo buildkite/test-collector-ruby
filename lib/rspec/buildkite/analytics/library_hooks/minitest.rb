@@ -1,8 +1,5 @@
 require "minitest"
 
-puts "loading minitest plugin" 
-
-# require_relative '../reporter'
 require_relative "../uploader"
 
 RSpec::Buildkite::Analytics.uploader = RSpec::Buildkite::Analytics::Uploader
