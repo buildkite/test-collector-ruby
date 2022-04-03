@@ -9,6 +9,7 @@ RSpec.describe "RSpec::Buildkite::Analytics::Uploader::Trace" do
     {
       children: [
         {
+          start_at: 347611.734956,
           detail: %{"query"=>"SELECT '\xC8'"}
         }
       ]
@@ -28,6 +29,12 @@ RSpec.describe "RSpec::Buildkite::Analytics::Uploader::Trace" do
 
       expect(history_json).to include('query')
       expect(history_json).to be_valid_encoding
+    end
+
+    it 'does not alter data types which are not strings' do
+      history_json = trace.as_hash[:history].to_json
+
+      expect(history_json).to include('347611.734956')
     end
   end
 end
