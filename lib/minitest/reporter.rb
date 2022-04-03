@@ -1,13 +1,15 @@
 puts "loading minitest reporter"
 
 module Minitest
-  class Reporter
+  class BuildkiteAnalyticsReporter < Minitest::StatisticsReporter
     def initialize(io, options)
+      super
       @io = io
       @options = options
     end
    
     def record(result)
+      super
       # FIXME: RSpec has the relative path from the current project folder
       # so we may need to update the path to be relative (minitests path is absolute)
       # Rspec looks like: "./spec/features/budgets_spec.rb[1:1]"
@@ -34,7 +36,29 @@ module Minitest
 
 
     def report
-      # TODO: Need to flush results here :)
+      super
+
+      if RSpec::Buildkite::Analytics.session.present?
+        examples_count = {
+          examples: count,
+          failed: failures,
+          pending: skips,
+          errors_outside_examples: 0,
+        }
+
+        RSpec::Buildkite::Analytics.session.close(examples_count)
+
+        # Write the debug file, if debug mode is enabled
+        if RSpec::Buildkite::Analytics.debug_enabled
+          filename = "#{RSpec::Buildkite::Analytics.debug_filepath}/bk-analytics-#{Time.now.strftime("%F-%R:%S")}-#{ENV["BUILDKITE_JOB_ID"]}.log.gz"
+
+          File.open(filename, "wb") do |f|
+            gz = Zlib::GzipWriter.new(f)
+            gz.puts(RSpec::Buildkite::Analytics.session.logger.to_array)
+            gz.close
+          end
+        end
+      end
     end
 
     private

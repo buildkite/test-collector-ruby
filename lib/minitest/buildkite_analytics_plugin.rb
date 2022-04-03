@@ -3,6 +3,6 @@ require_relative 'example'
 
 module Minitest
   def self.plugin_buildkite_analytics_init(options)
-    self.reporter << Minitest::Reporter.new(options[:io], options)
+    self.reporter << Minitest::BuildkiteAnalyticsReporter.new(options[:io], options)
   end
 end
