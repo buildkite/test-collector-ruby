@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 require_relative 'reporter'
-require_relative 'example'
+require_relative 'test_result'
 
 module Minitest
   def self.plugin_buildkite_analytics_init(options)

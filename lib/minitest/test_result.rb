@@ -1,16 +1,25 @@
 # frozen_string_literal: true
 
 module Minitest
-  class Example
+  class TestResult
     RESULT_CODES = {
-      '.' => :passed,
-      'F' => :failed,
-      'E' => :failed,
-      'S' => :pending,
+      '.' => 'passed',
+      'F' => 'failed',
+      'E' => 'failed',
+      'S' => 'pending',
     }
 
     def initialize(result)
       @result = result
+    end
+
+    def result_state
+      case @result.result_code
+      when "."; "passed"
+      when "F"; "failed"
+      when "E"; "failed"
+      when "S"; "skipped"
+      end
     end
 
     def id
@@ -18,25 +27,25 @@ module Minitest
 
       "#{File.join('./', location.delete_prefix(project_dir))}:#{line_number}"
     end
-
     alias_method :location, :id
-
-    def execution_result
-      Struct.new(:status).new(RESULT_CODES[@result.result_code])
-    end
-
-    def metadata
-      { shared_group_inclusion_backtrace: [] }
-    end
+    alias_method :identifier, :id
 
     # In Rspec this would be the describe/context, but minitest does not support this natively
     # So instead we provide the class name (as context)
-    def example_group
-      Struct.new(:metadata).new(full_description: @result.class_name)
+    def scope
+      @result.class_name
     end
 
-    def description
+    def name
       @result.name
+    end
+
+    def shared_example?
+      false
+    end
+
+    def shared_example_last_backtrace_location
+      ''
     end
 
     def failure_reason

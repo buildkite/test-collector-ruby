@@ -14,10 +14,10 @@ module Minitest
       trace = RSpec::Buildkite::Analytics.uploader.traces[result.source_location]
 
       if trace
-        trace.example = MiniTest::Example.new(result)
-        if trace.example.execution_result.status == :failed
-          trace.failure_reason = trace.example.failure_reason
-          trace.failure_expanded = trace.example.failure_expanded
+        trace.test_result = MiniTest::TestResult.new(result)
+        if trace.test_result.result_state == 'failed'
+          trace.failure_reason = trace.test_result.failure_reason
+          trace.failure_expanded = trace.test_result.failure_expanded
         end
         RSpec::Buildkite::Analytics.session&.write_result(trace)
       end

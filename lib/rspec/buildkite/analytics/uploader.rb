@@ -9,6 +9,7 @@ require_relative "network"
 require_relative "object"
 require_relative "session"
 require_relative "ci"
+require_relative "test_result"
 
 require "active_support"
 require "active_support/notifications"
@@ -18,34 +19,27 @@ require "securerandom"
 module RSpec::Buildkite::Analytics
   class Uploader
     class Trace
-      attr_accessor :example, :failure_reason, :failure_expanded
+      attr_accessor :test_result, :failure_reason, :failure_expanded
       attr_reader :id, :history
 
-      def initialize(example, history)
+      def initialize(test_result, history)
         @id = SecureRandom.uuid
-        @example = example
+        @test_result = test_result
         @history = history
         @failure_reason = nil
         @failure_expanded = []
       end
 
-      def result_state
-        case example.execution_result.status
-        when :passed; "passed"
-        when :failed; "failed"
-        when :pending; "skipped"
-        end
-      end
 
       def as_hash
         strip_invalid_utf8_chars(
           id: @id,
-          scope: example.example_group.metadata[:full_description],
-          name: example.description,
-          identifier: example.id,
-          location: example.location,
-          file_name: generate_file_name(example),
-          result: result_state,
+          scope: test_result.scope,
+          name: test_result.name,
+          identifier: test_result.identifier,
+          location: test_result.location,
+          file_name: generate_file_name(test_result),
+          result: test_result.result_state,
           failure_reason: failure_reason,
           failure_expanded: failure_expanded,
           history: history,
@@ -56,17 +50,17 @@ module RSpec::Buildkite::Analytics
 
       def generate_file_name(example)
         file_path_regex = /^(.*?\.(rb|feature))/
-        identifier_file_name = strip_invalid_utf8_chars(example.id)[file_path_regex]
-        location_file_name = example.location[file_path_regex]
+        identifier_file_name = strip_invalid_utf8_chars(test_result.id)[file_path_regex]
+        location_file_name = test_result.location[file_path_regex]
 
         if identifier_file_name != location_file_name
           # If the identifier and location files are not the same, we assume
-          # that the test was run as part of a shared example. If this isn't the
+          # that the test was run as part of a shared test_result. If this isn't the
           # case, then there's something we haven't accounted for
-          if example.metadata[:shared_group_inclusion_backtrace].any?
+          if test_result.shared_example?
             # Taking the last frame in this backtrace will give us the original
             # entry point for the shared example
-            example.metadata[:shared_group_inclusion_backtrace].last.inclusion_location[file_path_regex]
+            test_result.shared_example_last_backtrace_location[file_path_regex]
           else
             "Unknown"
           end

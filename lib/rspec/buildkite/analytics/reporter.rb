@@ -1,5 +1,7 @@
 require "time"
 
+require_relative "test_result"
+
 module RSpec::Buildkite::Analytics
   class Reporter
 
@@ -14,7 +16,7 @@ module RSpec::Buildkite::Analytics
       trace = RSpec::Buildkite::Analytics.uploader.traces[example.id]
 
       if trace
-        trace.example = example
+        trace.test_result = TestResult.new(example)
         trace.failure_reason, trace.failure_expanded = failure_info(notification) if example.execution_result.status == :failed
         RSpec::Buildkite::Analytics.session&.write_result(trace)
       end
