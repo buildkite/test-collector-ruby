@@ -13,9 +13,14 @@ group :test do
 end
 ```
 
+Set the `BUILDKITE_ANALYTICS_KEY` environment variable, either via the command line or using a secure method like Rails custom credentials (https://edgeguides.rubyonrails.org/security.html#custom-credentials).
+
+Please avoid committing your API key to your repository for security reasons.
+
+
 Configure your API key:
 ```ruby
-RSpec::Buildkite::Analytics.configure(token: "........")
+RSpec::Buildkite::Analytics.configure(token: ENV["BUILDKITE_ANALYTICS_KEY"])
 ```
 
 Run bundler to install the gem and update your `Gemfile.lock`:
