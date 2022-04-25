@@ -3,7 +3,7 @@
 module RSpec
   module Buildkite
     module Analytics
-      VERSION = "0.7.0"
+      VERSION = "0.8.0"
       NAME = "rspec-buildkite"
     end
   end
