@@ -116,14 +116,14 @@ module RSpec::Buildkite::Analytics
       # to which the server will respond with the last bits of data
       send_eot
 
+      # After EOT, we wait for 75 seconds for the send queue to be drained and for the
+      # server to confirm the last idents. If everything has already been confirmed we can
+      # proceed without waiting.
       @idents_mutex.synchronize do
-        @logger.write("waiting for last confirm")
-        # Here, we sleep for 75 seconds while waiting for the send
-        # queue to be drained and for the server to confirm the last
-        # idents.
-        # We are woken up when the unconfirmed_idents is empty, and given back the mutex to
-        # continue operation.
-        @empty.wait(@idents_mutex, CONFIRMATION_TIMEOUT) unless @unconfirmed_idents.empty?
+        if @unconfirmed_idents.any?
+          @logger.write("waiting for last confirm")
+          @empty.wait(@idents_mutex, CONFIRMATION_TIMEOUT)
+        end
       end
 
       # Then we always disconnect cos we can't wait forever? 🤷‍♀️
@@ -255,23 +255,21 @@ module RSpec::Buildkite::Analytics
       @idents_mutex.synchronize do
         @unconfirmed_idents[ident] = result_as_hash
 
-        data = {
+        @send_queue << {
           "action" => "record_results",
           "results" => [result_as_hash]
         }
-
-        @send_queue << data
       end
     end
 
-    def remove_unconfirmed_idents(idents)
-      return if idents.empty?
+    def confirm_idents(idents)
+      retransmit_required = @closing
 
       @idents_mutex.synchronize do
         # Remove received idents from unconfirmed_idents
         idents.each { |key| @unconfirmed_idents.delete(key) }
 
-        @logger.write("received confirm for indentifiers: #{idents.join(", ")}")
+        @logger.write("received confirm for indentifiers: #{idents}")
 
         # This @empty ConditionVariable broadcasts every time that @unconfirmed_idents is
         # empty, which will happen about every 10mb of data as that's when the server
@@ -281,23 +279,27 @@ module RSpec::Buildkite::Analytics
         # send the EOT message, so the prior broadcasts shouldn't do anything.
         if @unconfirmed_idents.empty?
           @empty.broadcast
-          @logger.write("broadcast empty")
+
+          retransmit_required = false
+
+          @logger.write("all identifiers have been confirmed")
         else
-          @logger.write("still waiting on confirm for #{@unconfirmed_idents.keys}")
+          @logger.write("still waiting on confirm for identifiers: #{@unconfirmed_idents.keys}")
         end
       end
+
+      # If we're closing, any unconfirmed results need to be retransmitted.
+      retransmit if retransmit_required
     end
 
     def send_eot
       @eot_queued_mutex.synchronize do
         return if @eot_queued
-        # Expect server to respond with data of indentifiers last upload part
-        data = {
+
+        @send_queue << {
           "action" => "end_of_transmission",
           "examples_count" => @examples_count.to_json
         }
-
-        @send_queue << data
         @eot_queued = true
 
         @logger.write("added EOT to send queue")
@@ -310,7 +312,7 @@ module RSpec::Buildkite::Analytics
 
       case
       when data["message"].key?("confirm")
-        remove_unconfirmed_idents(data["message"]["confirm"])
+        confirm_idents(data["message"]["confirm"])
       else
         # unhandled message
         @logger.write("received unhandled message #{data["message"]}")
@@ -322,13 +324,12 @@ module RSpec::Buildkite::Analytics
         results = @unconfirmed_idents.values
 
         # queue the contents of the buffer, unless it's empty
-        unless results.empty?
-          data = {
+        if results.any?
+          @send_queue << {
             "action" => "record_results",
             "results" => results
           }
 
-          @send_queue << data
           @logger.write("queueing up retransmitted results #{@unconfirmed_idents.keys}")
         end
       end
