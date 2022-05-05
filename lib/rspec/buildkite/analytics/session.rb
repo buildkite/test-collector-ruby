@@ -121,7 +121,9 @@ module RSpec::Buildkite::Analytics
       # proceed without waiting.
       @idents_mutex.synchronize do
         if @unconfirmed_idents.any?
+          puts "Waiting for Buildkite Test Analytics to send results..."
           @logger.write("waiting for last confirm")
+
           @empty.wait(@idents_mutex, CONFIRMATION_TIMEOUT)
         end
       end
@@ -130,6 +132,8 @@ module RSpec::Buildkite::Analytics
       @connection.close
       # We kill the write thread cos it's got a while loop in it, so it won't finish otherwise
       @write_thread&.kill
+
+      puts "Buildkite Test Analytics completed"
       @logger.write("socket connection closed")
     end
 
@@ -183,6 +187,7 @@ module RSpec::Buildkite::Analytics
 
       wait_for_confirm
 
+      puts "Connected to Buildkite Test Analytics!"
       @logger.write("connected")
     end
 
