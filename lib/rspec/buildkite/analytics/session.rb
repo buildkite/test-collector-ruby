@@ -5,9 +5,9 @@ require_relative "socket_connection"
 module RSpec::Buildkite::Analytics
   class Session
     # Picked 75 as the magic timeout number as it's longer than the TCP timeout of 60s 🤷‍♀️
-    CONFIRMATION_TIMEOUT = 75
-    MAX_RECONNECTION_ATTEMPTS = 3
-    WAIT_BETWEEN_RECONNECTIONS = 5
+    CONFIRMATION_TIMEOUT = ENV.fetch("BUILDKITE_ANALYTICS_CONFIRMATION_TIMEOUT") { 75 }.to_i
+    MAX_RECONNECTION_ATTEMPTS = ENV.fetch("BUILDKITE_ANALYTICS_RECONNECTION_ATTEMPTS") { 3 }.to_i
+    WAIT_BETWEEN_RECONNECTIONS = ENV.fetch("BUILDKITE_ANALYTICS_RECONNECTION_WAIT") { 5 }.to_i
 
     class RejectedSubscription < StandardError; end
     class InitialConnectionFailure < StandardError; end
