@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## v0.8.1
+
+- Improve the EOT confirmation #93 — @blaknite
+
 ## v0.8.0
 
 - Support multiple CI platforms and generic env #80 — @blaknite
