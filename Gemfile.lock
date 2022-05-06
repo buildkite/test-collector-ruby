@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    rspec-buildkite-analytics (0.8.0)
+    rspec-buildkite-analytics (0.8.1)
       activesupport (>= 5.2, < 8)
       rspec-core (~> 3.10)
       rspec-expectations (~> 3.10)
@@ -10,7 +10,7 @@ PATH
 GEM
   remote: https://rubygems.org/
   specs:
-    activesupport (7.0.2.3)
+    activesupport (7.0.2.4)
       concurrent-ruby (~> 1.0, >= 1.0.2)
       i18n (>= 1.6, < 2)
       minitest (>= 5.1)
