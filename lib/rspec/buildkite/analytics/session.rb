@@ -8,6 +8,7 @@ module RSpec::Buildkite::Analytics
     CONFIRMATION_TIMEOUT = ENV.fetch("BUILDKITE_ANALYTICS_CONFIRMATION_TIMEOUT") { 75 }.to_i
     MAX_RECONNECTION_ATTEMPTS = ENV.fetch("BUILDKITE_ANALYTICS_RECONNECTION_ATTEMPTS") { 3 }.to_i
     WAIT_BETWEEN_RECONNECTIONS = ENV.fetch("BUILDKITE_ANALYTICS_RECONNECTION_WAIT") { 5 }.to_i
+    UPLOAD_MESSAGES = ENV.fetch("BUILDKITE_ANALYTICS_UPLOAD_MESSAGES") { 1 }.to_i
 
     class RejectedSubscription < StandardError; end
     class InitialConnectionFailure < StandardError; end
@@ -121,7 +122,9 @@ module RSpec::Buildkite::Analytics
       # proceed without waiting.
       @idents_mutex.synchronize do
         if @unconfirmed_idents.any?
-          puts "Waiting for Buildkite Test Analytics to send results..."
+          if UPLOAD_MESSAGES == 1
+            puts "Waiting for Buildkite Test Analytics to send results..."
+          end
           @logger.write("waiting for last confirm")
 
           @empty.wait(@idents_mutex, CONFIRMATION_TIMEOUT)
@@ -133,7 +136,9 @@ module RSpec::Buildkite::Analytics
       # We kill the write thread cos it's got a while loop in it, so it won't finish otherwise
       @write_thread&.kill
 
-      puts "Buildkite Test Analytics completed"
+      if UPLOAD_MESSAGES == 1
+        puts "Buildkite Test Analytics completed"
+      end
       @logger.write("socket connection closed")
     end
 
@@ -187,7 +192,9 @@ module RSpec::Buildkite::Analytics
 
       wait_for_confirm
 
-      puts "Connected to Buildkite Test Analytics!"
+      if UPLOAD_MESSAGES == 1
+        puts "Connected to Buildkite Test Analytics!"
+      end
       @logger.write("connected")
     end
 
