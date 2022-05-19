@@ -29,7 +29,7 @@ $ bundle
 ```ruby
 require "rspec/buildkite/analytics"
 
-RSpec::Buildkite::Analytics.configure(ENV["TEST_ANALYTICS_TOKEN"])
+RSpec::Buildkite::Analytics.configure(ENV["BUILDKITE_ANALYTICS_TOKEN"])
 ```
 
 5. Commit and push your changes to start analysing your tests
