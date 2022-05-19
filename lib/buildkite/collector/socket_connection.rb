@@ -66,7 +66,7 @@ module Buildkite::Collector
       # Setting up a new thread that listens on the socket, and processes incoming
       # comms from the server
       @thread = Thread.new do
-        @session.logger.write("listening in on socket")
+        Buildkite::Collector.logger.debug("listening in on socket")
         frame = WebSocket::Frame::Incoming::Client.new
 
         while @socket
@@ -77,24 +77,24 @@ module Buildkite::Collector
           end
         end
       rescue EOFError, Errno::ECONNRESET => e
-        @session.logger.write("#{e}")
+        Buildkite::Collector.logger.error("#{e}")
         if @socket
-          @session.logger.write("attempting disconnected flow")
+          Buildkite::Collector.logger.error("attempting disconnected flow")
           @session.disconnected(self)
           disconnect
         end
       rescue IOError
         # This is fine to ignore
-        @session.logger.write("IOError")
+        Buildkite::Collector.logger.error("IOError")
       rescue IndexError
         # I don't like that we're doing this but I think it's the best of the options
         #
         # This relates to this issue https://github.com/ruby/openssl/issues/452
         # A fix for it has been released but the repercussions of overriding
         # the OpenSSL version in the stdlib seem worse than catching this error here.
-        @session.logger.write("IndexError")
+        Buildkite::Collector.logger.error("IndexError")
         if @socket
-          @session.logger.write("attempting disconnected flow")
+          Buildkite::Collector.logger.error("attempting disconnected flow")
           @session.disconnected(self)
           disconnect
         end
@@ -111,7 +111,7 @@ module Buildkite::Collector
     rescue Errno::EPIPE, Errno::ECONNRESET, OpenSSL::SSL::SSLError => e
       return unless @socket
       return if type == :close
-      @session.logger.write("got #{e}, attempting disconnected flow")
+      Buildkite::Collector.logger.error("got #{e}, attempting disconnected flow")
       @session.disconnected(self)
       disconnect
     rescue IndexError
@@ -120,16 +120,16 @@ module Buildkite::Collector
       # This relates to this issue https://github.com/ruby/openssl/issues/452
       # A fix for it has been released but the repercussions of overriding
       # the OpenSSL version in the stdlib seem worse than catching this error here.
-      @session.logger.write("IndexError")
+      Buildkite::Collector.logger.error("IndexError")
       if @socket
-        @session.logger.write("attempting disconnected flow")
+        Buildkite::Collector.logger.error("attempting disconnected flow")
         @session.disconnected(self)
         disconnect
       end
     end
 
     def close
-      @session.logger.write("socket close")
+      Buildkite::Collector.logger.debug("socket close")
       transmit(nil, type: :close)
       disconnect
     end
@@ -137,7 +137,7 @@ module Buildkite::Collector
     private
 
     def disconnect
-      @session.logger.write("socket disconnect")
+      Buildkite::Collector.logger.debug("socket disconnect")
       socket = @socket
       @socket = nil
       socket&.close

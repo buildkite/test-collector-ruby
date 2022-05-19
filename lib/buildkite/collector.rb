@@ -4,6 +4,7 @@ require "timeout"
 require "tmpdir"
 
 require_relative "collector/version"
+require_relative "collector/logger"
 
 module Buildkite
   module Collector

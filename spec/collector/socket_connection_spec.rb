@@ -29,8 +29,6 @@ RSpec.describe Buildkite::Collector::SocketConnection do
 
     allow(WebSocket::Frame::Outgoing::Client).to receive(:new).and_return(frame_double)
     allow(frame_double).to receive(:to_s).and_return("hi")
-
-    allow(session_double).to receive_message_chain("logger.write").with(anything).and_return(nil)
   end
 
   describe "#transmit" do
