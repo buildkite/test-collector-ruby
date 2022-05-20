@@ -3,7 +3,7 @@
 require "timeout"
 require "tmpdir"
 
-require_relative "analytics/version"
+require_relative "collector/version"
 
 module Buildkite
   module Collector
@@ -31,7 +31,7 @@ module Buildkite
     end
 
     def self.hook_into(hook)
-      file = "analytics/library_hooks/#{hook}"
+      file = "collector/library_hooks/#{hook}"
       require_relative file
     rescue LoadError => e
       raise ArgumentError.new("#{hook.inspect} is not a supported Buildkite Analytics Test library hook.")

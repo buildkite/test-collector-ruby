@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require_relative "lib/rspec/buildkite/analytics/version"
+require_relative "lib/buildkite/collector/version"
 
 Gem::Specification.new do |spec|
   spec.name          = "rspec-buildkite-analytics"
