@@ -1,9 +1,9 @@
 # frozen_string_literal: true
 
-require "rspec/buildkite/analytics/uploader"
+require "buildkite/collector/rspec_plugin/trace"
 
-RSpec.describe "Buildkite::Collector::Uploader::Trace" do
-  subject(:trace) { Buildkite::Collector::Uploader::Trace.new(example, history) }
+RSpec.describe Buildkite::Collector::RSpecPlugin::Trace do
+  subject(:trace) { Buildkite::Collector::RSpecPlugin::Trace.new(example, history: history) }
   let(:example) { double(id: "test for invalid character '\xC8'").as_null_object }
   let(:history) do
     {

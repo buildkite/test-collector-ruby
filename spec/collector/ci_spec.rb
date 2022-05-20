@@ -1,8 +1,8 @@
 # frozen_string_literal: true
 
-require "rspec/buildkite/analytics/ci"
+require "buildkite/collector/ci"
 
-RSpec.describe "Buildkite::Collector::CI" do
+RSpec.describe Buildkite::Collector::CI do
   describe ".env" do
     let(:ci) { "true" }
     let(:key) { SecureRandom.uuid }

@@ -1,10 +1,10 @@
 # frozen_string_literal: true
 
 require "websocket"
-require "rspec/buildkite/analytics/session"
-require "rspec/buildkite/analytics/socket_connection"
+require "buildkite/collector/session"
+require "buildkite/collector/socket_connection"
 
-RSpec.describe "Buildkite::Collector::SocketConnection" do
+RSpec.describe Buildkite::Collector::SocketConnection do
   let(:session_double) { instance_double("Buildkite::Collector::Session") }
   let(:socket_connection) { Buildkite::Collector::SocketConnection.new(session_double, "fake_url", {}) }
   let(:ssl_socket_double) { instance_double("OpenSSL::SSL::SSLSocket") }
