@@ -3,6 +3,6 @@
 module Buildkite
   module Collector
     VERSION = "0.8.1"
-    NAME = "buildkite-collector"
+    NAME = "rspec-buildkite-analytics"
   end
 end
