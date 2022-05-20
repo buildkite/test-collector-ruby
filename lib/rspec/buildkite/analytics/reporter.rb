@@ -16,7 +16,9 @@ module RSpec::Buildkite::Analytics
 
       if trace
         trace.example = example
-        trace.failure_reason, trace.failure_expanded = failure_info(notification) if example.execution_result.status == :failed
+        if example.execution_result.status == :failed
+          trace.failure_reason, trace.failure_expanded = failure_info(notification)
+        end
         RSpec::Buildkite::Analytics.session&.write_result(trace)
       end
     end

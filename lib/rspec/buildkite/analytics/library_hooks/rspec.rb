@@ -23,7 +23,7 @@ RSpec.configure do |config|
 
     tracer.finalize
 
-    trace = RSpec::Buildkite::Analytics::Uploader::Trace.new(example, tracer.history)
+    trace = RSpec::Buildkite::Analytics::Trace.new(example, history: tracer.history)
     RSpec::Buildkite::Analytics.uploader.traces[example.id] = trace
   end
 end
