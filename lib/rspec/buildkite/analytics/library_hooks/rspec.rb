@@ -2,12 +2,14 @@ require "rspec/core"
 require "rspec/expectations"
 
 require_relative "../uploader"
+require_relative "../rspec_plugin/reporter"
+require_relative "../rspec_plugin/trace"
 
 RSpec::Buildkite::Analytics.uploader = RSpec::Buildkite::Analytics::Uploader
 
 RSpec.configure do |config|
   config.before(:suite) do
-    config.add_formatter RSpec::Buildkite::Analytics::Reporter
+    config.add_formatter RSpec::Buildkite::Analytics::RSpecPlugin::Reporter
 
     RSpec::Buildkite::Analytics::Uploader.configure
   end
@@ -23,7 +25,7 @@ RSpec.configure do |config|
 
     tracer.finalize
 
-    trace = RSpec::Buildkite::Analytics::Trace.new(example, history: tracer.history)
+    trace = RSpec::Buildkite::Analytics::RSpecPlugin::Trace.new(example, history: tracer.history)
     RSpec::Buildkite::Analytics.uploader.traces[example.id] = trace
   end
 end

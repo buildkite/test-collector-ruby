@@ -7,12 +7,10 @@ require "net/http"
 require "openssl"
 require "websocket"
 
-require_relative "trace"
 require_relative "tracer"
 require_relative "network"
 require_relative "object"
 require_relative "session"
-require_relative "reporter"
 require_relative "ci"
 
 require "active_support"

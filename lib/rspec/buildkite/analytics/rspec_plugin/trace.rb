@@ -1,4 +1,4 @@
-class RSpec::Buildkite::Analytics::Trace
+class RSpec::Buildkite::Analytics::RSpecPlugin::Trace
   attr_accessor :example, :failure_reason, :failure_expanded
   attr_reader :id, :history
 

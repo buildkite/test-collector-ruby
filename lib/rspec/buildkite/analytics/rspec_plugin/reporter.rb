@@ -1,6 +1,6 @@
 require "time"
 
-module RSpec::Buildkite::Analytics
+module RSpec::Buildkite::Analytics::RSpecPlugin
   class Reporter
     RSpec::Core::Formatters.register self, :example_passed, :example_failed, :example_pending, :dump_summary
 
