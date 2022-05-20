@@ -20,15 +20,20 @@ module RSpec::Buildkite::Analytics
     attr_accessor :debug_filepath
   end
 
-  def self.configure(token: nil, url: nil, debug_enabled: false, debug_filepath: nil)
+  def self.configure(token: nil, url: nil, debug_enabled: false, debug_filepath: nil, hook: :rspec)
     self.api_token = token || ENV["BUILDKITE_ANALYTICS_TOKEN"]
     self.url = url || DEFAULT_URL
     self.debug_enabled = debug_enabled || !!(ENV["BUILDKITE_ANALYTICS_DEBUG_ENABLED"])
     self.debug_filepath = debug_filepath || ENV["BUILDKITE_ANALYTICS_DEBUG_FILEPATH"] || Dir.tmpdir
 
-    require_relative "analytics/uploader"
+    self.hook_into(hook)
+  end
 
-    self::Uploader.configure
+  def self.hook_into(hook)
+    file = "analytics/library_hooks/#{hook}"
+    require_relative file
+  rescue LoadError => e
+    raise ArgumentError.new("#{hook.inspect} is not a supported Buildkite Analytics Test library hook.")
   end
 
   def self.annotate(content)
