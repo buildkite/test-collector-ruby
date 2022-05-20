@@ -2,8 +2,8 @@
 
 require "rspec/buildkite/analytics/uploader"
 
-RSpec.describe "RSpec::Buildkite::Analytics::Uploader::Trace" do
-  subject(:trace) { RSpec::Buildkite::Analytics::Uploader::Trace.new(example, history) }
+RSpec.describe "Buildkite::Collector::Uploader::Trace" do
+  subject(:trace) { Buildkite::Collector::Uploader::Trace.new(example, history) }
   let(:example) { double(id: "test for invalid character '\xC8'").as_null_object }
   let(:history) do
     {

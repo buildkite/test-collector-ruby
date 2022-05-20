@@ -4,7 +4,7 @@ require_relative "lib/rspec/buildkite/analytics/version"
 
 Gem::Specification.new do |spec|
   spec.name          = "rspec-buildkite-analytics"
-  spec.version       = RSpec::Buildkite::Analytics::VERSION
+  spec.version       = Buildkite::Collector::VERSION
   spec.authors       = ["Buildkite"]
   spec.email         = ["hello@buildkite.com"]
 

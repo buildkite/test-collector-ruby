@@ -2,7 +2,7 @@
 
 require_relative "socket_connection"
 
-module RSpec::Buildkite::Analytics
+module Buildkite::Collector
   class Session
     # Picked 75 as the magic timeout number as it's longer than the TCP timeout of 60s 🤷‍♀️
     CONFIRMATION_TIMEOUT = ENV.fetch("BUILDKITE_ANALYTICS_CONFIRMATION_TIMEOUT") { 75 }.to_i
@@ -224,7 +224,7 @@ module RSpec::Buildkite::Analytics
             "data" => data.to_json
           })
 
-          if RSpec::Buildkite::Analytics.debug_enabled
+          if Buildkite::Collector.debug_enabled
             ids = if message_type == "record_results"
               data["results"].map { |result| result["id"] }
             end
@@ -235,7 +235,7 @@ module RSpec::Buildkite::Analytics
     end
 
     def pop_with_timeout(message_type)
-      Timeout.timeout(30, RSpec::Buildkite::Analytics::TimeoutError, "Timeout: Waited 30 seconds for #{message_type}") do
+      Timeout.timeout(30, Buildkite::Collector::TimeoutError, "Timeout: Waited 30 seconds for #{message_type}") do
         @establish_subscription_queue.pop
       end
     end

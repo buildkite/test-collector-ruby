@@ -2,7 +2,7 @@
 
 require "rspec/buildkite/analytics/ci"
 
-RSpec.describe "RSpec::Buildkite::Analytics::CI" do
+RSpec.describe "Buildkite::Collector::CI" do
   describe ".env" do
     let(:ci) { "true" }
     let(:key) { SecureRandom.uuid }
@@ -13,8 +13,8 @@ RSpec.describe "RSpec::Buildkite::Analytics::CI" do
     let(:job_id) { "242424" }
     let(:message) { "bananas are tasty" }
     let(:debug) { "true" }
-    let(:version) { RSpec::Buildkite::Analytics::VERSION }
-    let(:name) { RSpec::Buildkite::Analytics::NAME }
+    let(:version) { Buildkite::Collector::VERSION }
+    let(:name) { Buildkite::Collector::NAME }
 
     before do
       allow(ENV).to receive(:[]).and_call_original
@@ -49,7 +49,7 @@ RSpec.describe "RSpec::Buildkite::Analytics::CI" do
       end
 
       it "returns all env" do
-        result = RSpec::Buildkite::Analytics::CI.env
+        result = Buildkite::Collector::CI.env
 
         expect(result).to match({
           "CI" => "buildkite",
@@ -78,7 +78,7 @@ RSpec.describe "RSpec::Buildkite::Analytics::CI" do
         end
 
         it "returns the analytics env" do
-          result = RSpec::Buildkite::Analytics::CI.env
+          result = Buildkite::Collector::CI.env
 
           expect(result).to match({
             "CI" => "buildkite",
@@ -118,7 +118,7 @@ RSpec.describe "RSpec::Buildkite::Analytics::CI" do
       end
 
       it "returns all env" do
-        result = RSpec::Buildkite::Analytics::CI.env
+        result = Buildkite::Collector::CI.env
 
         expect(result).to match({
           "CI" => "github_actions",
@@ -145,7 +145,7 @@ RSpec.describe "RSpec::Buildkite::Analytics::CI" do
         end
 
         it "returns the analytics env" do
-          result = RSpec::Buildkite::Analytics::CI.env
+          result = Buildkite::Collector::CI.env
 
           expect(result).to match({
             "CI" => "github_actions",
@@ -181,7 +181,7 @@ RSpec.describe "RSpec::Buildkite::Analytics::CI" do
       end
 
       it "returns all env" do
-        result = RSpec::Buildkite::Analytics::CI.env
+        result = Buildkite::Collector::CI.env
 
         expect(result).to match({
           "CI" => "circleci",
@@ -208,7 +208,7 @@ RSpec.describe "RSpec::Buildkite::Analytics::CI" do
         end
 
         it "returns the analytics env" do
-          result = RSpec::Buildkite::Analytics::CI.env
+          result = Buildkite::Collector::CI.env
 
           expect(result).to match({
             "CI" => "circleci",
@@ -235,7 +235,7 @@ RSpec.describe "RSpec::Buildkite::Analytics::CI" do
       end
 
       it "returns all env" do
-        result = RSpec::Buildkite::Analytics::CI.env
+        result = Buildkite::Collector::CI.env
 
         expect(result).to match({
           "CI" => "generic",
@@ -258,7 +258,7 @@ RSpec.describe "RSpec::Buildkite::Analytics::CI" do
         end
 
         it "returns the analytics env" do
-          result = RSpec::Buildkite::Analytics::CI.env
+          result = Buildkite::Collector::CI.env
 
           expect(result).to match({
             "CI" => "generic",
@@ -283,7 +283,7 @@ RSpec.describe "RSpec::Buildkite::Analytics::CI" do
       end
 
       it "returns all env" do
-        result = RSpec::Buildkite::Analytics::CI.env
+        result = Buildkite::Collector::CI.env
 
         expect(result).to match({
           "CI" => nil,
@@ -306,7 +306,7 @@ RSpec.describe "RSpec::Buildkite::Analytics::CI" do
         end
 
         it "returns the analytics env" do
-          result = RSpec::Buildkite::Analytics::CI.env
+          result = Buildkite::Collector::CI.env
 
           expect(result).to match({
             "CI" => nil,

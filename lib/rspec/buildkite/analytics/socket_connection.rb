@@ -4,7 +4,7 @@ require "socket"
 require "openssl"
 require "json"
 
-module RSpec::Buildkite::Analytics
+module Buildkite::Collector
   class SocketConnection
     class HandshakeError < StandardError; end
     class SocketError < StandardError; end

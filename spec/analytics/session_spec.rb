@@ -3,9 +3,9 @@
 require "rspec/buildkite/analytics/session"
 require "rspec/buildkite/analytics/socket_connection"
 
-RSpec.describe "RSpec::Buildkite::Analytics::Session" do
-  let(:socket_double) { instance_double("RSpec::Buildkite::Analytics::SocketConnection") }
-  let(:session) { RSpec::Buildkite::Analytics::Session.new("fake_url", "fake_auth", "fake_channel") }
+RSpec.describe "Buildkite::Collector::Session" do
+  let(:socket_double) { instance_double("Buildkite::Collector::SocketConnection") }
+  let(:session) { Buildkite::Collector::Session.new("fake_url", "fake_auth", "fake_channel") }
   let(:examples_count) do
     {
       examples: 3,
@@ -17,7 +17,7 @@ RSpec.describe "RSpec::Buildkite::Analytics::Session" do
 
   before do
     # mock the SocketConnection new method to send the welcome message
-    allow(RSpec::Buildkite::Analytics::SocketConnection).to receive(:new) { |session, _, _|
+    allow(Buildkite::Collector::SocketConnection).to receive(:new) { |session, _, _|
       @session = session
       @session.handle(socket_double, {"type"=> "welcome"}.to_json)
       socket_double
@@ -29,14 +29,14 @@ RSpec.describe "RSpec::Buildkite::Analytics::Session" do
       "identifier" => "fake_channel"
     }) { @session.handle(socket_double, {"type"=> "confirm_subscription", "identifier"=> "fake_channel"}.to_json) }
 
-    stub_const("RSpec::Buildkite::Analytics::Session::WAIT_BETWEEN_RECONNECTIONS", 0)
-    stub_const("RSpec::Buildkite::Analytics::Session::CONFIRMATION_TIMEOUT", 5)
+    stub_const("Buildkite::Collector::Session::WAIT_BETWEEN_RECONNECTIONS", 0)
+    stub_const("Buildkite::Collector::Session::CONFIRMATION_TIMEOUT", 5)
   end
 
   describe "#initalize" do
     before do
       # mock the SocketConnection new method to send the confirm message, when it should be sending the welcome
-      allow(RSpec::Buildkite::Analytics::SocketConnection).to receive(:new) { |session, _, _|
+      allow(Buildkite::Collector::SocketConnection).to receive(:new) { |session, _, _|
         @session = session
         @session.handle(socket_double, {"type"=> "confirm_subscription"}.to_json)
         socket_double
@@ -95,7 +95,7 @@ RSpec.describe "RSpec::Buildkite::Analytics::Session" do
   end
 
   describe "#write_result" do
-    let(:fake_trace) { instance_double("RSpec::Buildkite::Analytics::Uploader::Trace") }
+    let(:fake_trace) { instance_double("Buildkite::Collector::Uploader::Trace") }
     let(:fake_trace_id) { "33569b01-4180-4416-9631-c25d370a4c96" }
     let(:trace_hash) do
       {
@@ -130,21 +130,21 @@ RSpec.describe "RSpec::Buildkite::Analytics::Session" do
     it "does a reconnect and redoes the socket" do
       session.disconnected(socket_double)
 
-      expect(RSpec::Buildkite::Analytics::SocketConnection).to have_received(:new).twice
+      expect(Buildkite::Collector::SocketConnection).to have_received(:new).twice
     end
 
     it "retries reconnection if it gets a handshake error" do
       # stub connection so that it is successful the first time, then raises an error,
       # and then is successful again
       call_count = 0
-      allow(RSpec::Buildkite::Analytics::SocketConnection).to receive(:new) { |session, _, _|
+      allow(Buildkite::Collector::SocketConnection).to receive(:new) { |session, _, _|
         call_count += 1
         if call_count.odd?
           @session = session
           @session.handle(socket_double, {"type"=> "welcome"}.to_json)
           socket_double
         else
-          raise RSpec::Buildkite::Analytics::SocketConnection::HandshakeError
+          raise Buildkite::Collector::SocketConnection::HandshakeError
         end
       }
 
@@ -153,7 +153,7 @@ RSpec.describe "RSpec::Buildkite::Analytics::Session" do
       # This expectation is for 3 times because the socket connects initially, then
       # after disconnection there is one connection attempt that throws an error,
       # and then the retry of the connection is successful
-      expect(RSpec::Buildkite::Analytics::SocketConnection)
+      expect(Buildkite::Collector::SocketConnection)
         .to have_received(:new).exactly(3).times
     end
 
@@ -161,14 +161,14 @@ RSpec.describe "RSpec::Buildkite::Analytics::Session" do
       # stub connection so that it is successful the first time, then raises an error,
       # and then is successful again
       call_count = 0
-      allow(RSpec::Buildkite::Analytics::SocketConnection).to receive(:new) { |session, _, _|
+      allow(Buildkite::Collector::SocketConnection).to receive(:new) { |session, _, _|
         call_count += 1
         if call_count.odd?
           @session = session
           @session.handle(socket_double, {"type"=> "welcome"}.to_json)
           socket_double
         else
-          raise RSpec::Buildkite::Analytics::SocketConnection::SocketError
+          raise Buildkite::Collector::SocketConnection::SocketError
         end
       }
 
@@ -177,7 +177,7 @@ RSpec.describe "RSpec::Buildkite::Analytics::Session" do
       # This expectation is for 3 times because the socket connects initially, then
       # after disconnection there is one connection attempt that throws an error,
       # and then the retry of the connection is successful
-      expect(RSpec::Buildkite::Analytics::SocketConnection)
+      expect(Buildkite::Collector::SocketConnection)
         .to have_received(:new).exactly(3).times
     end
 
@@ -193,7 +193,7 @@ RSpec.describe "RSpec::Buildkite::Analytics::Session" do
           if call_count.odd?
             @session.handle(socket_double, {"type"=> "confirm_subscription", "identifier"=> "fake_channel"}.to_json)
           else
-            raise RSpec::Buildkite::Analytics::Session::RejectedSubscription
+            raise Buildkite::Collector::Session::RejectedSubscription
           end
       }
 
@@ -202,7 +202,7 @@ RSpec.describe "RSpec::Buildkite::Analytics::Session" do
       # This expectation is for 3 times because the socket connects initially, then
       # after disconnection there is one connection attempt that throws an error,
       # and then the retry of the connection is successful
-      expect(RSpec::Buildkite::Analytics::SocketConnection)
+      expect(Buildkite::Collector::SocketConnection)
         .to have_received(:new).exactly(3).times
     end
 
@@ -214,7 +214,7 @@ RSpec.describe "RSpec::Buildkite::Analytics::Session" do
         call_count += 1
         case call_count
         when 1
-          raise RSpec::Buildkite::Analytics::TimeoutError
+          raise Buildkite::Collector::TimeoutError
         when 2
           { "type" => "welcome" }
         when 3
@@ -227,7 +227,7 @@ RSpec.describe "RSpec::Buildkite::Analytics::Session" do
       # This expectation is for 3 times because the socket connects initially, then
       # after disconnection there is one connection attempt that throws an error,
       # and then the retry of the connection is successful
-      expect(RSpec::Buildkite::Analytics::SocketConnection)
+      expect(Buildkite::Collector::SocketConnection)
         .to have_received(:new).exactly(3).times
     end
 
@@ -263,7 +263,7 @@ RSpec.describe "RSpec::Buildkite::Analytics::Session" do
 
     it "raises error if it can't reconnect after 3 goes" do
       call_count = 0
-      allow(RSpec::Buildkite::Analytics::SocketConnection).to receive(:new) { |session, _, _|
+      allow(Buildkite::Collector::SocketConnection).to receive(:new) { |session, _, _|
         call_count += 1
         # let the initial connection be successful
         if call_count == 1
@@ -272,14 +272,14 @@ RSpec.describe "RSpec::Buildkite::Analytics::Session" do
           socket_double
         else
           # every other connection attempt will raise an error
-          raise RSpec::Buildkite::Analytics::SocketConnection::SocketError
+          raise Buildkite::Collector::SocketConnection::SocketError
         end
       }
 
-      expect { session.disconnected(socket_double) }.to raise_error(RSpec::Buildkite::Analytics::SocketConnection::SocketError)
+      expect { session.disconnected(socket_double) }.to raise_error(Buildkite::Collector::SocketConnection::SocketError)
 
       # This expectation is for 5 times because the socket connects initially, then it has 2 retries, then on the fourth retry the error is thrown
-      expect(RSpec::Buildkite::Analytics::SocketConnection).to have_received(:new).exactly(5).times
+      expect(Buildkite::Collector::SocketConnection).to have_received(:new).exactly(5).times
     end
   end
 end

@@ -2,7 +2,7 @@
 
 require "active_support/core_ext/hash/indifferent_access"
 
-module RSpec::Buildkite::Analytics
+module Buildkite::Collector
   class Tracer
     class Span
       attr_accessor :section, :start_at, :end_at, :detail, :children

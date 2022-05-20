@@ -4,9 +4,9 @@ require "websocket"
 require "rspec/buildkite/analytics/session"
 require "rspec/buildkite/analytics/socket_connection"
 
-RSpec.describe "RSpec::Buildkite::Analytics::SocketConnection" do
-  let(:session_double) { instance_double("RSpec::Buildkite::Analytics::Session") }
-  let(:socket_connection) { RSpec::Buildkite::Analytics::SocketConnection.new(session_double, "fake_url", {}) }
+RSpec.describe "Buildkite::Collector::SocketConnection" do
+  let(:session_double) { instance_double("Buildkite::Collector::Session") }
+  let(:socket_connection) { Buildkite::Collector::SocketConnection.new(session_double, "fake_url", {}) }
   let(:ssl_socket_double) { instance_double("OpenSSL::SSL::SSLSocket") }
   let(:tcp_socket_double) { instance_double("TCPSocket") }
   let(:handshake_double) { instance_double("WebSocket::Handshake::Client") }

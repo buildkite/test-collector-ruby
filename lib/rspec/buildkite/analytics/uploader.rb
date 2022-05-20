@@ -18,7 +18,7 @@ require "active_support/notifications"
 
 require "securerandom"
 
-module RSpec::Buildkite::Analytics
+module Buildkite::Collector
   class Uploader
     def self.traces
       @traces ||= {}
@@ -36,26 +36,26 @@ module RSpec::Buildkite::Analytics
     ]
 
     def self.configure
-      if RSpec::Buildkite::Analytics.api_token
-        contact_uri = URI.parse(RSpec::Buildkite::Analytics.url)
+      if Buildkite::Collector.api_token
+        contact_uri = URI.parse(Buildkite::Collector.url)
 
         http = Net::HTTP.new(contact_uri.host, contact_uri.port)
         http.use_ssl = contact_uri.scheme == "https"
 
-        authorization_header = "Token token=\"#{RSpec::Buildkite::Analytics.api_token}\""
+        authorization_header = "Token token=\"#{Buildkite::Collector.api_token}\""
 
         contact = Net::HTTP::Post.new(contact_uri.path, {
           "Authorization" => authorization_header,
           "Content-Type" => "application/json",
         })
         contact.body = {
-          run_env: RSpec::Buildkite::Analytics::CI.env,
+          run_env: Buildkite::Collector::CI.env,
           format: "websocket"
         }.to_json
 
         response = begin
           http.request(contact)
-        rescue *RSpec::Buildkite::Analytics::REQUEST_EXCEPTIONS => e
+        rescue *Buildkite::Collector::REQUEST_EXCEPTIONS => e
           puts "Buildkite Test Analytics: Error communicating with the server: #{e.message}"
         end
 
@@ -68,7 +68,7 @@ module RSpec::Buildkite::Analytics
           json = JSON.parse(response.body)
 
           if (socket_url = json["cable"]) && (channel = json["channel"])
-            RSpec::Buildkite::Analytics.session = RSpec::Buildkite::Analytics::Session.new(socket_url, authorization_header, channel)
+            Buildkite::Collector.session = Buildkite::Collector::Session.new(socket_url, authorization_header, channel)
           end
         else
           request_id = response.to_hash["x-request-id"]
