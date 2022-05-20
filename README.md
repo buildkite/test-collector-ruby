@@ -27,9 +27,9 @@ $ bundle
 4. Add the Test Analytics code to your application in `spec/spec_helper.rb`, and [set the environment variable securely](https://buildkite.com/docs/pipelines/secrets) on your agent or agents.
 
 ```ruby
-require "rspec/buildkite/analytics"
+require "buildkite/collector"
 
-RSpec::Buildkite::Analytics.configure(ENV["BUILDKITE_ANALYTICS_TOKEN"])
+Buildkite::Collector.configure(ENV["BUILDKITE_ANALYTICS_TOKEN"])
 ```
 
 5. Commit and push your changes to start analysing your tests
