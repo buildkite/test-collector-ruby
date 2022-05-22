@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require "rspec/buildkite/analytics"
+require "buildkite/collector"
 
 Dir["spec/support/**/*.rb"].each { |f| require File.expand_path(f) }
 

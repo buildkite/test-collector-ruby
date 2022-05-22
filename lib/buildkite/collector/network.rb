@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-module RSpec::Buildkite::Analytics
+module Buildkite::Collector
   class Network
     module NetHTTPPatch
       def request(request, *args, &block)
@@ -11,7 +11,7 @@ module RSpec::Buildkite::Analytics
 
         detail = { method: request.method.upcase, url: uri.to_s, lib: "net-http" }
 
-        http_tracer = RSpec::Buildkite::Analytics::Uploader.tracer
+        http_tracer = Buildkite::Collector::Uploader.tracer
         http_tracer&.enter("http", **detail)
 
         super
@@ -22,7 +22,7 @@ module RSpec::Buildkite::Analytics
 
     module VCRPatch
       def handle
-        if request_type == :stubbed_by_vcr && tracer = RSpec::Buildkite::Analytics::Uploader.tracer
+        if request_type == :stubbed_by_vcr && tracer = Buildkite::Collector::Uploader.tracer
           tracer.current_span.detail.merge!(stubbed: "vcr")
         end
 
@@ -34,7 +34,7 @@ module RSpec::Buildkite::Analytics
       def perform(request, options)
         detail = { method: request.verb.to_s.upcase, url: request.uri.to_s, lib: "http" }
 
-        http_tracer = RSpec::Buildkite::Analytics::Uploader.tracer
+        http_tracer = Buildkite::Collector::Uploader.tracer
         http_tracer&.enter("http", **detail)
 
         super
@@ -47,7 +47,7 @@ module RSpec::Buildkite::Analytics
       def response_for_request(request_signature)
         response_from_webmock = super
 
-        if response_from_webmock && tracer = RSpec::Buildkite::Analytics::Uploader.tracer
+        if response_from_webmock && tracer = Buildkite::Collector::Uploader.tracer
           tracer.current_span.detail.merge!(stubbed: "webmock")
         end
 

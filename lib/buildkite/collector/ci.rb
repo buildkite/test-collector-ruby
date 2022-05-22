@@ -2,7 +2,7 @@
 
 require "securerandom"
 
-class RSpec::Buildkite::Analytics::CI
+class Buildkite::Collector::CI
   def self.env
     new.env
   end
@@ -37,8 +37,8 @@ class RSpec::Buildkite::Analytics::CI
       "job_id" => ENV["BUILDKITE_ANALYTICS_JOB_ID"],
       "message" => ENV["BUILDKITE_ANANLYTICS_MESSAGE"],
       "debug" => ENV["BUILDKITE_ANALYTICS_DEBUG_ENABLED"],
-      "version" => RSpec::Buildkite::Analytics::VERSION,
-      "collector" => RSpec::Buildkite::Analytics::NAME,
+      "version" => Buildkite::Collector::VERSION,
+      "collector" => Buildkite::Collector::NAME,
   }.compact
   end
 

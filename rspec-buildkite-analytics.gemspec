@@ -1,14 +1,14 @@
 # frozen_string_literal: true
 
-require_relative "lib/rspec/buildkite/analytics/version"
+require_relative "lib/buildkite/collector/version"
 
 Gem::Specification.new do |spec|
   spec.name          = "rspec-buildkite-analytics"
-  spec.version       = RSpec::Buildkite::Analytics::VERSION
+  spec.version       = Buildkite::Collector::VERSION
   spec.authors       = ["Buildkite"]
   spec.email         = ["hello@buildkite.com"]
 
-  spec.summary       = "Track execution of specs and report to Buildkite Analytics"
+  spec.summary       = "Track test execution and report to Buildkite Analytics"
   spec.homepage      = "https://github.com/buildkite/rspec-buildkite-analytics"
   spec.license       = "MIT"
 

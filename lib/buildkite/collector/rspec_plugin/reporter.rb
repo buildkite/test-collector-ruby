@@ -1,6 +1,6 @@
 require "time"
 
-module RSpec::Buildkite::Analytics
+module Buildkite::Collector::RSpecPlugin
   class Reporter
     RSpec::Core::Formatters.register self, :example_passed, :example_failed, :example_pending, :dump_summary
 
@@ -12,17 +12,19 @@ module RSpec::Buildkite::Analytics
 
     def handle_example(notification)
       example = notification.example
-      trace = RSpec::Buildkite::Analytics.uploader.traces[example.id]
+      trace = Buildkite::Collector.uploader.traces[example.id]
 
       if trace
         trace.example = example
-        trace.failure_reason, trace.failure_expanded = failure_info(notification) if example.execution_result.status == :failed
-        RSpec::Buildkite::Analytics.session&.write_result(trace)
+        if example.execution_result.status == :failed
+          trace.failure_reason, trace.failure_expanded = failure_info(notification)
+        end
+        Buildkite::Collector.session&.write_result(trace)
       end
     end
 
     def dump_summary(notification)
-      if RSpec::Buildkite::Analytics.session.present?
+      if Buildkite::Collector.session.present?
         examples_count = {
           examples: notification.examples.count,
           failed: notification.failed_examples.count,
@@ -30,15 +32,15 @@ module RSpec::Buildkite::Analytics
           errors_outside_examples: notification.errors_outside_of_examples_count
         }
 
-        RSpec::Buildkite::Analytics.session.close(examples_count)
+        Buildkite::Collector.session.close(examples_count)
 
         # Write the debug file, if debug mode is enabled
-        if RSpec::Buildkite::Analytics.debug_enabled
-          filename = "#{RSpec::Buildkite::Analytics.debug_filepath}/bk-analytics-#{Time.now.strftime("%F-%R:%S")}-#{ENV["BUILDKITE_JOB_ID"]}.log.gz"
+        if Buildkite::Collector.debug_enabled
+          filename = "#{Buildkite::Collector.debug_filepath}/bk-analytics-#{Time.now.strftime("%F-%R:%S")}-#{ENV["BUILDKITE_JOB_ID"]}.log.gz"
 
           File.open(filename, "wb") do |f|
             gz = Zlib::GzipWriter.new(f)
-            gz.puts(RSpec::Buildkite::Analytics.session.logger.to_array)
+            gz.puts(Buildkite::Collector.session.logger.to_array)
             gz.close
           end
         end
@@ -59,7 +61,7 @@ module RSpec::Buildkite::Analytics
     def failure_info(notification)
       failure_expanded = []
 
-      if RSpec::Buildkite::Analytics::Reporter::MULTIPLE_ERRORS.include?(notification.exception.class)
+      if Buildkite::Collector::Reporter::MULTIPLE_ERRORS.include?(notification.exception.class)
         failure_reason = notification.exception.summary
         notification.exception.all_exceptions.each do |exception|
           # an example with multiple failures doesn't give us a

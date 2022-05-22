@@ -1,8 +1,8 @@
 # frozen_string_literal: true
 
-RSpec.describe RSpec::Buildkite::Analytics do
+RSpec.describe Buildkite::Collector do
   it "can configure api_token and url" do
-    analytics = RSpec::Buildkite::Analytics
+    analytics = Buildkite::Collector
     ENV["BUILDKITE_ANALYTICS_TOKEN"] = "MyToken"
 
     analytics.configure
