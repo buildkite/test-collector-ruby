@@ -33,17 +33,6 @@ module Buildkite::Collector::RSpecPlugin
         }
 
         Buildkite::Collector.session.close(examples_count)
-
-        # Write the debug file, if debug mode is enabled
-        if Buildkite::Collector.debug_enabled
-          filename = "#{Buildkite::Collector.debug_filepath}/bk-analytics-#{Time.now.strftime("%F-%R:%S")}-#{ENV["BUILDKITE_JOB_ID"]}.log.gz"
-
-          File.open(filename, "wb") do |f|
-            gz = Zlib::GzipWriter.new(f)
-            gz.puts(Buildkite::Collector.session.logger.to_array)
-            gz.close
-          end
-        end
       end
     end
 

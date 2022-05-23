@@ -4,6 +4,7 @@ require "timeout"
 require "tmpdir"
 
 require_relative "collector/version"
+require_relative "collector/logger"
 
 module Buildkite
   module Collector
@@ -41,6 +42,30 @@ module Buildkite
       tracer = Buildkite::Collector::Uploader.tracer
       tracer&.enter("annotation", **{ content: content })
       tracer&.leave
+    end
+
+    def self.log_formatter
+      @log_formatter ||= Buildkite::Collector::Logger::Formatter.new
+    end
+
+    def self.log_formatter=(log_formatter)
+      @log_formatter = log_formatter
+      logger.formatter = log_formatter
+    end
+
+    def self.logger=(logger)
+      @logger = logger
+    end
+
+    def self.logger
+      return @logger if defined?(@logger)
+
+      debug_mode = ENV.fetch("BUILDKITE_ANALYTICS_DEBUG_ENABLED") do
+        $DEBUG
+      end
+
+      level = !!debug_mode ? ::Logger::DEBUG : ::Logger::WARN
+      @logger ||= Buildkite::Collector::Logger.new($stderr, level)
     end
   end
 end

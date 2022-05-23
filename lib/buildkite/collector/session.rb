@@ -12,28 +12,6 @@ module Buildkite::Collector
     class RejectedSubscription < StandardError; end
     class InitialConnectionFailure < StandardError; end
 
-    class Logger
-      def initialize
-        @log = Queue.new
-      end
-
-      def write(str)
-        @log << "#{Time.now.strftime("%F-%R:%S.%9N")} #{Thread.current} #{str}"
-      end
-
-      def to_array
-        # This empty check is important cos calling pop on a Queue is blocking until
-        # it's not empty
-        if @log.empty?
-          []
-        else
-          Array.new(@log.size) { @log.pop }
-        end
-      end
-    end
-
-    attr_reader :logger
-
     def initialize(url, authorization_header, channel)
       @establish_subscription_queue = Queue.new
       @channel = channel
@@ -50,20 +28,18 @@ module Buildkite::Collector
       @url = url
       @authorization_header = authorization_header
 
-      @logger = Logger.new
-
       reconnection_count = 0
 
       begin
         reconnection_count += 1
         connect
       rescue TimeoutError, InitialConnectionFailure => e
-        @logger.write("rspec-buildkite-analytics could not establish an initial connection with Buildkite due to #{e}. Attempting retry #{reconnection_count} of #{MAX_RECONNECTION_ATTEMPTS}...")
+        Buildkite::Collector.logger.warn("rspec-buildkite-analytics could not establish an initial connection with Buildkite due to #{e}. Attempting retry #{reconnection_count} of #{MAX_RECONNECTION_ATTEMPTS}...")
         if reconnection_count > MAX_RECONNECTION_ATTEMPTS
-          $stderr.puts "rspec-buildkite-analytics could not establish an initial connection with Buildkite due to #{e.message} after #{MAX_RECONNECTION_ATTEMPTS} attempts. You may be missing some data for this test suite, please contact support if this issue persists."
+          Buildkite::Collector.logger.error "rspec-buildkite-analytics could not establish an initial connection with Buildkite due to #{e.message} after #{MAX_RECONNECTION_ATTEMPTS} attempts. You may be missing some data for this test suite, please contact support if this issue persists."
         else
           sleep(WAIT_BETWEEN_RECONNECTIONS)
-          @logger.write("retrying reconnection")
+          Buildkite::Collector.logger.warn("retrying reconnection")
           retry
         end
       end
@@ -82,7 +58,7 @@ module Buildkite::Collector
         # time the mutex is released, the value of @connection has been refreshed, and so
         # the second thread returns early and does not reattempt the reconnection.
         return unless connection == @connection
-        @logger.write("starting reconnection")
+        Buildkite::Collector.logger.debug("starting reconnection")
 
         reconnection_count = 0
 
@@ -91,13 +67,13 @@ module Buildkite::Collector
           connect
           init_write_thread
         rescue SocketConnection::HandshakeError, RejectedSubscription, TimeoutError, InitialConnectionFailure, SocketConnection::SocketError => e
-          @logger.write("failed reconnection attempt #{reconnection_count} due to #{e}")
+          Buildkite::Collector.logger.warn("failed reconnection attempt #{reconnection_count} due to #{e}")
           if reconnection_count > MAX_RECONNECTION_ATTEMPTS
-            $stderr.puts "rspec-buildkite-analytics experienced a disconnection and could not reconnect to Buildkite due to #{e.message}. Please contact support."
+            Buildkite::Collector.logger.error "rspec-buildkite-analytics experienced a disconnection and could not reconnect to Buildkite due to #{e.message}. Please contact support."
             raise e
           else
             sleep(WAIT_BETWEEN_RECONNECTIONS)
-            @logger.write("retrying reconnection")
+            Buildkite::Collector.logger.warn("retrying reconnection")
             retry
           end
         end
@@ -108,7 +84,7 @@ module Buildkite::Collector
     def close(examples_count)
       @closing = true
       @examples_count = examples_count
-      @logger.write("closing socket connection")
+      Buildkite::Collector.logger.debug("closing socket connection")
 
       # Because the server only sends us confirmations after every 10mb of
       # data it uploads to S3, we'll never get confirmation of the
@@ -121,8 +97,8 @@ module Buildkite::Collector
       # proceed without waiting.
       @idents_mutex.synchronize do
         if @unconfirmed_idents.any?
-          puts "Waiting for Buildkite Test Analytics to send results..."
-          @logger.write("waiting for last confirm")
+          Buildkite::Collector.logger.debug "Waiting for Buildkite Test Analytics to send results..."
+          Buildkite::Collector.logger.debug("waiting for last confirm")
 
           @empty.wait(@idents_mutex, CONFIRMATION_TIMEOUT)
         end
@@ -133,8 +109,8 @@ module Buildkite::Collector
       # We kill the write thread cos it's got a while loop in it, so it won't finish otherwise
       @write_thread&.kill
 
-      puts "Buildkite Test Analytics completed"
-      @logger.write("socket connection closed")
+      Buildkite::Collector.logger.info "Buildkite Test Analytics completed"
+      Buildkite::Collector.logger.debug("socket connection closed")
     end
 
     def handle(_connection, data)
@@ -143,14 +119,14 @@ module Buildkite::Collector
       when "ping"
         # In absence of other message, the server sends us a ping every 3 seconds
         # We are currently not doing anything with these
-        @logger.write("received ping")
+        Buildkite::Collector.logger.debug("received ping")
       when "welcome", "confirm_subscription"
         # Push these two messages onto the queue, so that we block on waiting for the
         # initializing phase to complete
         @establish_subscription_queue.push(data)
-      @logger.write("received #{data['type']}")
+      Buildkite::Collector.logger.debug("received #{data['type']}")
       when "reject_subscription"
-        @logger.write("received rejected_subscription")
+        Buildkite::Collector.logger.debug("received rejected_subscription")
         raise RejectedSubscription
       else
         process_message(data)
@@ -160,7 +136,7 @@ module Buildkite::Collector
     def write_result(result)
       queue_and_track_result(result.id, result.as_hash)
 
-      @logger.write("added #{result.id} to send queue")
+      Buildkite::Collector.logger.debug("added #{result.id} to send queue")
     end
 
     def unconfirmed_idents_count
@@ -172,7 +148,7 @@ module Buildkite::Collector
     private
 
     def connect
-      @logger.write("starting socket connection process")
+      Buildkite::Collector.logger.debug("starting socket connection process")
 
       @connection = SocketConnection.new(self, @url, {
         "Authorization" => @authorization_header,
@@ -187,8 +163,8 @@ module Buildkite::Collector
 
       wait_for_confirm
 
-      puts "Connected to Buildkite Test Analytics!"
-      @logger.write("connected")
+      Buildkite::Collector.logger.info "Connected to Buildkite Test Analytics!"
+      Buildkite::Collector.logger.debug("connected")
     end
 
     def init_write_thread
@@ -198,7 +174,7 @@ module Buildkite::Collector
       @write_thread&.kill
 
       @write_thread = Thread.new do
-        @logger.write("hello from write thread")
+        Buildkite::Collector.logger.debug("hello from write thread")
         # Pretty sure this eternal loop is fine cos the call to queue.pop is blocking
         loop do
           data = @send_queue.pop
@@ -210,7 +186,7 @@ module Buildkite::Collector
             # queued), we don't want to send an EOT before any retransmits are sent.
             if @send_queue.length > 0
               @send_queue << data
-              @logger.write("putting eot at back of queue")
+              Buildkite::Collector.logger.debug("putting eot at back of queue")
               next
             end
             @eot_queued_mutex.synchronize do
@@ -228,7 +204,7 @@ module Buildkite::Collector
             ids = if message_type == "record_results"
               data["results"].map { |result| result["id"] }
             end
-            @logger.write("transmitted #{message_type} #{ids}")
+            Buildkite::Collector.logger.debug("transmitted #{message_type} #{ids}")
           end
         end
       end
@@ -274,7 +250,7 @@ module Buildkite::Collector
         # Remove received idents from unconfirmed_idents
         idents.each { |key| @unconfirmed_idents.delete(key) }
 
-        @logger.write("received confirm for indentifiers: #{idents}")
+        Buildkite::Collector.logger.debug("received confirm for indentifiers: #{idents}")
 
         # This @empty ConditionVariable broadcasts every time that @unconfirmed_idents is
         # empty, which will happen about every 10mb of data as that's when the server
@@ -287,9 +263,9 @@ module Buildkite::Collector
 
           retransmit_required = false
 
-          @logger.write("all identifiers have been confirmed")
+          Buildkite::Collector.logger.debug("all identifiers have been confirmed")
         else
-          @logger.write("still waiting on confirm for identifiers: #{@unconfirmed_idents.keys}")
+          Buildkite::Collector.logger.debug("still waiting on confirm for identifiers: #{@unconfirmed_idents.keys}")
         end
       end
 
@@ -307,7 +283,7 @@ module Buildkite::Collector
         }
         @eot_queued = true
 
-        @logger.write("added EOT to send queue")
+        Buildkite::Collector.logger.debug("added EOT to send queue")
       end
     end
 
@@ -320,7 +296,7 @@ module Buildkite::Collector
         confirm_idents(data["message"]["confirm"])
       else
         # unhandled message
-        @logger.write("received unhandled message #{data["message"]}")
+        Buildkite::Collector.logger.debug("received unhandled message #{data["message"]}")
       end
     end
 
@@ -335,7 +311,7 @@ module Buildkite::Collector
             "results" => results
           }
 
-          @logger.write("queueing up retransmitted results #{@unconfirmed_idents.keys}")
+          Buildkite::Collector.logger.debug("queueing up retransmitted results #{@unconfirmed_idents.keys}")
         end
       end
 

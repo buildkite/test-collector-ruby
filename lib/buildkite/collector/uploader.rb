@@ -36,6 +36,8 @@ module Buildkite::Collector
     ]
 
     def self.configure
+      Buildkite::Collector.logger.debug("hello from RSpec thread")
+
       if Buildkite::Collector.api_token
         contact_uri = URI.parse(Buildkite::Collector.url)
 
@@ -56,14 +58,14 @@ module Buildkite::Collector
         response = begin
           http.request(contact)
         rescue *Buildkite::Collector::REQUEST_EXCEPTIONS => e
-          puts "Buildkite Test Analytics: Error communicating with the server: #{e.message}"
+          Buildkite::Collector.logger.error "Buildkite Test Analytics: Error communicating with the server: #{e.message}"
         end
 
         return unless response
 
         case response.code
         when "401"
-          puts "Buildkite Test Analytics: Invalid Suite API key. Please double check your Suite API key."
+          Buildkite::Collector.logger.info "Buildkite Test Analytics: Invalid Suite API key. Please double check your Suite API key."
         when "200"
           json = JSON.parse(response.body)
 
@@ -72,11 +74,11 @@ module Buildkite::Collector
           end
         else
           request_id = response.to_hash["x-request-id"]
-          puts "rspec-buildkite-analytics could not establish an initial connection with Buildkite. You may be missing some data for this test suite, please contact support."
+          Buildkite::Collector.logger.info "rspec-buildkite-analytics could not establish an initial connection with Buildkite. You may be missing some data for this test suite, please contact support."
         end
       else
         if !!ENV["BUILDKITE_BUILD_ID"]
-          puts "Buildkite Test Analytics: No Suite API key provided. You can get the API key from your Suite settings page."
+          Buildkite::Collector.logger.info "Buildkite Test Analytics: No Suite API key provided. You can get the API key from your Suite settings page."
         end
       end
     end
