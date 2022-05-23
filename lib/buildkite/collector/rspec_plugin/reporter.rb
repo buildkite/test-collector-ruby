@@ -50,7 +50,7 @@ module Buildkite::Collector::RSpecPlugin
     def failure_info(notification)
       failure_expanded = []
 
-      if Buildkite::Collector::Reporter::MULTIPLE_ERRORS.include?(notification.exception.class)
+      if Buildkite::Collector::RSpecPlugin::Reporter::MULTIPLE_ERRORS.include?(notification.exception.class)
         failure_reason = notification.exception.summary
         notification.exception.all_exceptions.each do |exception|
           # an example with multiple failures doesn't give us a

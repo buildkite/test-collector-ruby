@@ -65,11 +65,6 @@ RSpec.describe "Logger" do
       expect(result).to eq formatter
     end
 
-    def reset_io(io)
-      io.truncate(0)
-      io.rewind
-    end
-
     it "formatted output contains ISO 8601 timstamp, process and thread id" do
       # Replace IO for testing
       io = StringIO.new
