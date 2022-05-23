@@ -8,7 +8,7 @@ RSpec.describe "Logger" do
     let(:logger) { Buildkite::Collector }
 
     it "accepts standard logger arguments" do
-      logger = Buildkite::Collector::CustomLogger.new("/dev/null", level: Logger::INFO)
+      logger = Buildkite::Collector::Logger.new("/dev/null", level: Logger::INFO)
 
       expect(logger.level).to eq ::Logger::INFO
     end
@@ -35,16 +35,16 @@ RSpec.describe "Logger" do
       $DEBUG = debug
     end
 
-    it "returns custom logger by default" do
+    it "returns our logger by default" do
       result = Buildkite::Collector.logger
 
-      expect(result).to be_a(Buildkite::Collector::CustomLogger)
+      expect(result).to be_a(Buildkite::Collector::Logger)
     end
 
-    it "returns custom formatter by default" do
+    it "returns our formatter by default" do
       result = Buildkite::Collector.log_formatter
 
-      expect(result).to be_a(Buildkite::Collector::CustomFormatter)
+      expect(result).to be_a(Buildkite::Collector::Logger::Formatter)
     end
 
     it "can change logger" do
@@ -73,8 +73,8 @@ RSpec.describe "Logger" do
     it "formatted output contains ISO 8601 timstamp, process and thread id" do
       # Replace IO for testing
       io = StringIO.new
-      logger = Buildkite::Collector::CustomLogger.new(io)
-      logger.formatter = Buildkite::Collector::CustomFormatter.new
+      logger = Buildkite::Collector::Logger.new(io)
+      logger.formatter = Buildkite::Collector::Logger::Formatter.new
       Buildkite::Collector.logger = logger
 
       Buildkite::Collector.logger.info "TestAnalytics-123"
