@@ -24,7 +24,7 @@ RSpec.describe Buildkite::Collector::RSpecPlugin::Reporter do
     end
   end
 
-  def fake_example
+  def fake_example(status:)
     example = double("RSpec::Core::Example")
     allow(example).to receive(:execution_result) { FakeExecutionResult.new(status: :failed) }
     allow(example).to receive(:id) { "spec/fake/fake_spec[1:2:3]" }
@@ -42,6 +42,24 @@ RSpec.describe Buildkite::Collector::RSpecPlugin::Reporter do
     fake_trace
   end
 
+  it "test reporter works with a passed RSpec example" do
+    Buildkite::Collector.configure(
+      token: "fake",
+      url: "http://fake.buildkite.localhost/v1/uploads",
+    )
+    io = StringIO.new
+    reporter = Buildkite::Collector::RSpecPlugin::Reporter.new(io)
+    a_example = fake_example(status: :passed)
+    trace = fake_trace(a_example)
+    allow(Buildkite::Collector.uploader).to receive(:traces) { trace }
+    notification = RSpec::Core::Notifications::ExampleNotification.for(a_example)
+    allow(notification).to receive(:colorized_message_lines) { [""] }
+
+    reporter.handle_example(notification)
+
+    reset_io(io)
+  end
+
   it "test reporter works with a failed RSpec example" do
     Buildkite::Collector.configure(
       token: "fake",
@@ -49,7 +67,7 @@ RSpec.describe Buildkite::Collector::RSpecPlugin::Reporter do
     )
     io = StringIO.new
     reporter = Buildkite::Collector::RSpecPlugin::Reporter.new(io)
-    a_example = fake_example
+    a_example = fake_example(status: :failed)
     trace = fake_trace(a_example)
     allow(Buildkite::Collector.uploader).to receive(:traces) { trace }
     notification = RSpec::Core::Notifications::ExampleNotification.for(a_example)
