@@ -57,7 +57,7 @@ module Buildkite::Collector
 
         response = begin
           http.request(contact)
-        rescue *Buildkite::Collector::REQUEST_EXCEPTIONS => e
+        rescue *Buildkite::Collector::Uploader::REQUEST_EXCEPTIONS => e
           Buildkite::Collector.logger.error "Buildkite Test Analytics: Error communicating with the server: #{e.message}"
         end
 
