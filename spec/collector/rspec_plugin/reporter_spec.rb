@@ -24,6 +24,24 @@ RSpec.describe Buildkite::Collector::RSpecPlugin::Reporter do
     end
   end
 
+  def fake_example
+    example = double("RSpec::Core::Example")
+    allow(example).to receive(:execution_result) { FakeExecutionResult.new(status: :failed) }
+    allow(example).to receive(:id) { "spec/fake/fake_spec[1:2:3]" }
+    allow(example).to receive(:full_description) { "this is a fake error full description" }
+    allow(example).to receive(:metadata) { Hash.new(shared_group_inclusion_backtrace: []) }
+    example
+  end
+
+  def fake_trace(a_example)
+    fake_trace = double("Buildkite::Collector::RSpecPlugin::Trace", example: a_example)
+    allow(fake_trace).to receive(:[]) { fake_trace }
+    allow(fake_trace).to receive(:example=)
+    allow(fake_trace).to receive(:failure_reason=)
+    allow(fake_trace).to receive(:failure_expanded=)
+    fake_trace
+  end
+
   it "test reporter works with a failed RSpec example" do
     Buildkite::Collector.configure(
       token: "fake",
@@ -31,19 +49,10 @@ RSpec.describe Buildkite::Collector::RSpecPlugin::Reporter do
     )
     io = StringIO.new
     reporter = Buildkite::Collector::RSpecPlugin::Reporter.new(io)
-    example = double("RSpec::Core::Example")
-    allow(example).to receive(:execution_result) { FakeExecutionResult.new(status: :failed) }
-    allow(example).to receive(:id) { "spec/fake/fake_spec[1:2:3]" }
-    allow(example).to receive(:full_description) { "this is a fake error full description" }
-    allow(example).to receive(:metadata) { Hash.new(shared_group_inclusion_backtrace: []) }
-    fake_trace = double("Buildkite::Collector::RSpecPlugin::Trace", example: example)
-    allow(fake_trace).to receive(:[]) { fake_trace }
-    allow(fake_trace).to receive(:example=)
-    allow(fake_trace).to receive(:failure_reason=)
-    allow(fake_trace).to receive(:failure_expanded=)
-    allow(Buildkite::Collector.uploader).to receive(:traces) { fake_trace }
-
-    notification = RSpec::Core::Notifications::ExampleNotification.for(example)
+    a_example = fake_example
+    trace = fake_trace(a_example)
+    allow(Buildkite::Collector.uploader).to receive(:traces) { trace }
+    notification = RSpec::Core::Notifications::ExampleNotification.for(a_example)
     allow(notification).to receive(:colorized_message_lines) { [""] }
 
     reporter.handle_example(notification)
