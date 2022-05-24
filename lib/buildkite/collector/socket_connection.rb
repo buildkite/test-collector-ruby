@@ -76,7 +76,14 @@ module Buildkite::Collector
             @session.handle(self, data.data)
           end
         end
-      rescue EOFError, Errno::ECONNRESET => e
+      rescue EOFError => e
+        Buildkite::Collector.logger.warn("#{e}")
+        if @socket
+          Buildkite::Collector.logger.warn("attempting disconnected flow")
+          @session.disconnected(self)
+          disconnect
+        end
+      rescue Errno::ECONNRESET => e
         Buildkite::Collector.logger.error("#{e}")
         if @socket
           Buildkite::Collector.logger.error("attempting disconnected flow")
