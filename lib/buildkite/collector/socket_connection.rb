@@ -76,6 +76,9 @@ module Buildkite::Collector
             @session.handle(self, data.data)
           end
         end
+      # These get re-raise from session, we should fail gracefully
+      rescue *Buildkite::Collector::Session::DISCONNECTED_EXCEPTIONS => e
+        Buildkite::Collector.logger.error("We could not establish a connection with Buildkite Test Analytics. The error was: #{e.message}. If this is a problem, please contact support.")
       rescue EOFError => e
         Buildkite::Collector.logger.warn("#{e}")
         if @socket
