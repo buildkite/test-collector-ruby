@@ -12,6 +12,14 @@ module Buildkite::Collector
     class RejectedSubscription < StandardError; end
     class InitialConnectionFailure < StandardError; end
 
+    DISCONNECTED_EXCEPTIONS = [
+      SocketConnection::HandshakeError,
+      RejectedSubscription,
+      TimeoutError,
+      InitialConnectionFailure,
+      SocketConnection::SocketError
+    ]
+
     def initialize(url, authorization_header, channel)
       @establish_subscription_queue = Queue.new
       @channel = channel
@@ -66,7 +74,7 @@ module Buildkite::Collector
           reconnection_count += 1
           connect
           init_write_thread
-        rescue SocketConnection::HandshakeError, RejectedSubscription, TimeoutError, InitialConnectionFailure, SocketConnection::SocketError => e
+        rescue *DISCONNECTED_EXCEPTIONS => e
           Buildkite::Collector.logger.warn("failed reconnection attempt #{reconnection_count} due to #{e}")
           if reconnection_count > MAX_RECONNECTION_ATTEMPTS
             Buildkite::Collector.logger.error "rspec-buildkite-analytics experienced a disconnection and could not reconnect to Buildkite due to #{e.message}. Please contact support."
