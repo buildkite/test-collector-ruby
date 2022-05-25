@@ -36,7 +36,7 @@ module Buildkite::Collector
     ]
 
     def self.configure
-      Buildkite::Collector.logger.debug("hello from RSpec thread")
+      Buildkite::Collector.logger.debug("hello from main thread")
 
       if Buildkite::Collector.api_token
         contact_uri = URI.parse(Buildkite::Collector.url)
