@@ -1,7 +1,6 @@
 # Buildkite Collectors for Ruby
 
-Official Ruby-based [Buildkite Test Analytics](https://buildkite.com/test-analytics) collectors ✨
-
+Official Ruby based [Buildkite Test Analytics](https://buildkite.com/test-analytics) collectors ✨
 
 **Supported test frameworks:** RSpec, Minitest and more [coming soon](#roadmap).
 
