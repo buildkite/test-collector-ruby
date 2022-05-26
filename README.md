@@ -40,7 +40,7 @@ $ git commit -m "Add Buildkite Test Analytics collector"
 $ git push
 ```
 
-4) Make sure that the [Test Analytics environment variables](https://buildkite.com/docs/test-analytics/integrations#integrating-with-rspec-environment-variables) are set so that the RSpec integration can use them in your Test Analytics dashboard.
+4) Make sure that the [Test Analytics environment variables](https://buildkite.com/docs/test-analytics/ruby-collectors#environment-variables) are set so that the RSpec integration can use them in your Test Analytics dashboard.
 
 ## Debugging
 
