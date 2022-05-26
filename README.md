@@ -66,7 +66,7 @@ $ bundle exec rspec
 
 ## Contributing
 
-Bug reports and pull requests are welcome on GitHub at https://github.com/buildkite/rspec-buildkite-analytics.
+Bug reports and pull requests are welcome on GitHub at https://github.com/buildkite/collector-rb.
 
 ## License
 
