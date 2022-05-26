@@ -48,7 +48,7 @@ To enable debugging output, set `BUILDKITE_ANALYTICS_DEBUG_ENABLED=true`.
 
 ## Roadmap
 
-- [ ] Additional test frameworks (test-unit, bacon, Cucumber)
+- [ ] Additional test frameworks (`Test::Unit`, Bacon, Cucumber)
 
 ## Developing
 
