@@ -18,7 +18,7 @@ This gem collects data about your test suite's performance and reliability, and 
 
 ```ruby
 group :test do
-  gem "rspec-buildkite-analytics"
+  gem "buildkite-collector"
 end
 ```
 
