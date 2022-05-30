@@ -35,7 +35,7 @@ class Buildkite::Collector::CI
       "commit_sha" => ENV["BUILDKITE_ANALYTICS_SHA"],
       "number" => ENV["BUILDKITE_ANALYTICS_NUMBER"],
       "job_id" => ENV["BUILDKITE_ANALYTICS_JOB_ID"],
-      "message" => ENV["BUILDKITE_ANANLYTICS_MESSAGE"],
+      "message" => ENV["BUILDKITE_ANALYTICS_MESSAGE"],
       "debug" => ENV["BUILDKITE_ANALYTICS_DEBUG_ENABLED"],
       "version" => Buildkite::Collector::VERSION,
       "collector" => Buildkite::Collector::NAME,
