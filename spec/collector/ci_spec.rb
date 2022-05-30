@@ -74,7 +74,7 @@ RSpec.describe Buildkite::Collector::CI do
           fake_env("BUILDKITE_ANALYTICS_SHA", sha)
           fake_env("BUILDKITE_ANALYTICS_NUMBER", number)
           fake_env("BUILDKITE_ANALYTICS_JOB_ID", job_id)
-          fake_env("BUILDKITE_ANANLYTICS_MESSAGE", message)
+          fake_env("BUILDKITE_ANALYTICS_MESSAGE", message)
         end
 
         it "returns the analytics env" do
@@ -141,7 +141,7 @@ RSpec.describe Buildkite::Collector::CI do
           fake_env("BUILDKITE_ANALYTICS_SHA", sha)
           fake_env("BUILDKITE_ANALYTICS_NUMBER", number)
           fake_env("BUILDKITE_ANALYTICS_JOB_ID", job_id)
-          fake_env("BUILDKITE_ANANLYTICS_MESSAGE", message)
+          fake_env("BUILDKITE_ANALYTICS_MESSAGE", message)
         end
 
         it "returns the analytics env" do
@@ -204,7 +204,7 @@ RSpec.describe Buildkite::Collector::CI do
           fake_env("BUILDKITE_ANALYTICS_SHA", sha)
           fake_env("BUILDKITE_ANALYTICS_NUMBER", number)
           fake_env("BUILDKITE_ANALYTICS_JOB_ID", job_id)
-          fake_env("BUILDKITE_ANANLYTICS_MESSAGE", message)
+          fake_env("BUILDKITE_ANALYTICS_MESSAGE", message)
         end
 
         it "returns the analytics env" do
@@ -254,7 +254,7 @@ RSpec.describe Buildkite::Collector::CI do
           fake_env("BUILDKITE_ANALYTICS_SHA", sha)
           fake_env("BUILDKITE_ANALYTICS_NUMBER", number)
           fake_env("BUILDKITE_ANALYTICS_JOB_ID", job_id)
-          fake_env("BUILDKITE_ANANLYTICS_MESSAGE", message)
+          fake_env("BUILDKITE_ANALYTICS_MESSAGE", message)
         end
 
         it "returns the analytics env" do
@@ -302,7 +302,7 @@ RSpec.describe Buildkite::Collector::CI do
           fake_env("BUILDKITE_ANALYTICS_SHA", sha)
           fake_env("BUILDKITE_ANALYTICS_NUMBER", number)
           fake_env("BUILDKITE_ANALYTICS_JOB_ID", job_id)
-          fake_env("BUILDKITE_ANANLYTICS_MESSAGE", message)
+          fake_env("BUILDKITE_ANALYTICS_MESSAGE", message)
         end
 
         it "returns the analytics env" do
