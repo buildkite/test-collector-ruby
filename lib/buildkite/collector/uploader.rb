@@ -1,8 +1,5 @@
 # frozen_string_literal: true
 
-require "rspec/core"
-require "rspec/expectations"
-
 require "net/http"
 require "openssl"
 require "websocket"
