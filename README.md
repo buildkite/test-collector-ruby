@@ -14,14 +14,17 @@ Official [Buildkite Test Analytics](https://buildkite.com/test-analytics) collec
 
 Add the [`buildkite-test_collector` gem](https://rubygems.org/gems/buildkite-test_collector):
 
-  ```ruby
-  gem install buildkite-test_collector
+```shell
+gem install buildkite-test_collector
+```
 
-  # or add this to your Gemfile’s test group
-  group :development, :test do
-    gem "buildkite-test_collector"
-  end
-  ```
+Or add this to your Gemfile’s test group:
+
+```ruby
+group :test do
+  gem "buildkite-test_collector"
+end
+```
 
 ### Step 2
 
