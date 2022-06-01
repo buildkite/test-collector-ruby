@@ -10,9 +10,9 @@ RSpec.describe Buildkite::Collector::MinitestPlugin::Reporter do
     http = double("http", post: response)
     allow(Buildkite::Collector::HTTPClient).to receive(:new) { http }
     Buildkite::Collector.configure(
+      hook: :minitest,
       token: "fake",
-      url: "http://fake.buildkite.example/v1/uploads",
-      hook: :minitest
+      url: "http://fake.buildkite.example/v1/uploads"
     )
     io = StringIO.new
     reporter = Buildkite::Collector::MinitestPlugin::Reporter.new(io, {})
@@ -31,9 +31,9 @@ RSpec.describe Buildkite::Collector::MinitestPlugin::Reporter do
     http = double("http", post: response)
     allow(Buildkite::Collector::HTTPClient).to receive(:new) { http }
     Buildkite::Collector.configure(
+      hook: :minitest,
       token: "fake",
-      url: "http://fake.buildkite.example/v1/uploads",
-      hook: :minitest
+      url: "http://fake.buildkite.example/v1/uploads"
     )
     io = StringIO.new
     reporter = Buildkite::Collector::MinitestPlugin::Reporter.new(io, {})

@@ -7,6 +7,7 @@ RSpec.describe Buildkite::Collector::RSpecPlugin::Reporter do
 
   it "test reporter works with a passed RSpec example" do
     Buildkite::Collector.configure(
+      hook: :rspec,
       token: "fake",
       url: "http://fake.buildkite.localhost/v1/uploads",
     )
@@ -26,6 +27,7 @@ RSpec.describe Buildkite::Collector::RSpecPlugin::Reporter do
 
   it "test reporter works with a failed RSpec example" do
     Buildkite::Collector.configure(
+      hook: :rspec,
       token: "fake",
       url: "http://fake.buildkite.localhost/v1/uploads",
     )

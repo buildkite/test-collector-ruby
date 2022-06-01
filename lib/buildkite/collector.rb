@@ -22,7 +22,7 @@ module Buildkite
       attr_accessor :debug_filepath
     end
 
-    def self.configure(token: nil, url: nil, debug_enabled: false, debug_filepath: nil, hook: :rspec)
+    def self.configure(hook:, token: nil, url: nil, debug_enabled: false, debug_filepath: nil)
       self.api_token = token || ENV["BUILDKITE_ANALYTICS_TOKEN"]
       self.url = url || DEFAULT_URL
       self.debug_enabled = debug_enabled || !!(ENV["BUILDKITE_ANALYTICS_DEBUG_ENABLED"])
