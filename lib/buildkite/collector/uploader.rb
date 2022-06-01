@@ -9,6 +9,7 @@ require_relative "network"
 require_relative "object"
 require_relative "session"
 require_relative "ci"
+require_relative "http_client"
 
 require "active_support"
 require "active_support/notifications"
@@ -36,24 +37,8 @@ module Buildkite::Collector
       Buildkite::Collector.logger.debug("hello from main thread")
 
       if Buildkite::Collector.api_token
-        contact_uri = URI.parse(Buildkite::Collector.url)
-
-        http = Net::HTTP.new(contact_uri.host, contact_uri.port)
-        http.use_ssl = contact_uri.scheme == "https"
-
-        authorization_header = "Token token=\"#{Buildkite::Collector.api_token}\""
-
-        contact = Net::HTTP::Post.new(contact_uri.path, {
-          "Authorization" => authorization_header,
-          "Content-Type" => "application/json",
-        })
-        contact.body = {
-          run_env: Buildkite::Collector::CI.env,
-          format: "websocket"
-        }.to_json
-
         response = begin
-          http.request(contact)
+          Buildkite::Collector::HTTPClient.post(Buildkite::Collector.url)
         rescue *Buildkite::Collector::Uploader::REQUEST_EXCEPTIONS => e
           Buildkite::Collector.logger.error "Buildkite Test Analytics: Error communicating with the server: #{e.message}"
         end
