@@ -3,8 +3,6 @@ PATH
   specs:
     rspec-buildkite-analytics (0.8.1)
       activesupport (>= 5.2, < 8)
-      rspec-core (~> 3.10)
-      rspec-expectations (~> 3.10)
       websocket (~> 1.2)
 
 GEM
