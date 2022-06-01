@@ -6,7 +6,7 @@ Gem::Specification.new do |spec|
   spec.name          = "buildkite-test_collector"
   spec.version       = Buildkite::TestCollector::VERSION
   spec.authors       = ["Buildkite"]
-  spec.email         = ["test_analytics@buildkite.com"]
+  spec.email         = ["support+analytics@buildkite.com"]
 
   spec.summary       = "Track test executions and report to Buildkite Test Analytics"
   spec.homepage      = "https://github.com/buildkite/test-collector-ruby"
