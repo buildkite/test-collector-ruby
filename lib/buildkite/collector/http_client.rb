@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "net/http"
+
 module Buildkite::Collector
   class HTTPClient
     attr :authorization_header
