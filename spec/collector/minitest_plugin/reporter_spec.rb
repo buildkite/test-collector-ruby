@@ -7,7 +7,8 @@ require "buildkite/collector/uploader"
 RSpec.describe Buildkite::Collector::MinitestPlugin::Reporter do
   it "test reporter works with a passed minitest result" do
     response = double("Fake Response", code: 200, body: {}, to_hash: {})
-    allow(Buildkite::Collector::HTTPClient).to receive(:post) { response }
+    http = double("http", post: response)
+    allow(Buildkite::Collector::HTTPClient).to receive(:new) { http }
     Buildkite::Collector.configure(
       token: "fake",
       url: "http://fake.buildkite.example/v1/uploads",
@@ -27,7 +28,8 @@ RSpec.describe Buildkite::Collector::MinitestPlugin::Reporter do
 
   it "test reporter works with a failed minitest result" do
     response = double("Fake Response", code: 200, body: {}, to_hash: {})
-    allow(Buildkite::Collector::HTTPClient).to receive(:post) { response }
+    http = double("http", post: response)
+    allow(Buildkite::Collector::HTTPClient).to receive(:new) { http }
     Buildkite::Collector.configure(
       token: "fake",
       url: "http://fake.buildkite.example/v1/uploads",

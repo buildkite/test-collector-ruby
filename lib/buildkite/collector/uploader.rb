@@ -37,8 +37,10 @@ module Buildkite::Collector
       Buildkite::Collector.logger.debug("hello from main thread")
 
       if Buildkite::Collector.api_token
+        http = Buildkite::Collector::HTTPClient.new(Buildkite::Collector.url)
+
         response = begin
-          Buildkite::Collector::HTTPClient.post(Buildkite::Collector.url)
+          http.post
         rescue *Buildkite::Collector::Uploader::REQUEST_EXCEPTIONS => e
           Buildkite::Collector.logger.error "Buildkite Test Analytics: Error communicating with the server: #{e.message}"
         end
@@ -52,7 +54,7 @@ module Buildkite::Collector
           json = JSON.parse(response.body)
 
           if (socket_url = json["cable"]) && (channel = json["channel"])
-            Buildkite::Collector.session = Buildkite::Collector::Session.new(socket_url, authorization_header, channel)
+            Buildkite::Collector.session = Buildkite::Collector::Session.new(socket_url, http.authorization_header, channel)
           end
         else
           request_id = response.to_hash["x-request-id"]

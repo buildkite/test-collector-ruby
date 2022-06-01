@@ -2,13 +2,17 @@
 
 module Buildkite::Collector
   class HTTPClient
-    def self.post(url)
+    attr :authorization_header
+    def initialize(url)
+      @url = url
+      @authorization_header = "Token token=\"#{Buildkite::Collector.api_token}\""
+    end
+
+    def post
       contact_uri = URI.parse(url)
 
       http = Net::HTTP.new(contact_uri.host, contact_uri.port)
       http.use_ssl = contact_uri.scheme == "https"
-
-      authorization_header = "Token token=\"#{Buildkite::Collector.api_token}\""
 
       contact = Net::HTTP::Post.new(contact_uri.path, {
         "Authorization" => authorization_header,
@@ -21,5 +25,9 @@ module Buildkite::Collector
 
       http.request(contact)
     end
+
+    private
+
+    attr :url
   end
 end
