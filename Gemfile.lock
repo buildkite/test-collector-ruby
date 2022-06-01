@@ -45,6 +45,8 @@ DEPENDENCIES
   rake (~> 13.0)
   rspec (~> 3.0)
   rspec-buildkite-analytics!
+  rspec-core (~> 3.10)
+  rspec-expectations (~> 3.10)
 
 BUNDLED WITH
    2.2.22
