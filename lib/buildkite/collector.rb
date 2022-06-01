@@ -65,7 +65,7 @@ module Buildkite
       end
 
       level = !!debug_mode ? ::Logger::DEBUG : ::Logger::WARN
-      @logger ||= Buildkite::Collector::Logger.new($stderr, level)
+      @logger ||= Buildkite::Collector::Logger.new($stderr, level: level)
     end
   end
 end
