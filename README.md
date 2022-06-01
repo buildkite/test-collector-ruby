@@ -1,51 +1,100 @@
-# RSpec Buildkite Analytics
+# Buildkite Collectors for Ruby
 
-This gem collects data about your test suite's performance and reliability, and allows you to see trends and insights about your test suite over time ✨
+Official [Buildkite Test Analytics](https://buildkite.com/test-analytics) collectors for Ruby test frameworks ✨
 
-## Installation
+⚒ **Supported test frameworks:** Jest, and [more coming soon](https://github.com/buildkite/test-collector-ruby/issues?q=is%3Aissue+is%3Aopen+label%3A%22test+frameworks%22).
 
-1. Create a new branch
+📦 **Supported CI systems:** Buildkite, GitHub Actions, CircleCI, and others via the `BUILDKITE_ANALYTICS_*` environment variables.
 
-```sh
-git checkout -b install-buildkite-test-analytics
-```
+## 👉 Installing
 
-2. Add the `rspec-buildkite-analytics` gem to your `Gemfile` in the `test` group
+### Step 1
+
+[Create a test suite](https://buildkite.com/docs/test-analytics), and copy the API token that it gives you.
+
+Add the [`buildkite-test_collector` gem](https://rubygems.org/gems/buildkite-test_collector):
+
+  ```ruby
+  gem install buildkite-test_collector
+
+  # or add this to your Gemfile’s test group
+  group :development, :test do
+    gem "buildkite-test_collector"
+  end
+  ```
+
+### Step 2
+
+#### RSpec
+
+Add the following code to your RSpec setup file:
 
 ```ruby
-group :test do
-  gem "rspec-buildkite-analytics"
-end
+# spec/spec_helper.rb
+require "buildkite/test_collector"
+Buildkite::TestCollector.configure(hook: :rspec)
 ```
 
-3. Run `bundle` to install the gem and update your `Gemfile.lock`
+Run your tests locally:
 
-```sh
-$ bundle
+```shell
+BUILDKITE_ANALYTICS_TOKEN=xyz rspec
 ```
 
-4. Add the Test Analytics code to your application in `spec/spec_helper.rb`, and [set the environment variable securely](https://buildkite.com/docs/pipelines/secrets) on your agent or agents.
+#### Minitest
+
+Add the following code to your Minitest setup file:
 
 ```ruby
-require "buildkite/collector"
-
-Buildkite::Collector.configure(ENV["BUILDKITE_ANALYTICS_TOKEN"])
+# test/test_helper.rb
+require "buildkite/test_collector"
+Buildkite::TestCollector.configure(hook: :minitest)
 ```
 
-5. Commit and push your changes to start analysing your tests
+Run your tests locally:
 
-```sh
-$ git add .
-$ git commit -m "Add Buildkite Test Analytics client"
-$ git push
+```shell
+BUILDKITE_ANALYTICS_TOKEN=xyz rake
 ```
 
-6. Make sure that the [Test Analytics environment variables](https://buildkite.com/docs/test-analytics/integrations#integrating-with-rspec-environment-variables) are set so that the RSpec integration can use them in your Test Analytics dashboard.
+### Step 3
 
-## Contributing
+Add the `BUILDKITE_ANALYTICS_TOKEN` secret to your CI, push your changes to a branch, and open a pull request 🎉
 
-Bug reports and pull requests are welcome on GitHub at https://github.com/buildkite/rspec-buildkite-analytics.
+```bash
+git checkout -b add-buildkite-test-analytics
+git commit -am "Add Buildkite Test Analytics"
+git push origin add-buildkite-test-analytics
+```
 
-## License
+## 🔍 Debugging
+
+To enable debugging output, set the `BUILDKITE_ANALYTICS_DEBUG_ENABLED` environment variable to `true`.
+
+## 🔜 Roadmap
+
+See the [GitHub 'enhancement' issues](https://github.com/buildkite/test-collector-ruby/issues?q=is%3Aissue+is%3Aopen+label%3Aenhancement) for planned features. Pull requests are always welcome, and we’ll give you feedback and guidance if you choose to contribute 💚
+
+## ⚒ Developing
+
+After cloning the repository, install the dependencies:
+
+```
+bundle
+```
+
+And run the tests:
+
+```
+bundle exec rspec
+```
+
+Useful resources for developing collectors include the [Buildkite Test Analytics docs](https://buildkite.com/docs/test-analytics).
+
+## 👩‍💻 Contributing
+
+Bug reports and pull requests are welcome on GitHub at https://github.com/buildkite/test-collector-ruby
+
+## 📜 MIT License
 
 The gem is available as open source under the terms of the [MIT License](https://opensource.org/licenses/MIT).
