@@ -12,7 +12,7 @@ Official [Buildkite Test Analytics](https://buildkite.com/test-analytics) collec
 
 [Create a test suite](https://buildkite.com/docs/test-analytics), and copy the API token that it gives you.
 
-Add the [`buildkite-test_collector` gem](https://rubygems.org/gems/buildkite-test_collector):
+Add the [`buildkite-test_collector`](https://rubygems.org/gems/buildkite-test_collector) gem:
 
 ```shell
 gem install buildkite-test_collector
