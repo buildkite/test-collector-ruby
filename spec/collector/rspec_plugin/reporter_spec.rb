@@ -18,6 +18,7 @@ RSpec.describe Buildkite::Collector::RSpecPlugin::Reporter do
     notification = RSpec::Core::Notifications::ExampleNotification.for(a_example)
     allow(notification).to receive(:colorized_message_lines) { [""] }
 
+    # does this raise an error?
     reporter.handle_example(notification)
 
     reset_io(io)
@@ -36,6 +37,7 @@ RSpec.describe Buildkite::Collector::RSpecPlugin::Reporter do
     notification = RSpec::Core::Notifications::ExampleNotification.for(a_example)
     allow(notification).to receive(:colorized_message_lines) { [""] }
 
+    # does this raise an error?
     reporter.handle_example(notification)
 
     reset_io(io)
