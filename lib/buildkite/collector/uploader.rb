@@ -1,9 +1,5 @@
 # frozen_string_literal: true
 
-require "rspec/core"
-require "rspec/expectations"
-
-require "net/http"
 require "openssl"
 require "websocket"
 
@@ -12,6 +8,7 @@ require_relative "network"
 require_relative "object"
 require_relative "session"
 require_relative "ci"
+require_relative "http_client"
 
 require "active_support"
 require "active_support/notifications"
@@ -36,27 +33,13 @@ module Buildkite::Collector
     ]
 
     def self.configure
-      Buildkite::Collector.logger.debug("hello from RSpec thread")
+      Buildkite::Collector.logger.debug("hello from main thread")
 
       if Buildkite::Collector.api_token
-        contact_uri = URI.parse(Buildkite::Collector.url)
-
-        http = Net::HTTP.new(contact_uri.host, contact_uri.port)
-        http.use_ssl = contact_uri.scheme == "https"
-
-        authorization_header = "Token token=\"#{Buildkite::Collector.api_token}\""
-
-        contact = Net::HTTP::Post.new(contact_uri.path, {
-          "Authorization" => authorization_header,
-          "Content-Type" => "application/json",
-        })
-        contact.body = {
-          run_env: Buildkite::Collector::CI.env,
-          format: "websocket"
-        }.to_json
+        http = Buildkite::Collector::HTTPClient.new(Buildkite::Collector.url)
 
         response = begin
-          http.request(contact)
+          http.post
         rescue *Buildkite::Collector::Uploader::REQUEST_EXCEPTIONS => e
           Buildkite::Collector.logger.error "Buildkite Test Analytics: Error communicating with the server: #{e.message}"
         end
@@ -70,7 +53,7 @@ module Buildkite::Collector
           json = JSON.parse(response.body)
 
           if (socket_url = json["cable"]) && (channel = json["channel"])
-            Buildkite::Collector.session = Buildkite::Collector::Session.new(socket_url, authorization_header, channel)
+            Buildkite::Collector.session = Buildkite::Collector::Session.new(socket_url, http.authorization_header, channel)
           end
         else
           request_id = response.to_hash["x-request-id"]
