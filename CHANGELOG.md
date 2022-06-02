@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## v1.0.0
+
+- Option to disable detailed tracing #108 - @blanknite
+- minitest support (beta) #103 - @mariovisic, @blaknite
+- Handle re-raised disconnect exceptions #102 - @JuantoFatas
+- Make trace lookup faster using a Hash #98 - @blaknite, @mariovisic
+- Introduce more configurable logging #97 - @JuanitoFatas
+
 ## v0.8.1
 
 - Improve the EOT confirmation #93 — @blaknite
