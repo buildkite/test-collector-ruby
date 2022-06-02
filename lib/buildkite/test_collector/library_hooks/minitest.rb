@@ -11,11 +11,6 @@ class MiniTest::Test
   include Buildkite::TestCollector::MinitestPlugin
 end
 
-Buildkite::TestCollector::Network.configure
-Buildkite::TestCollector::Object.configure
-
-ActiveSupport::Notifications.subscribe("sql.active_record") do |name, start, finish, id, payload|
-  Buildkite::TestCollector::Uploader.tracer&.backfill(:sql, finish - start, **{ query: payload[:sql] })
-end
+Buildkite::TestCollector.enable_tracing!
 
 Buildkite::TestCollector::Uploader.configure
