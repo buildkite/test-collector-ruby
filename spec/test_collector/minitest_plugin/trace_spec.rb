@@ -37,5 +37,15 @@ RSpec.describe Buildkite::TestCollector::MinitestPlugin::Trace do
 
       expect(history_json).to include('347611.734956')
     end
+
+    it "sets the filename, when not in Rails" do
+      expect(trace.as_hash[:file_name].split("/").last).to eq("method_double.rb")
+    end
+
+    let(:rails) { double("Rails", root: Pathname.new("./")) }
+    it "sets the filename, when in Rails" do
+      Rails = rails
+      expect(trace.as_hash[:file_name].split("/").last).to eq("method_double.rb")
+    end
   end
 end
