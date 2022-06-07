@@ -66,7 +66,7 @@ module Buildkite::TestCollector::MinitestPlugin
 
     def project_dir
       if defined?(Rails) && Rails.respond_to?(:root)
-        Rails.root
+        Rails.root.to_s
       else
         Dir.getwd
       end
