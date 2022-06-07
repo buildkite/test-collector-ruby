@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    buildkite-test_collector (1.0.0)
+    buildkite-test_collector (1.0.1)
       activesupport (>= 5.2, < 8)
       websocket (~> 1.2)
 
