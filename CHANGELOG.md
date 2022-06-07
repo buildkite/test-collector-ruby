@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## v1.0.1
+
+- Fix project_dir issue expecting a string, not a Pathname #112 — @paulca
+
 ## v1.0.0
 
 - Option to disable detailed tracing #108 - @blanknite
