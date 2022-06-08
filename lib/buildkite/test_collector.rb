@@ -19,15 +19,13 @@ module Buildkite
       attr_accessor :uploader
       attr_accessor :session
       attr_accessor :debug_enabled
-      attr_accessor :debug_filepath
       attr_accessor :tracing_enabled
     end
 
-    def self.configure(hook:, token: nil, url: nil, debug_enabled: false, debug_filepath: nil, tracing_enabled: true)
+    def self.configure(hook:, token: nil, url: nil, debug_enabled: false, tracing_enabled: true)
       self.api_token = token || ENV["BUILDKITE_ANALYTICS_TOKEN"]
       self.url = url || DEFAULT_URL
       self.debug_enabled = debug_enabled || !!(ENV["BUILDKITE_ANALYTICS_DEBUG_ENABLED"])
-      self.debug_filepath = debug_filepath || ENV["BUILDKITE_ANALYTICS_DEBUG_FILEPATH"] || Dir.tmpdir
       self.tracing_enabled = tracing_enabled
 
       self.hook_into(hook)
