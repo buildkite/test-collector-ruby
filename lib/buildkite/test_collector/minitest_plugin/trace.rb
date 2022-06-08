@@ -4,7 +4,8 @@ require "active_support/core_ext/hash/indifferent_access"
 
 module Buildkite::TestCollector::MinitestPlugin
   class Trace
-    attr_accessor :example, :failure_reason, :failure_expanded
+    attr_accessor :example
+    attr_writer :failure_reason, :failure_expanded
     attr_reader :id, :history
 
     RESULT_CODES = {
