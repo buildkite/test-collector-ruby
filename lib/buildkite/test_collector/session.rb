@@ -42,9 +42,9 @@ module Buildkite::TestCollector
         reconnection_count += 1
         connect
       rescue TimeoutError, InitialConnectionFailure => e
-        Buildkite::TestCollector.logger.warn("rspec-buildkite-analytics could not establish an initial connection with Buildkite due to #{e}. Attempting retry #{reconnection_count} of #{MAX_RECONNECTION_ATTEMPTS}...")
+        Buildkite::TestCollector.logger.warn("buildkite-test_collector could not establish an initial connection with Buildkite due to #{e}. Attempting retry #{reconnection_count} of #{MAX_RECONNECTION_ATTEMPTS}...")
         if reconnection_count > MAX_RECONNECTION_ATTEMPTS
-          Buildkite::TestCollector.logger.error "rspec-buildkite-analytics could not establish an initial connection with Buildkite due to #{e.message} after #{MAX_RECONNECTION_ATTEMPTS} attempts. You may be missing some data for this test suite, please contact support if this issue persists."
+          Buildkite::TestCollector.logger.error "buildkite-test_collector could not establish an initial connection with Buildkite due to #{e.message} after #{MAX_RECONNECTION_ATTEMPTS} attempts. You may be missing some data for this test suite, please contact support if this issue persists."
         else
           sleep(WAIT_BETWEEN_RECONNECTIONS)
           Buildkite::TestCollector.logger.warn("retrying reconnection")
@@ -77,7 +77,7 @@ module Buildkite::TestCollector
         rescue *DISCONNECTED_EXCEPTIONS => e
           Buildkite::TestCollector.logger.warn("failed reconnection attempt #{reconnection_count} due to #{e}")
           if reconnection_count > MAX_RECONNECTION_ATTEMPTS
-            Buildkite::TestCollector.logger.error "rspec-buildkite-analytics experienced a disconnection and could not reconnect to Buildkite due to #{e.message}. Please contact support."
+            Buildkite::TestCollector.logger.error "buildkite-test_collector experienced a disconnection and could not reconnect to Buildkite due to #{e.message}. Please contact support."
             raise e
           else
             sleep(WAIT_BETWEEN_RECONNECTIONS)
