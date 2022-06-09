@@ -26,6 +26,8 @@ module RSpec::Buildkite::Analytics
     self.debug_enabled = debug_enabled || !!(ENV["BUILDKITE_ANALYTICS_DEBUG_ENABLED"])
     self.debug_filepath = debug_filepath || ENV["BUILDKITE_ANALYTICS_DEBUG_FILEPATH"] || Dir.tmpdir
 
+    Kernel.warn "UNSUPPORTED: The rspec-buildkite-analytics gem has been renamed to buildkite-test_collector. rspec-buildkite-analytics will not receive any further maintenance. Please follow our docs https://buildkite.com/docs/test-analytics/ruby-collectors to upgrade to the new gem: https://rubygems.org/gems/buildkite-test_collector. Thank you!"
+
     require_relative "analytics/uploader"
 
     self::Uploader.configure
