@@ -57,7 +57,7 @@ module Buildkite::TestCollector
           end
         else
           request_id = response.to_hash["x-request-id"]
-          Buildkite::TestCollector.logger.info "rspec-buildkite-analytics could not establish an initial connection with Buildkite. You may be missing some data for this test suite, please contact support with request ID #{request_id}."
+          Buildkite::TestCollector.logger.info "buildkite-test_collector could not establish an initial connection with Buildkite. You may be missing some data for this test suite, please contact support with request ID #{request_id}."
         end
       else
         if !!ENV["BUILDKITE_BUILD_ID"]
