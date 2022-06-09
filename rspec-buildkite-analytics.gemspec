@@ -6,11 +6,16 @@ Gem::Specification.new do |spec|
   spec.name          = "rspec-buildkite-analytics"
   spec.version       = RSpec::Buildkite::Analytics::VERSION
   spec.authors       = ["Buildkite"]
-  spec.email         = ["hello@buildkite.com"]
+  spec.email         = ["support+analytics@buildkite.com"]
 
   spec.summary       = "Track execution of specs and report to Buildkite Analytics"
+  spec.description   = "UNSUPPORTED: The rspec-buildkite-analytics gem has been renamed to buildkite-test_collector. rspec-buildkite-analytics will not receive any further maintenance. Please follow our docs https://buildkite.com/docs/test-analytics/ruby-collectors to upgrade to the new gem: https://rubygems.org/gems/buildkite-test_collector. Thank you!"
   spec.homepage      = "https://github.com/buildkite/rspec-buildkite-analytics"
   spec.license       = "MIT"
+
+  spec.post_install_message = <<~MSG
+    UNSUPPORTED: The rspec-buildkite-analytics gem has been renamed to buildkite-test_collector. rspec-buildkite-analytics will not receive any further maintenance. Please follow our docs https://buildkite.com/docs/test-analytics/ruby-collectors to upgrade to the new gem: https://rubygems.org/gems/buildkite-test_collector. Thank you!
+  MSG
 
   spec.metadata["homepage_uri"] = spec.homepage
   spec.metadata["source_code_uri"] = "https://github.com/buildkite/rspec-buildkite-analytics"
