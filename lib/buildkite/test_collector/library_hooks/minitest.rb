@@ -7,7 +7,7 @@ require_relative "../minitest_plugin"
 
 Buildkite::TestCollector.uploader = Buildkite::TestCollector::Uploader
 
-class MiniTest::Test
+class Minitest::Test
   include Buildkite::TestCollector::MinitestPlugin
 end
 
