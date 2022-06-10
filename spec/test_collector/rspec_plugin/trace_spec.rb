@@ -16,6 +16,29 @@ RSpec.describe Buildkite::TestCollector::RSpecPlugin::Trace do
     }
   end
 
+  context "Location from Trace" do
+    before do
+      allow(example).to receive(:location) { "/Users/hello/path/to/your_test.rb" }
+    end
+
+    it "returns location from test" do
+      result = trace.as_hash[:location]
+
+      expect(result).to eq "/Users/hello/path/to/your_test.rb"
+    end
+
+    it "adds custom location prefix via ENV" do
+      env = ENV["BUILDKITE_ANALYTICS_LOCATION_PREFIX"]
+      ENV["BUILDKITE_ANALYTICS_LOCATION_PREFIX"] = "payments"
+
+      result = trace.as_hash[:location]
+
+      expect(result).to eq "payments/Users/hello/path/to/your_test.rb"
+
+      ENV["BUILDKITE_ANALYTICS_LOCATION_PREFIX"] = env
+    end
+  end
+
   describe '#as_hash' do
     it 'removes invalid UTF-8 characters from top level values' do
       identifier = trace.as_hash[:identifier]

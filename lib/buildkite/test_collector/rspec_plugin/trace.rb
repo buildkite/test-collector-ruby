@@ -31,7 +31,7 @@ module Buildkite::TestCollector::RSpecPlugin
         scope: example.example_group.metadata[:full_description],
         name: example.description,
         identifier: example.id,
-        location: example.location,
+        location: example_location,
         file_name: file_name,
         result: result,
         failure_reason: failure_reason,
@@ -41,6 +41,17 @@ module Buildkite::TestCollector::RSpecPlugin
     end
 
     private
+
+    def example_location
+      location = example.location
+      prefix = ENV["BUILDKITE_ANALYTICS_LOCATION_PREFIX"]
+
+      if prefix && !prefix.empty?
+        File.join(prefix, location)
+      else
+        location
+      end
+    end
 
     def file_name
       @file_name ||= begin
