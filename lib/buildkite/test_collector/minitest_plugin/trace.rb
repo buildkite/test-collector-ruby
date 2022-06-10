@@ -58,7 +58,14 @@ module Buildkite::TestCollector::MinitestPlugin
     alias_method :identifier, :location
 
     def file_name
-      @file_name ||= File.join('./', source_location[0].delete_prefix(project_dir))
+      @file_name ||= begin
+        prefix = ENV["BUILDKITE_ANALYTICS_LOCATION_PREFIX"]
+        if prefix && !prefix.empty?
+          File.join(prefix, source_location[0].delete_prefix(project_dir))
+        else
+          File.join('./', source_location[0].delete_prefix(project_dir))
+        end
+      end
     end
 
     def line_number
