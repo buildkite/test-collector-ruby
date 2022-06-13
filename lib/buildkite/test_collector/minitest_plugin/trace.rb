@@ -39,6 +39,7 @@ module Buildkite::TestCollector::MinitestPlugin
         scope: example.class.name,
         name: example.name,
         identifier: identifier,
+        location_prefix: location_prefix,
         location: location,
         file_name: file_name,
         result: result,
@@ -50,6 +51,15 @@ module Buildkite::TestCollector::MinitestPlugin
 
     private
 
+    def location_prefix
+      return @location_prefix if defined? @location_prefix
+
+      prefix = ENV["BUILDKITE_ANALYTICS_LOCATION_PREFIX"]
+      if prefix && !prefix.empty?
+        @location_prefix = prefix
+      end
+    end
+
     def location
       if file_name
         "#{file_name}:#{line_number}"
@@ -59,9 +69,8 @@ module Buildkite::TestCollector::MinitestPlugin
 
     def file_name
       @file_name ||= begin
-        prefix = ENV["BUILDKITE_ANALYTICS_LOCATION_PREFIX"]
-        if prefix && !prefix.empty?
-          File.join(prefix, source_location[0].delete_prefix(project_dir))
+        if location_prefix
+          File.join(location_prefix, source_location[0].delete_prefix(project_dir))
         else
           File.join('./', source_location[0].delete_prefix(project_dir))
         end

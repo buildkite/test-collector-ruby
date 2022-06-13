@@ -22,8 +22,10 @@ RSpec.describe Buildkite::TestCollector::RSpecPlugin::Trace do
     end
 
     it "returns location from test" do
+      prefix = trace.as_hash[:location_prefix]
       result = trace.as_hash[:location]
 
+      expect(prefix).to be_nil
       expect(result).to eq "/Users/hello/path/to/your_test.rb"
     end
 
@@ -31,8 +33,10 @@ RSpec.describe Buildkite::TestCollector::RSpecPlugin::Trace do
       env = ENV["BUILDKITE_ANALYTICS_LOCATION_PREFIX"]
       ENV["BUILDKITE_ANALYTICS_LOCATION_PREFIX"] = "payments"
 
+      prefix = trace.as_hash[:location_prefix]
       result = trace.as_hash[:location]
 
+      expect(prefix).to eq "payments"
       expect(result).to eq "payments/Users/hello/path/to/your_test.rb"
 
       ENV["BUILDKITE_ANALYTICS_LOCATION_PREFIX"] = env
