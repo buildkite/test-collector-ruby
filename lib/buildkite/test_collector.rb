@@ -1,16 +1,19 @@
 # frozen_string_literal: true
 
+module Buildkite
+  module TestCollector
+  end
+end
+
 require "timeout"
 require "tmpdir"
 
+require_relative "test_collector/error"
 require_relative "test_collector/version"
 require_relative "test_collector/logger"
 
 module Buildkite
   module TestCollector
-    class Error < StandardError; end
-    class TimeoutError < ::Timeout::Error; end
-
     DEFAULT_URL = "https://analytics-api.buildkite.com/v1/uploads"
 
     class << self
