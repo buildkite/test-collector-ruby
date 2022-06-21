@@ -1,9 +1,5 @@
 # frozen_string_literal: true
 
-require "socket"
-require "openssl"
-require "json"
-
 module Buildkite::TestCollector
   class SocketConnection
     class HandshakeError < StandardError; end

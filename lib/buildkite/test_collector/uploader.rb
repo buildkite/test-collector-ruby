@@ -1,20 +1,5 @@
 # frozen_string_literal: true
 
-require "openssl"
-require "websocket"
-
-require_relative "tracer"
-require_relative "network"
-require_relative "object"
-require_relative "session"
-require_relative "ci"
-require_relative "http_client"
-
-require "active_support"
-require "active_support/notifications"
-
-require "securerandom"
-
 module Buildkite::TestCollector
   class Uploader
     def self.traces

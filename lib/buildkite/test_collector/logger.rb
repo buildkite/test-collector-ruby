@@ -1,8 +1,5 @@
 # frozen_string_literal: true
 
-require "logger"
-require "time"
-
 module Buildkite::TestCollector
   class Logger < ::Logger
     class Formatter < ::Logger::Formatter

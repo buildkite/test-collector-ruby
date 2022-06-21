@@ -3,7 +3,6 @@
 require "rspec/core"
 require "rspec/expectations"
 
-require_relative "../uploader"
 require_relative "../rspec_plugin/reporter"
 require_relative "../rspec_plugin/trace"
 

@@ -1,7 +1,5 @@
 # frozen_string_literal: true
 
-require "buildkite/test_collector/ci"
-
 RSpec.describe Buildkite::TestCollector::CI do
   describe ".env" do
     let(:ci) { "true" }

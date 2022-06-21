@@ -1,7 +1,5 @@
 # frozen_string_literal: true
 
-require "active_support/core_ext/hash/indifferent_access"
-
 module Buildkite::TestCollector::RSpecPlugin
   class Trace
     attr_accessor :example, :failure_reason, :failure_expanded

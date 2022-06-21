@@ -1,8 +1,5 @@
 # frozen_string_literal: true
 
-require "logger"
-require "buildkite/test_collector/logger"
-
 RSpec.describe "Logger" do
   describe ".logger" do
     let(:logger) { Buildkite::TestCollector }
