@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## v1.1.0
+
+- Remove an internal debugging change #115 — @juanitofatas
+- Remove warnings #116 - @juanitofatas
+- Fix old gem name still in debugging and warning messages #117 - @juanitofatas
+- Include module from `Minitest` #118 - @juanitofatas
+- Fix Minitest loading without using minitest hook #125 — @paulca
+
 ## v1.0.1
 
 - Fix project_dir issue expecting a string, not a Pathname #112 — @paulca
