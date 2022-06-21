@@ -6,6 +6,7 @@
 - Remove warnings #116 - @juanitofatas
 - Fix old gem name still in debugging and warning messages #117 - @juanitofatas
 - Include module from `Minitest` #118 - @juanitofatas
+- Fix Minitest loading without using minitest hook #125 — @paulca
 
 ## v1.0.1
 
