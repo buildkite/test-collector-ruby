@@ -23,7 +23,7 @@ module Buildkite
     end
 
     def self.configure(hook:, token: nil, url: nil, debug_enabled: false, tracing_enabled: true)
-      self.api_token = token || ENV["BUILDKITE_ANALYTICS_TOKEN"]
+      self.api_token = (token || ENV["BUILDKITE_ANALYTICS_TOKEN"])&.strip
       self.url = url || DEFAULT_URL
       self.debug_enabled = debug_enabled || !!(ENV["BUILDKITE_ANALYTICS_DEBUG_ENABLED"])
       self.tracing_enabled = tracing_enabled
