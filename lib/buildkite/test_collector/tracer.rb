@@ -4,6 +4,13 @@ require "active_support/core_ext/hash/indifferent_access"
 
 module Buildkite::TestCollector
   class Tracer
+    # https://github.com/buildkite/test-collector-ruby/issues/131
+    class MonotonicTime
+      def self.call
+        Process.method(:clock_gettime).call Process::CLOCK_MONOTONIC
+      end
+    end
+
     class Span
       attr_accessor :section, :start_at, :end_at, :detail, :children
 
@@ -28,23 +35,23 @@ module Buildkite::TestCollector
     end
 
     def initialize
-      @top = Span.new(:top, Concurrent.monotonic_time, nil, {})
+      @top = Span.new(:top, MonotonicTime.call, nil, {})
       @stack = [@top]
     end
 
     def enter(section, **detail)
-      new_entry = Span.new(section, Concurrent.monotonic_time, nil, detail)
+      new_entry = Span.new(section, MonotonicTime.call, nil, detail)
       current_span.children << new_entry
       @stack << new_entry
     end
 
     def leave
-      current_span.end_at = Concurrent.monotonic_time
+      current_span.end_at = MonotonicTime.call
       @stack.pop
     end
 
     def backfill(section, duration, **detail)
-      new_entry = Span.new(section, Concurrent.monotonic_time - duration, Concurrent.monotonic_time, detail)
+      new_entry = Span.new(section, MonotonicTime.call - duration, MonotonicTime.call, detail)
       current_span.children << new_entry
     end
 
@@ -54,7 +61,7 @@ module Buildkite::TestCollector
 
     def finalize
       raise "Stack not empty" unless @stack.size == 1
-      @top.end_at = Concurrent.monotonic_time
+      @top.end_at = MonotonicTime.call
       self
     end
 
