@@ -12,7 +12,7 @@ module Buildkite::TestCollector::MinitestPlugin
     Thread.current[:_buildkite_tracer] = tracer
   end
 
-  def before_teardown
+  def after_teardown
     super
 
     tracer = Thread.current[:_buildkite_tracer]
