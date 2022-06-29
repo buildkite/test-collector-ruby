@@ -12,9 +12,7 @@ module Buildkite::TestCollector::MinitestPlugin
     Thread.current[:_buildkite_tracer] = tracer
   end
 
-  def before_teardown
-    super
-
+  def after_teardown
     tracer = Thread.current[:_buildkite_tracer]
     if !tracer.nil?
       Thread.current[:_buildkite_tracer] = nil
@@ -23,5 +21,7 @@ module Buildkite::TestCollector::MinitestPlugin
       trace = Buildkite::TestCollector::MinitestPlugin::Trace.new(self, history: tracer.history)
       Buildkite::TestCollector.uploader.traces[trace.source_location] = trace
     end
+
+    super
   end
 end
