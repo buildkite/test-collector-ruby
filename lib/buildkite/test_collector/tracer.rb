@@ -6,8 +6,11 @@ module Buildkite::TestCollector
   class Tracer
     # https://github.com/buildkite/test-collector-ruby/issues/131
     class MonotonicTime
+      GET_TIME = Process.method(:clock_gettime)
+      private_constant :GET_TIME
+
       def self.call
-        Process.method(:clock_gettime).call Process::CLOCK_MONOTONIC
+        GET_TIME.call Process::CLOCK_MONOTONIC
       end
     end
 
