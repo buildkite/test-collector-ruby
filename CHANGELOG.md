@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## v1.1.1
+
+- Strip CR/LF from token input #127 - @gchan
+- Allow specify run name prefix and suffix #130 - @juanitofatas
+- Improve Minitest support by using after_teardown #131 - @davidstosik
+- Avoid breaking test suite stubs `Process.clock_gettime` #132 - @juanitofatas (thanks @ChrisBR)
+
 ## v1.1.0
 
 - Remove an internal debugging change #115 — @juanitofatas
