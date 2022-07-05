@@ -69,7 +69,7 @@ class Buildkite::TestCollector::CI
       "CI" => "github_actions",
       "key" => "#{ENV["GITHUB_ACTION"]}-#{ENV["GITHUB_RUN_NUMBER"]}-#{ENV["GITHUB_RUN_ATTEMPT"]}",
       "url" => File.join("https://github.com", ENV["GITHUB_REPOSITORY"], "actions/runs", ENV["GITHUB_RUN_ID"]),
-      "branch" => ENV["GITHUB_REF"],
+      "branch" => ENV["GITHUB_REF_NAME"],
       "commit_sha" => ENV["GITHUB_SHA"],
       "number" => ENV["GITHUB_RUN_NUMBER"],
     }

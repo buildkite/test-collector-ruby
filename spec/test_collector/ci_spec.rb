@@ -113,7 +113,7 @@ RSpec.describe Buildkite::TestCollector::CI do
         fake_env("GITHUB_RUN_ATTEMPT", gha_run_attempt)
         fake_env("GITHUB_RUN_ID", gha_run_id)
         fake_env("GITHUB_REPOSITORY", gha_repository)
-        fake_env("GITHUB_REF", gha_ref)
+        fake_env("GITHUB_REF_NAME", gha_ref)
         fake_env("GITHUB_SHA", gha_sha)
       end
 
