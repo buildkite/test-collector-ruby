@@ -1,7 +1,5 @@
 # frozen_string_literal: true
 
-require_relative "socket_connection"
-
 module Buildkite::TestCollector
   class Session
     # Picked 75 as the magic timeout number as it's longer than the TCP timeout of 60s 🤷‍♀️
@@ -13,11 +11,11 @@ module Buildkite::TestCollector
     class InitialConnectionFailure < StandardError; end
 
     DISCONNECTED_EXCEPTIONS = [
-      SocketConnection::HandshakeError,
+      Buildkite::TestCollector::SocketConnection::HandshakeError,
+      Buildkite::TestCollector::TimeoutError,
+      Buildkite::TestCollector::SocketConnection::SocketError,
       RejectedSubscription,
-      TimeoutError,
       InitialConnectionFailure,
-      SocketConnection::SocketError
     ]
 
     def initialize(url, authorization_header, channel)
@@ -41,7 +39,7 @@ module Buildkite::TestCollector
       begin
         reconnection_count += 1
         connect
-      rescue TimeoutError, InitialConnectionFailure => e
+      rescue Buildkite::TestCollector::TimeoutError, InitialConnectionFailure => e
         Buildkite::TestCollector.logger.warn("buildkite-test_collector could not establish an initial connection with Buildkite due to #{e}. Attempting retry #{reconnection_count} of #{MAX_RECONNECTION_ATTEMPTS}...")
         if reconnection_count > MAX_RECONNECTION_ATTEMPTS
           Buildkite::TestCollector.logger.error "buildkite-test_collector could not establish an initial connection with Buildkite due to #{e.message} after #{MAX_RECONNECTION_ATTEMPTS} attempts. You may be missing some data for this test suite, please contact support if this issue persists."

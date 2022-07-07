@@ -1,7 +1,5 @@
 # frozen_string_literal: true
 
-require "active_support/core_ext/hash/indifferent_access"
-
 module Buildkite::TestCollector::MinitestPlugin
   class Trace
     attr_accessor :example

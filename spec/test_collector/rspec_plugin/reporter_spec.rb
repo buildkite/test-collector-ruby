@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 require "buildkite/test_collector/rspec_plugin/reporter"
-require "buildkite/test_collector/uploader"
 
 RSpec.describe Buildkite::TestCollector::RSpecPlugin::Reporter do
 

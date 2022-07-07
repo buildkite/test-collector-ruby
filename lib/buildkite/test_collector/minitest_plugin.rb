@@ -1,5 +1,8 @@
 # frozen_string_literal: true
 
+# Minitest finds this file before setup code
+require_relative "tracer"
+
 require_relative "minitest_plugin/reporter"
 require_relative "minitest_plugin/trace"
 

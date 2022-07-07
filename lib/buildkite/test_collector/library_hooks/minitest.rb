@@ -2,7 +2,6 @@
 
 require "minitest"
 
-require_relative "../uploader"
 require_relative "../minitest_plugin"
 
 Buildkite::TestCollector.uploader = Buildkite::TestCollector::Uploader

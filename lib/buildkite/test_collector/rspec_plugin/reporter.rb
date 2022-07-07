@@ -1,7 +1,5 @@
 # frozen_string_literal: true
 
-require "time"
-
 module Buildkite::TestCollector::RSpecPlugin
   class Reporter
     RSpec::Core::Formatters.register self, :example_passed, :example_failed, :example_pending, :dump_summary

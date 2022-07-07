@@ -1,7 +1,5 @@
 # frozen_string_literal: true
 
-require "securerandom"
-
 class Buildkite::TestCollector::CI
   def self.env
     new.env

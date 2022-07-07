@@ -1,9 +1,5 @@
 # frozen_string_literal: true
 
-require "websocket"
-require "buildkite/test_collector/session"
-require "buildkite/test_collector/socket_connection"
-
 RSpec.describe Buildkite::TestCollector::SocketConnection do
   let(:session_double) { instance_double("Buildkite::TestCollector::Session") }
   let(:socket_connection) { Buildkite::TestCollector::SocketConnection.new(session_double, "fake_url", {}) }

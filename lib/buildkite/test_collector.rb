@@ -1,16 +1,39 @@
 # frozen_string_literal: true
 
+module Buildkite
+  module TestCollector
+  end
+end
+
+require "json"
+require "logger"
+require "net/http"
+require "openssl"
+require "time"
 require "timeout"
 require "tmpdir"
+require "securerandom"
+require "socket"
+require "websocket"
+
+require "active_support/core_ext/object/blank"
+require "active_support/core_ext/hash/indifferent_access"
+require "active_support/notifications"
 
 require_relative "test_collector/version"
+require_relative "test_collector/error"
 require_relative "test_collector/logger"
+require_relative "test_collector/ci"
+require_relative "test_collector/http_client"
+require_relative "test_collector/uploader"
+require_relative "test_collector/network"
+require_relative "test_collector/object"
+require_relative "test_collector/tracer"
+require_relative "test_collector/socket_connection"
+require_relative "test_collector/session"
 
 module Buildkite
   module TestCollector
-    class Error < StandardError; end
-    class TimeoutError < ::Timeout::Error; end
-
     DEFAULT_URL = "https://analytics-api.buildkite.com/v1/uploads"
 
     class << self

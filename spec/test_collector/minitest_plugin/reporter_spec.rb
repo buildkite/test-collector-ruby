@@ -2,7 +2,6 @@
 
 require "minitest"
 require "buildkite/test_collector/minitest_plugin/reporter"
-require "buildkite/test_collector/uploader"
 
 RSpec.describe Buildkite::TestCollector::MinitestPlugin::Reporter do
   it "test reporter works with a passed minitest result" do
