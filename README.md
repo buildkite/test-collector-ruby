@@ -22,7 +22,7 @@ Or add this to your Gemfile’s test group:
 
 ```ruby
 group :test do
-  gem "buildkite-test_collector"
+  gem 'buildkite-test_collector'
 end
 ```
 
@@ -34,7 +34,7 @@ Add the following code to your RSpec setup file:
 
 ```ruby
 # spec/spec_helper.rb
-require "buildkite/test_collector"
+require 'buildkite/test_collector'
 Buildkite::TestCollector.configure(hook: :rspec)
 ```
 
@@ -50,7 +50,7 @@ Add the following code to your Minitest setup file:
 
 ```ruby
 # test/test_helper.rb
-require "buildkite/test_collector"
+require 'buildkite/test_collector'
 Buildkite::TestCollector.configure(hook: :minitest)
 ```
 
