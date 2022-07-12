@@ -35,9 +35,11 @@ class Buildkite::TestCollector::CI
       "job_id" => ENV["BUILDKITE_ANALYTICS_JOB_ID"],
       "message" => ENV["BUILDKITE_ANALYTICS_MESSAGE"],
       "debug" => ENV["BUILDKITE_ANALYTICS_DEBUG_ENABLED"],
+      "execution_name_prefix" => ENV["BUILDKITE_ANALYTICS_EXECUTION_NAME_PREFIX"],
+      "execution_name_suffix" => ENV["BUILDKITE_ANALYTICS_EXECUTION_NAME_SUFFIX"],
       "version" => Buildkite::TestCollector::VERSION,
       "collector" => Buildkite::TestCollector::NAME,
-  }.compact
+    }.compact
   end
 
   def generic
