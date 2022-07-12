@@ -253,8 +253,6 @@ RSpec.describe Buildkite::TestCollector::CI do
           fake_env("BUILDKITE_ANALYTICS_NUMBER", number)
           fake_env("BUILDKITE_ANALYTICS_JOB_ID", job_id)
           fake_env("BUILDKITE_ANALYTICS_MESSAGE", message)
-          fake_env("BUILDKITE_ANALYTICS_RUN_NAME_PREFIX", "run_name_prefix")
-          fake_env("BUILDKITE_ANALYTICS_RUN_NAME_SUFFIX", "run_name_suffix")
         end
 
         it "returns the analytics env" do
@@ -271,9 +269,7 @@ RSpec.describe Buildkite::TestCollector::CI do
             "message" => message,
             "debug" => debug,
             "version" => version,
-            "collector" => name,
-            "run_name_prefix" => "run_name_prefix",
-            "run_name_suffix" => "run_name_suffix",
+            "collector" => name
           })
         end
       end
