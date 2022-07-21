@@ -104,6 +104,10 @@ module Buildkite::TestCollector
           @session.disconnected(self)
           disconnect
         end
+      rescue JSON::ParserError => e
+        Buildkite::TestCollector.logger.error("JSON::ParserError: #{e}")
+        Buildkite::TestCollector.logger.debug("JSON data: #{data}")
+        raise
       end
     end
 
