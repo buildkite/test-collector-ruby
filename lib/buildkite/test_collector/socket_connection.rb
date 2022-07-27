@@ -106,7 +106,7 @@ module Buildkite::TestCollector
         end
       rescue JSON::ParserError => e
         Buildkite::TestCollector.logger.error("JSON::ParserError: #{e}")
-        Buildkite::TestCollector.logger.debug("JSON data: #{data}")
+        Buildkite::TestCollector.logger.error("JSON data: #{data}")
         raise
       end
     end
