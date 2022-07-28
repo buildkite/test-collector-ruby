@@ -101,5 +101,11 @@ module Buildkite
         Buildkite::TestCollector::Uploader.tracer&.backfill(:sql, finish - start, **{ query: payload[:sql] })
       end
     end
+
+    def self.safe(&block)
+      block.call
+    rescue StandardError => e
+      logger.error("Buildkite::TestCollector received exception: #{e}")
+    end
   end
 end
