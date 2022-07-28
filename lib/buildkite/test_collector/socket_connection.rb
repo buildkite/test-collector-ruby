@@ -61,7 +61,7 @@ module Buildkite::TestCollector
 
       # Setting up a new thread that listens on the socket, and processes incoming
       # comms from the server
-      @thread = Thread.new do
+      @read_thread = Thread.new do
         Buildkite::TestCollector.logger.debug("listening in on socket")
         frame = WebSocket::Frame::Incoming::Client.new
 
@@ -147,7 +147,7 @@ module Buildkite::TestCollector
       socket = @socket
       @socket = nil
       socket&.close
-      @thread&.join unless @thread == Thread.current
+      @read_thread&.join unless @read_thread == Thread.current
     end
   end
 end
