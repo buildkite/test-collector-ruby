@@ -106,6 +106,7 @@ module Buildkite
       block.call
     rescue StandardError => e
       logger.error("Buildkite::TestCollector received exception: #{e}")
+      logger.error("Backtrace:\n#{e.backtrace.join("\n")}")
     end
   end
 end
