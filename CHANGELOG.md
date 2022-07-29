@@ -1,5 +1,16 @@
 # CHANGELOG
 
+## v1.1.2
+
+- Remove branch reference prefix in Github Actions #136 - @gchan
+- Make ruby collector work better for non-web app #128 - @JuanitoFatas
+- Avoid linters complaining about double quotes #137 - @SocalNick
+- Revert "Allow specifying run name prefix and suffix" #139 - @JuanitoFatas
+- Update Code of Conduct contact email address #143 - @JuanitoFatas
+- Suppress errors when connecting to Buildkite #145 - @swebb
+- Add some design documentation to understand how the gem works #146 - @swebb
+- Fix logging level from debug to error #147 - @gchan
+
 ## v1.1.1
 
 - Strip CR/LF from token input #127 - @gchan
