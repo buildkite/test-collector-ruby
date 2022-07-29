@@ -78,7 +78,7 @@ module Buildkite::TestCollector
       rescue EOFError => e
         Buildkite::TestCollector.logger.warn("#{e}")
         if @socket
-          Buildkite::TestCollector.logger.warn("attempting disconnected flow")
+          Buildkite::TestCollector.logger.error("attempting disconnected flow")
           @session.disconnected(self)
           disconnect
         end
