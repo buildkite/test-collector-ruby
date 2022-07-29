@@ -1,6 +1,18 @@
 # frozen_string_literal: true
 
 module Buildkite::TestCollector
+  # Traces the execution of an application by creating and storing spans of information.
+  #
+  # This class contains two data structures:
+  #
+  # - A stack (called @stack) that traces the entering & leaving of each part of the application.
+  # - A tree made up of many Span nodes. Each Span is a node in the tree. Each
+  #   span is also stored in the stack. The root of the tree is called @top and
+  #   is stored at @stack[0].
+  #
+  # When the trace is complete the stack MUST contain a single node @top, which
+  # is the root of the tree (see #finalize). The tree is converted into a hash
+  # in #as_json which recursively calls #as_json on all of it's children.
   class Tracer
     # https://github.com/buildkite/test-collector-ruby/issues/131
     class MonotonicTime

@@ -94,6 +94,8 @@ bundle exec rspec
 
 Useful resources for developing collectors include the [Buildkite Test Analytics docs](https://buildkite.com/docs/test-analytics).
 
+See [DESIGN.md](DESIGN.md) for an overview of the design of this gem.
+
 ## 👩‍💻 Contributing
 
 Bug reports and pull requests are welcome on GitHub at https://github.com/buildkite/test-collector-ruby
