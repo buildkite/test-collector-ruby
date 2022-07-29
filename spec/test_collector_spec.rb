@@ -24,4 +24,27 @@ RSpec.describe Buildkite::TestCollector do
       expect(analytics.url).to eq "https://analytics-api.buildkite.com/v1/uploads"
     end
   end
+
+  describe ".safe" do
+    let(:logger) { TestLogger.new }
+
+    class TestLogger
+      attr_reader :errors
+
+      def initialize
+        @errors = []
+      end
+
+      def error(message)
+        @errors << message
+      end
+    end
+
+    before { Buildkite::TestCollector.logger = logger }
+
+    it "suppresses exceptions and logs them to logger.error" do
+      expect{ described_class.safe { raise "penguines dance" } }.to_not raise_error
+      expect(logger.errors.first).to eq("Buildkite::TestCollector received exception: penguines dance")
+    end
+  end
 end
