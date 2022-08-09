@@ -53,6 +53,12 @@ RSpec.describe Buildkite::TestCollector::Session do
       session.handle(socket_double, {"type"=> "message", "identifier"=> "fake_channel", "message" => {"confirm"=> ["./spec/analytics/session_spec.rb[1:1]"]}}.to_json)
       expect(session.unconfirmed_idents_count).to be 0
     end
+
+    it "is immune to JSON.parse being mocked" do
+      allow(JSON).to receive(:parse).and_raise(JSON::ParserError)
+
+      session.handle(socket_double, {"type"=> "message", "identifier"=> "fake_channel", "message" => {"confirm"=> ["./spec/analytics/session_spec.rb[1:1]"]}}.to_json)
+    end
   end
 
   describe "#close" do
