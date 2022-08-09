@@ -7,6 +7,10 @@ module Buildkite::TestCollector
     MAX_RECONNECTION_ATTEMPTS = ENV.fetch("BUILDKITE_ANALYTICS_RECONNECTION_ATTEMPTS") { 3 }.to_i
     WAIT_BETWEEN_RECONNECTIONS = ENV.fetch("BUILDKITE_ANALYTICS_RECONNECTION_WAIT") { 5 }.to_i
 
+    # We keep a private reference so that mocking libraries won't break JSON
+    JSON_PARSE = JSON.method(:parse)
+    private_constant :JSON_PARSE
+
     class RejectedSubscription < StandardError; end
     class InitialConnectionFailure < StandardError; end
 
@@ -120,7 +124,7 @@ module Buildkite::TestCollector
     end
 
     def handle(_connection, data)
-      data = JSON.parse(data)
+      data = JSON_PARSE.call(data)
       case data["type"]
       when "ping"
         # In absence of other message, the server sends us a ping every 3 seconds
