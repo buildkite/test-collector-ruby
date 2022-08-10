@@ -1,5 +1,8 @@
 # CHANGELOG
 
+## v1.1.3
+- Use a private reference to JSON.parse to prevent it being mocked #149 - @ghcan
+
 ## v1.1.2
 
 - Remove branch reference prefix in Github Actions #136 - @gchan
