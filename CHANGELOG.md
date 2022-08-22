@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## v1.2.3
+
+- Add ability to specify execution prefix/suffix #140 - @JuanitoFatas
+
 ## v1.1.3
 - Use a private reference to JSON.parse to prevent it being mocked #149 - @ghcan
 
