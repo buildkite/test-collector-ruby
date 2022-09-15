@@ -7,7 +7,11 @@ module Buildkite::TestCollector
         tracer = Buildkite::TestCollector::Uploader.tracer
         tracer&.enter("sleep")
 
-        super
+        if duration
+          super(duration)
+        else
+          super()
+        end
       ensure
         tracer&.leave
       end
