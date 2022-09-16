@@ -3,7 +3,7 @@
 module Buildkite::TestCollector
   class Object
     module CustomObjectSleep
-      def sleep(duration)
+      def sleep(duration = nil)
         tracer = Buildkite::TestCollector::Uploader.tracer
         tracer&.enter("sleep")
 
