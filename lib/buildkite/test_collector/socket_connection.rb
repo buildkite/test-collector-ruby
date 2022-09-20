@@ -75,10 +75,13 @@ module Buildkite::TestCollector
       # These get re-raise from session, we should fail gracefully
       rescue *Buildkite::TestCollector::Session::DISCONNECTED_EXCEPTIONS => e
         Buildkite::TestCollector.logger.error("We could not establish a connection with Buildkite Test Analytics. The error was: #{e.message}. If this is a problem, please contact support.")
-      rescue EOFError => e
+      rescue EOFError, OpenSSL::SSL::SSLError => e
+        # https://github.com/buildkite/test-collector-ruby/pull/147#issuecomment-1250485611
+        raise if e.class == OpenSSL::SSL::SSLError && e.message != "SSL_read: unexpected eof while reading"
+
         Buildkite::TestCollector.logger.warn("#{e}")
         if @socket
-          Buildkite::TestCollector.logger.error("attempting disconnected flow")
+          Buildkite::TestCollector.logger.warn("attempting disconnected flow")
           @session.disconnected(self)
           disconnect
         end
