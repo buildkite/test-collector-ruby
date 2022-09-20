@@ -1,8 +1,8 @@
 PATH
   remote: .
   specs:
-    buildkite-test_collector (1.2.4)
-      activesupport (>= 5.2, < 8)
+    buildkite-test_collector (1.2.5)
+      activesupport (>= 4.2)
       websocket (~> 1.2)
 
 GEM
