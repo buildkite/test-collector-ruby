@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## v1.2.4
+
+- Fix sleep instrumentation errors without argument #153 - @JuanitoFatas
+
 ## v1.2.3
 
 - Add ability to specify execution prefix/suffix #140 - @JuanitoFatas
