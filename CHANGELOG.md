@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## v1.2.5
+
+- Relax activesupport dependency to >= 4.2.0 #155 - @noodl
+
 ## v1.2.4
 
 - Fix sleep instrumentation errors without argument #153 - @JuanitoFatas
