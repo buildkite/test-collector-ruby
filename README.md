@@ -80,6 +80,15 @@ Buildkite::TestCollector.annotate("User logged in successfully")
 
 This is particularly useful for tests that generate a lot of span data such as system/feature tests.
 
+## 🏷️ Tagging duplicate test executions with a prefix/suffix
+
+For builds that execute the same test multiple times - such as when running the same test suite against multiple versions of ruby/rails - it's possible to tag each test execution with a prefix/suffix. This prefix/suffix is displayed for each execution on the test show page to differentiate the build environment. The prefix/suffix is specified using these environment variables:
+
+```
+BUILDKITE_ANALYTICS_EXECUTION_NAME_PREFIX
+BUILDKITE_ANALYTICS_EXECUTION_NAME_SUFFIX
+```
+
 ## 🔍 Debugging
 
 To enable debugging output, set the `BUILDKITE_ANALYTICS_DEBUG_ENABLED` environment variable to `true`.
