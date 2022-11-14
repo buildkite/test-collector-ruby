@@ -82,7 +82,7 @@ module Buildkite::TestCollector
           @session.disconnected(self)
           disconnect
         end
-      rescue Errno::ECONNRESET => e
+      rescue Errno::ECONNRESET, Errno::ETIMEDOUT => e
         Buildkite::TestCollector.logger.error("#{e}")
         if @socket
           Buildkite::TestCollector.logger.error("attempting disconnected flow")
