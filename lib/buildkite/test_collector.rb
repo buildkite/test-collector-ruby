@@ -43,13 +43,15 @@ module Buildkite
       attr_accessor :session
       attr_accessor :debug_enabled
       attr_accessor :tracing_enabled
+      attr_accessor :env
     end
 
-    def self.configure(hook:, token: nil, url: nil, debug_enabled: false, tracing_enabled: true)
+    def self.configure(hook:, token: nil, url: nil, debug_enabled: false, tracing_enabled: true, env: {})
       self.api_token = (token || ENV["BUILDKITE_ANALYTICS_TOKEN"])&.strip
       self.url = url || DEFAULT_URL
       self.debug_enabled = debug_enabled || !!(ENV["BUILDKITE_ANALYTICS_DEBUG_ENABLED"])
       self.tracing_enabled = tracing_enabled
+      self.env = env
 
       self.hook_into(hook)
     end

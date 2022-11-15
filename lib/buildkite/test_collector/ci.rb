@@ -8,7 +8,7 @@ class Buildkite::TestCollector::CI
   # The analytics env are more specific than the automatic ci platform env.
   # If they've been specified we'll assume the user wants to use that value instead.
   def env
-    ci_env.merge(analytics_env)
+    ci_env.merge(analytics_env).merge(Buildkite::TestCollector.env)
   end
 
   private

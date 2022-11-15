@@ -13,6 +13,7 @@ RSpec.describe Buildkite::TestCollector::CI do
     let(:debug) { "true" }
     let(:version) { Buildkite::TestCollector::VERSION }
     let(:name) { Buildkite::TestCollector::NAME }
+    let(:test_value) { "test_value" }
 
     before do
       allow(ENV).to receive(:[]).and_call_original
@@ -24,6 +25,14 @@ RSpec.describe Buildkite::TestCollector::CI do
       fake_env("BUILDKITE_BUILD_ID", nil)
       fake_env("GITHUB_RUN_NUMBER", nil)
       fake_env("CIRCLE_BUILD_NUM", nil)
+
+      Buildkite::TestCollector.configure(hook: :rspec, env: { "test" => test_value })
+    end
+
+    it "merges in the custom env" do
+      result = Buildkite::TestCollector::CI.env
+
+      expect(result["test"]).to eq test_value
     end
 
     context "when running on Buildkite" do
@@ -60,7 +69,8 @@ RSpec.describe Buildkite::TestCollector::CI do
           "message" => bk_message,
           "debug" => debug,
           "version" => version,
-          "collector" => name
+          "collector" => name,
+          "test" => test_value,
         })
       end
 
@@ -93,7 +103,8 @@ RSpec.describe Buildkite::TestCollector::CI do
             "execution_name_prefix" => "execution_name_prefix",
             "execution_name_suffix" => "execution_name_suffix",
             "version" => version,
-            "collector" => name
+            "collector" => name,
+            "test" => test_value,
           })
         end
       end
@@ -131,7 +142,8 @@ RSpec.describe Buildkite::TestCollector::CI do
           "number" => gha_run_number,
           "debug" => debug,
           "version" => version,
-          "collector" => name
+          "collector" => name,
+          "test" => test_value,
         })
       end
 
@@ -160,7 +172,8 @@ RSpec.describe Buildkite::TestCollector::CI do
             "message" => message,
             "debug" => debug,
             "version" => version,
-            "collector" => name
+            "collector" => name,
+            "test" => test_value,
           })
         end
       end
@@ -194,7 +207,8 @@ RSpec.describe Buildkite::TestCollector::CI do
           "number" => c_number,
           "debug" => debug,
           "version" => version,
-          "collector" => name
+          "collector" => name,
+          "test" => test_value,
         })
       end
 
@@ -223,7 +237,8 @@ RSpec.describe Buildkite::TestCollector::CI do
             "message" => message,
             "debug" => debug,
             "version" => version,
-            "collector" => name
+            "collector" => name,
+            "test" => test_value,
           })
         end
       end
@@ -244,7 +259,8 @@ RSpec.describe Buildkite::TestCollector::CI do
           "key" => key,
           "debug" => debug,
           "version" => version,
-          "collector" => name
+          "collector" => name,
+          "test" => test_value,
         })
       end
 
@@ -273,7 +289,8 @@ RSpec.describe Buildkite::TestCollector::CI do
             "message" => message,
             "debug" => debug,
             "version" => version,
-            "collector" => name
+            "collector" => name,
+            "test" => test_value,
           })
         end
       end
@@ -292,7 +309,8 @@ RSpec.describe Buildkite::TestCollector::CI do
           "key" => "845ac829-2ab3-4bbb-9e24-3529755a6d37",
           "debug" => debug,
           "version" => version,
-          "collector" => name
+          "collector" => name,
+          "test" => test_value,
         })
       end
 
@@ -321,7 +339,8 @@ RSpec.describe Buildkite::TestCollector::CI do
             "message" => message,
             "debug" => debug,
             "version" => version,
-            "collector" => name
+            "collector" => name,
+            "test" => test_value,
           })
         end
       end
