@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## v1.3.0
+
+- Fix ETIMEDOUT during socket connection causing non-zero exit code #162 - @blaknite
+- Add ability to pass custom run env to Test Analytics API #163 - @blaknite
+
 ## v1.2.5
 
 - Relax activesupport dependency to >= 4.2.0 #155 - @noodl
@@ -13,6 +18,7 @@
 - Add ability to specify execution prefix/suffix #140 - @JuanitoFatas
 
 ## v1.1.3
+
 - Use a private reference to JSON.parse to prevent it being mocked #149 - @ghcan
 
 ## v1.1.2
