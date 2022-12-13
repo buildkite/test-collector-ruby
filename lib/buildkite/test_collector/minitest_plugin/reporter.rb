@@ -11,8 +11,10 @@ module Buildkite::TestCollector::MinitestPlugin
     def record(result)
       super
 
-      if trace = Buildkite::TestCollector.uploader.traces[result.source_location]
-        Buildkite::TestCollector.session&.write_result(trace)
+      if Buildkite::TestCollector.uploader
+        if trace = Buildkite::TestCollector.uploader.traces[result.source_location]
+          Buildkite::TestCollector.session&.write_result(trace)
+        end
       end
     end
 
