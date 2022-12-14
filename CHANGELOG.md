@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## v1.3.1
+
+- Cope with the gem being loaded but not configured when using minitest #165 - @billhorsman
+
 ## v1.3.0
 
 - Fix ETIMEDOUT during socket connection causing non-zero exit code #162 - @blaknite
