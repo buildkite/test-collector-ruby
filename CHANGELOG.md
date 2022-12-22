@@ -1,5 +1,8 @@
 # CHANGELOG
 
+## v1.4.1
+- Add in support to create file with trace data #167
+
 ## v1.3.1
 
 - Cope with the gem being loaded but not configured when using minitest #165 - @billhorsman
