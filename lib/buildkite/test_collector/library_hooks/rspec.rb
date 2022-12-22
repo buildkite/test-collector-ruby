@@ -29,6 +29,18 @@ RSpec.configure do |config|
     trace = Buildkite::TestCollector::RSpecPlugin::Trace.new(example, history: tracer.history)
     Buildkite::TestCollector.uploader.traces[example.id] = trace
   end
+
+  config.after(:suite) do
+    if Buildkite::TestCollector.artifact_path
+      filename = File.join(Buildkite::TestCollector.artifact_path, "buildkite-test-collector-rspec-#{SecureRandom.uuid}.json.gz")
+      data_set = { results: Buildkite::TestCollector.uploader.traces.values.map(&:as_hash) }
+      File.open(filename, "wb") do |f|
+        gz = Zlib::GzipWriter.new(f)
+        gz.write(data_set.to_json)
+        gz.close
+      end
+    end
+  end
 end
 
 Buildkite::TestCollector.enable_tracing!
