@@ -121,12 +121,17 @@ Bug reports and pull requests are welcome on GitHub at https://github.com/buildk
 
 ## Deploying
 
-1. Bump the version in `version.rb` and run `bundle` to update the `Gemfile.lock`
-1. Update the CHANGELOG.md with your new version and a description of the changes.
-
-Once your PR with your changes is on `main`:
+1. Bump the version in `version.rb` and run `bundle` to update the `Gemfile.lock`.
+1. Update the CHANGELOG.md with your new version and a description of your changes.
+1. Git tag your changes and push
+```
+git tag v.x.x.x
+git push --tags
+```
+Once your PR is merged to `main`:
 
 1. Run `rake release` from `main` and use the rubygems credentials in 1Password.
+1. Create a [new release in github](https://github.com/buildkite/test-collector-ruby/releases).
 1. Bump the gem in [buildkite/buildkite](https://github.com/buildkite/buildkite).
 
 ## 📜 MIT License

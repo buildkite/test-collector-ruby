@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## v1.3.2
+
+- Update collector argument in the Analytics::API payload #170 - @KatieWright26
+
 ## v1.3.1
 
 - Cope with the gem being loaded but not configured when using minitest #165 - @billhorsman
