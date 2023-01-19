@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## v1.4.2
+
+- Update collector argument in the Analytics::API payload #170 - @KatieWright26
+
 ## v1.4.1
 - Add in support to create file with trace data #167
 

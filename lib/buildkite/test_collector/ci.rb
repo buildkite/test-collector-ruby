@@ -38,7 +38,7 @@ class Buildkite::TestCollector::CI
       "execution_name_prefix" => ENV["BUILDKITE_ANALYTICS_EXECUTION_NAME_PREFIX"],
       "execution_name_suffix" => ENV["BUILDKITE_ANALYTICS_EXECUTION_NAME_SUFFIX"],
       "version" => Buildkite::TestCollector::VERSION,
-      "collector" => Buildkite::TestCollector::NAME,
+      "collector" => "ruby-#{Buildkite::TestCollector::NAME}",
     }.compact
   end
 
