@@ -12,7 +12,7 @@ RSpec.describe Buildkite::TestCollector::CI do
     let(:message) { "bananas are tasty" }
     let(:debug) { "true" }
     let(:version) { Buildkite::TestCollector::VERSION }
-    let(:name) { Buildkite::TestCollector::NAME }
+    let(:name) { "ruby-#{Buildkite::TestCollector::NAME}" }
     let(:test_value) { "test_value" }
 
     before do
