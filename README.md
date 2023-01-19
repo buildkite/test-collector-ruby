@@ -119,6 +119,16 @@ See [DESIGN.md](DESIGN.md) for an overview of the design of this gem.
 
 Bug reports and pull requests are welcome on GitHub at https://github.com/buildkite/test-collector-ruby
 
+## Deploying
+
+1. Bump the version in `version.rb` and run `bundle` to update the `Gemfile.lock`
+1. Update the CHANGELOG.md with your new version and a description of the changes.
+
+Once your PR with your changes is on `main`:
+
+1. Run `rake release` from `main` and use the rubygems credentials in 1Password.
+1. Bump the gem in [buildkite/buildkite](https://github.com/buildkite/buildkite).
+
 ## 📜 MIT License
 
 The gem is available as open source under the terms of the [MIT License](https://opensource.org/licenses/MIT).
