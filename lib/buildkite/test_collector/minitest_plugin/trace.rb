@@ -72,7 +72,7 @@ module Buildkite::TestCollector::MinitestPlugin
     end
 
     def failure_reason
-      @failure_reason ||= example.failure&.message
+      @failure_reason ||= example.failure&.message&.split("\n")&.first
     end
 
     def failure_expanded
