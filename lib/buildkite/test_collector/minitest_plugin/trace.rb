@@ -70,14 +70,14 @@ module Buildkite::TestCollector::MinitestPlugin
     end
 
     def failure_reason
-      @failure_reason ||= example.failure&.message&.split("\n")&.first
+      @failure_reason ||= strip_invalid_utf8_chars(example.failure&.message)&.split("\n")&.first
     end
 
     def failure_expanded
       @failure_expanded ||= example.failures.map.with_index do |failure, index|
         # remove the first line of message from the first failure
         # to avoid duplicate line in Test Analytics UI
-        messages = failure.message.split("\n")
+        messages = strip_invalid_utf8_chars(failure.message).split("\n")
         messages = messages[1..] if index.zero?
 
         {
