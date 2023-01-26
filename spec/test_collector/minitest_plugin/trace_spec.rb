@@ -53,7 +53,7 @@ RSpec.describe Buildkite::TestCollector::MinitestPlugin::Trace do
     end
 
     describe "failure_expanded" do
-      it "does not empty" do
+      it "is not empty" do
         failure_expanded = trace.as_hash[:failure_expanded]
         expect(failure_expanded).not_to be_empty
       end
