@@ -28,7 +28,6 @@ RSpec.describe Buildkite::TestCollector::MinitestPlugin::Trace do
     it 'removes invalid UTF-8 characters from top level values' do
       failure_reason = trace.as_hash[:failure_reason]
 
-      expect(failure_reason).to include('test for invalid character')
       expect(failure_reason).to be_valid_encoding
     end
 
@@ -45,20 +44,39 @@ RSpec.describe Buildkite::TestCollector::MinitestPlugin::Trace do
       expect(history_json).to include('347611.734956')
     end
 
-    it 'sets the failure_expanded' do
-      failure_expanded = trace.as_hash[:failure_expanded]
-      expect(failure_expanded).not_to be_empty
-      expect(failure_expanded[0][:expanded]).not_to include('test for invalid character')
+    describe "failure_reason" do
+      it "only contains the first line of failure message" do
+        failure_reason = trace.as_hash[:failure_reason]
+        expect(failure_reason).to include("test for invalid character")
+        expect(failure_reason).not_to include("Expected: true")
+      end
     end
 
-    it "sets the filename, when not in Rails" do
+    describe "failure_expanded" do
+      it "does not empty" do
+        failure_expanded = trace.as_hash[:failure_expanded]
+        expect(failure_expanded).not_to be_empty
+      end
+
+      it "contains the remaining lines of failure message" do
+        failure_expanded = trace.as_hash[:failure_expanded][0][:expanded].to_s
+        expect(failure_expanded).not_to include("test for invalid character")
+        expect(failure_expanded).to include("Expected: true", "Actual: false")
+      end
+    end
+
+    it "sets the filename" do
       expect(trace.as_hash[:file_name].split("/").last).to eq("method_double.rb")
     end
 
-    let(:rails) { double("Rails", root: Pathname.new("./")) }
-    it "sets the filename, when in Rails" do
-      Rails = rails
-      expect(trace.as_hash[:file_name].split("/").last).to eq("method_double.rb")
+    describe "when in rails" do
+      let(:rails) { double("Rails", root: Pathname.new("./")) }
+
+      it "sets the filename" do
+        Rails = rails
+        expect(trace.as_hash[:file_name].split("/").last).to eq("method_double.rb")
+      end
     end
+
   end
 end
