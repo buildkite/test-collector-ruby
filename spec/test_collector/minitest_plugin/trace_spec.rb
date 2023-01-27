@@ -8,7 +8,7 @@ RSpec.describe Buildkite::TestCollector::MinitestPlugin::Trace do
   let(:example) { double("Minitest::Test", name: "test_it_passes", test_it_passes: nil, result_code: 'F', failure: failure, failures: [failure, another_failure]) }
 
   # failure is either Minitest::Assertion or Minitest::UnexpectedError object. 
-  # ref: https://github.com/minitest/minitest/blob/master/lib/minitest/test.rb#L198
+  # ref: https://github.com/minitest/minitest/blob/0984e29995a5c0f4dcf3c185442bcb4f493ed5e3/lib/minitest/test.rb#L198
   let(:failure) { instance_double(Minitest::Assertion, message: "test for invalid character'\xC8'\n    Expected: true\n    Actual: false", backtrace: backtrace) }
   let(:another_failure) { instance_double(Minitest::Assertion, message: "another test\n    Expected thing to be truthy.", backtrace: backtrace) }
 
