@@ -15,12 +15,10 @@ module Buildkite::TestCollector::MinitestPlugin
 
     FILE_PATH_REGEX = /^(.*?\.(rb|feature))/
 
-    def initialize(example, history:, failure_reason: nil, failure_expanded: [])
+    def initialize(example, history:)
       @id = SecureRandom.uuid
       @example = example
       @history = history
-      @failure_reason = failure_reason
-      @failure_expanded = failure_expanded
     end
 
     def result
@@ -72,17 +70,20 @@ module Buildkite::TestCollector::MinitestPlugin
     end
 
     def failure_reason
-      @failure_reason ||= example.failure&.message
+      @failure_reason ||= strip_invalid_utf8_chars(example.failure&.message)&.split("\n")&.first
     end
 
     def failure_expanded
-      @failure_expanded ||= begin
-        example.failures.map do |failure|
-          {
-            expanded: failure.message,
-            backtrace: failure.backtrace,
-          }
-        end
+      @failure_expanded ||= example.failures.map.with_index do |failure, index|
+        # remove the first line of message from the first failure
+        # to avoid duplicate line in Test Analytics UI
+        messages = strip_invalid_utf8_chars(failure.message).split("\n")
+        messages = messages[1..] if index.zero?
+
+        {
+          expanded: messages,
+          backtrace: failure.backtrace
+        }
       end
     end
 
