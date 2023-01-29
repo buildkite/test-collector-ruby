@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## v1.5.0
+
+- Send `failure_expanded` from minitest #171 - @nprizal 
+
 ## v1.4.2
 
 - Update collector argument in the Analytics::API payload #170 - @KatieWright26
