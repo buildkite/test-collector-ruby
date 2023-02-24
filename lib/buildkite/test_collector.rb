@@ -31,6 +31,7 @@ require_relative "test_collector/object"
 require_relative "test_collector/tracer"
 require_relative "test_collector/socket_connection"
 require_relative "test_collector/socket_session"
+require_relative "test_collector/session"
 
 module Buildkite
   module TestCollector
