@@ -2,7 +2,7 @@
 
 module Buildkite::TestCollector::RSpecPlugin
   class Reporter
-    RSpec::Core::Formatters.register self, :example_passed, :example_failed, :example_pending, :dump_summary
+    RSpec::Core::Formatters.register self, :example_passed, :example_failed, :example_pending
 
     attr_reader :output
 
@@ -19,20 +19,6 @@ module Buildkite::TestCollector::RSpecPlugin
         if example.execution_result.status == :failed
           trace.failure_reason, trace.failure_expanded = failure_info(notification)
         end
-        Buildkite::TestCollector.session&.write_result(trace)
-      end
-    end
-
-    def dump_summary(notification)
-      if Buildkite::TestCollector.session.present?
-        examples_count = {
-          examples: notification.examples.count,
-          failed: notification.failed_examples.count,
-          pending: notification.pending_examples.count,
-          errors_outside_examples: notification.errors_outside_of_examples_count
-        }
-
-        Buildkite::TestCollector.session.close(examples_count)
       end
     end
 

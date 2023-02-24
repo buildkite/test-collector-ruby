@@ -12,7 +12,6 @@ RSpec.configure do |config|
   config.before(:suite) do
     config.add_formatter Buildkite::TestCollector::RSpecPlugin::Reporter
 
-    Buildkite::TestCollector.safe { Buildkite::TestCollector::Uploader.configure }
   end
 
   config.around(:each) do |example|
