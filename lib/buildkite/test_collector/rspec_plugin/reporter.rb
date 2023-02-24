@@ -2,11 +2,12 @@
 
 module Buildkite::TestCollector::RSpecPlugin
   class Reporter
-    RSpec::Core::Formatters.register self, :example_passed, :example_failed, :example_pending
+    RSpec::Core::Formatters.register self, :example_passed, :example_failed, :example_pending, :dump_summary
 
     attr_reader :output
 
     def initialize(output)
+      Buildkite::TestCollector.session = Buildkite::TestCollector::Session.new
       @output = output
     end
 
@@ -20,6 +21,13 @@ module Buildkite::TestCollector::RSpecPlugin
           trace.failure_reason, trace.failure_expanded = failure_info(notification)
         end
       end
+
+      Buildkite::TestCollector.session.add_example_to_send_queue(example.id)
+    end
+
+    def dump_summary(_)
+      Buildkite::TestCollector.session.send_remaining_data
+      Buildkite::TestCollector.session.close
     end
 
     alias_method :example_passed, :handle_example

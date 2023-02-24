@@ -11,7 +11,6 @@ Buildkite::TestCollector.uploader = Buildkite::TestCollector::Uploader
 RSpec.configure do |config|
   config.before(:suite) do
     config.add_formatter Buildkite::TestCollector::RSpecPlugin::Reporter
-
   end
 
   config.around(:each) do |example|
