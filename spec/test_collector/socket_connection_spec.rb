@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 RSpec.describe Buildkite::TestCollector::SocketConnection do
-  let(:session_double) { instance_double("Buildkite::TestCollector::Session") }
+  let(:session_double) { instance_double("Buildkite::TestCollector::SocketSession") }
   let(:socket_connection) { Buildkite::TestCollector::SocketConnection.new(session_double, "fake_url", {}) }
   let(:ssl_socket_double) { instance_double("OpenSSL::SSL::SSLSocket") }
   let(:tcp_socket_double) { instance_double("TCPSocket") }

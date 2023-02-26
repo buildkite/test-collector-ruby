@@ -38,7 +38,7 @@ module Buildkite::TestCollector
           json = JSON.parse(response.body)
 
           if (socket_url = json["cable"]) && (channel = json["channel"])
-            Buildkite::TestCollector.session = Buildkite::TestCollector::Session.new(socket_url, http.authorization_header, channel)
+            Buildkite::TestCollector.session = Buildkite::TestCollector::SocketSession.new(socket_url, http.authorization_header, channel)
           end
         else
           request_id = response.to_hash["x-request-id"]
