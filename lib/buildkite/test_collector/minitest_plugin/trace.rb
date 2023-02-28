@@ -34,7 +34,6 @@ module Buildkite::TestCollector::MinitestPlugin
         id: id,
         scope: example.class.name,
         name: example.name,
-        identifier: identifier,
         location: location,
         file_name: file_name,
         result: result,

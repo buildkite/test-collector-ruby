@@ -28,7 +28,6 @@ module Buildkite::TestCollector::RSpecPlugin
         id: id,
         scope: example.example_group.metadata[:full_description],
         name: example.description,
-        identifier: example.id,
         location: example.location,
         file_name: file_name,
         result: result,
