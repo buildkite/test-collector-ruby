@@ -50,7 +50,6 @@ module Buildkite::TestCollector::MinitestPlugin
         "#{file_name}:#{line_number}"
       end
     end
-    alias_method :identifier, :location
 
     def file_name
       @file_name ||= File.join('./', source_location[0].delete_prefix(project_dir))
