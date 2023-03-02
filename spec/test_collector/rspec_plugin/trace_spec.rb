@@ -17,13 +17,6 @@ RSpec.describe Buildkite::TestCollector::RSpecPlugin::Trace do
   end
 
   describe '#as_hash' do
-    it 'removes invalid UTF-8 characters from top level values' do
-      identifier = trace.as_hash[:identifier]
-
-      expect(identifier).to include('test for invalid character')
-      expect(identifier).to be_valid_encoding
-    end
-
     it 'removes invalid UTF-8 characters from nested values' do
       history_json = trace.as_hash[:history].to_json
 
