@@ -7,6 +7,7 @@ module Buildkite::TestCollector::RSpecPlugin
     attr_reader :output
 
     def initialize(output)
+      Buildkite::TestCollector.session = Buildkite::TestCollector::Session.new
       @output = output
     end
 
@@ -19,21 +20,13 @@ module Buildkite::TestCollector::RSpecPlugin
         if example.execution_result.status == :failed
           trace.failure_reason, trace.failure_expanded = failure_info(notification)
         end
-        Buildkite::TestCollector.session&.write_result(trace)
+        Buildkite::TestCollector.session.add_example_to_send_queue(example.id)
       end
     end
 
-    def dump_summary(notification)
-      if Buildkite::TestCollector.session.present?
-        examples_count = {
-          examples: notification.examples.count,
-          failed: notification.failed_examples.count,
-          pending: notification.pending_examples.count,
-          errors_outside_examples: notification.errors_outside_of_examples_count
-        }
-
-        Buildkite::TestCollector.session.close(examples_count)
-      end
+    def dump_summary(_notification)
+      Buildkite::TestCollector.session.send_remaining_data
+      Buildkite::TestCollector.session.close
     end
 
     alias_method :example_passed, :handle_example
