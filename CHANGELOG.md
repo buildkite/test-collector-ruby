@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## v2.0.0.pre
+
+- Major change: RSpec plugin to use HTTP Upload API instead of websocket connection to send test data #174 #175 - @niceking
+- `identifier` field removed from trace #176 - @amybiyuliu
+
 ## v1.5.0
 
 - Send `failure_expanded` from minitest #171 - @nprizal 
