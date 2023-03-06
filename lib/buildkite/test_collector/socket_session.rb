@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 module Buildkite::TestCollector
-  class Session
+  class SocketSession
     # Picked 75 as the magic timeout number as it's longer than the TCP timeout of 60s 🤷‍♀️
     CONFIRMATION_TIMEOUT = ENV.fetch("BUILDKITE_ANALYTICS_CONFIRMATION_TIMEOUT") { 75 }.to_i
     MAX_RECONNECTION_ATTEMPTS = ENV.fetch("BUILDKITE_ANALYTICS_RECONNECTION_ATTEMPTS") { 3 }.to_i

@@ -1,8 +1,8 @@
 # frozen_string_literal: true
 
-RSpec.describe Buildkite::TestCollector::Session do
+RSpec.describe Buildkite::TestCollector::SocketSession do
   let(:socket_double) { instance_double("Buildkite::TestCollector::SocketConnection") }
-  let(:session) { Buildkite::TestCollector::Session.new("fake_url", "fake_auth", "fake_channel") }
+  let(:session) { Buildkite::TestCollector::SocketSession.new("fake_url", "fake_auth", "fake_channel") }
   let(:examples_count) do
     {
       examples: 3,
@@ -26,8 +26,8 @@ RSpec.describe Buildkite::TestCollector::Session do
       "identifier" => "fake_channel"
     }) { @session.handle(socket_double, {"type"=> "confirm_subscription", "identifier"=> "fake_channel"}.to_json) }
 
-    stub_const("Buildkite::TestCollector::Session::WAIT_BETWEEN_RECONNECTIONS", 0)
-    stub_const("Buildkite::TestCollector::Session::CONFIRMATION_TIMEOUT", 5)
+    stub_const("Buildkite::TestCollector::SocketSession::WAIT_BETWEEN_RECONNECTIONS", 0)
+    stub_const("Buildkite::TestCollector::SocketSession::CONFIRMATION_TIMEOUT", 5)
   end
 
   describe "#initalize" do
@@ -196,7 +196,7 @@ RSpec.describe Buildkite::TestCollector::Session do
           if call_count.odd?
             @session.handle(socket_double, {"type"=> "confirm_subscription", "identifier"=> "fake_channel"}.to_json)
           else
-            raise Buildkite::TestCollector::Session::RejectedSubscription
+            raise Buildkite::TestCollector::SocketSession::RejectedSubscription
           end
       }
 

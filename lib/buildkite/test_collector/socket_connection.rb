@@ -73,7 +73,7 @@ module Buildkite::TestCollector
           end
         end
       # These get re-raise from session, we should fail gracefully
-      rescue *Buildkite::TestCollector::Session::DISCONNECTED_EXCEPTIONS => e
+      rescue *Buildkite::TestCollector::SocketSession::DISCONNECTED_EXCEPTIONS => e
         Buildkite::TestCollector.logger.error("We could not establish a connection with Buildkite Test Analytics. The error was: #{e.message}. If this is a problem, please contact support.")
       rescue EOFError, OpenSSL::SSL::SSLError => e
         # https://github.com/buildkite/test-collector-ruby/pull/147#issuecomment-1250485611
