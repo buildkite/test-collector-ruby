@@ -25,7 +25,7 @@ RSpec.describe Buildkite::TestCollector::HTTPClient do
       "run_env": {
         "CI": nil,
         "key": "build-123",
-        "version": "1.5.0",
+        "version": "2.0.0.pre",
         "collector": "ruby-buildkite-test_collector",
         "test": "test_value"
       },
@@ -34,7 +34,6 @@ RSpec.describe Buildkite::TestCollector::HTTPClient do
         "id": trace.id,
         "scope": "i love to eat pies",
         "name": "mince and cheese",
-        "identifier": "12",
         "location": "123 Pie St",
         "result": "passed",
         "failure_expanded": [],
