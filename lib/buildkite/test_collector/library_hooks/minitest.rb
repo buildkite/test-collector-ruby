@@ -12,4 +12,4 @@ end
 
 Buildkite::TestCollector.enable_tracing!
 
-Buildkite::TestCollector.safe { Buildkite::TestCollector::Uploader.configure }
+Buildkite::TestCollector.session = Buildkite::TestCollector::Session.new
