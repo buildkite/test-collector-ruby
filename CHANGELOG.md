@@ -1,9 +1,13 @@
 # CHANGELOG
 
+## v2.1.0.pre
+- Minitest plugin to use HTTP Upload API instead of websocket connection to send test data #178 #179 - @niceking
+
 ## v2.0.0.pre
 
 - Major change: RSpec plugin to use HTTP Upload API instead of websocket connection to send test data #174 #175 - @niceking
 - `identifier` field removed from trace #176 - @amybiyuliu
+- Only warn on EOF errors and also catch SSLErrors #160 - @gchan
 
 ## v1.5.0
 
