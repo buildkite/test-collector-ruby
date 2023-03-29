@@ -89,10 +89,6 @@ BUILDKITE_ANALYTICS_EXECUTION_NAME_PREFIX
 BUILDKITE_ANALYTICS_EXECUTION_NAME_SUFFIX
 ```
 
-## 🔍 Debugging
-
-To enable debugging output, set the `BUILDKITE_ANALYTICS_DEBUG_ENABLED` environment variable to `true`.
-
 ## 🔜 Roadmap
 
 See the [GitHub 'enhancement' issues](https://github.com/buildkite/test-collector-ruby/issues?q=is%3Aissue+is%3Aopen+label%3Aenhancement) for planned features. Pull requests are always welcome, and we’ll give you feedback and guidance if you choose to contribute 💚

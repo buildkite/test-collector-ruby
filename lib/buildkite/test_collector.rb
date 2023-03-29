@@ -22,7 +22,6 @@ require "active_support/notifications"
 
 require_relative "test_collector/version"
 require_relative "test_collector/error"
-require_relative "test_collector/logger"
 require_relative "test_collector/ci"
 require_relative "test_collector/http_client"
 require_relative "test_collector/uploader"
@@ -41,17 +40,15 @@ module Buildkite
       attr_accessor :url
       attr_accessor :uploader
       attr_accessor :session
-      attr_accessor :debug_enabled
       attr_accessor :tracing_enabled
       attr_accessor :artifact_path
       attr_accessor :env
       attr_accessor :batch_size
     end
 
-    def self.configure(hook:, token: nil, url: nil, debug_enabled: false, tracing_enabled: true, artifact_path: nil, env: {})
+    def self.configure(hook:, token: nil, url: nil, tracing_enabled: true, artifact_path: nil, env: {})
       self.api_token = (token || ENV["BUILDKITE_ANALYTICS_TOKEN"])&.strip
       self.url = url || DEFAULT_URL
-      self.debug_enabled = debug_enabled || !!(ENV["BUILDKITE_ANALYTICS_DEBUG_ENABLED"])
       self.tracing_enabled = tracing_enabled
       self.artifact_path = artifact_path
       self.env = env
@@ -70,30 +67,6 @@ module Buildkite
       tracer = Buildkite::TestCollector::Uploader.tracer
       tracer&.enter("annotation", **{ content: content })
       tracer&.leave
-    end
-
-    def self.log_formatter
-      @log_formatter ||= Buildkite::TestCollector::Logger::Formatter.new
-    end
-
-    def self.log_formatter=(log_formatter)
-      @log_formatter = log_formatter
-      logger.formatter = log_formatter
-    end
-
-    def self.logger=(logger)
-      @logger = logger
-    end
-
-    def self.logger
-      return @logger if defined?(@logger)
-
-      debug_mode = ENV.fetch("BUILDKITE_ANALYTICS_DEBUG_ENABLED") do
-        $DEBUG
-      end
-
-      level = !!debug_mode ? ::Logger::DEBUG : ::Logger::WARN
-      @logger ||= Buildkite::TestCollector::Logger.new($stderr, level: level)
     end
 
     def self.enable_tracing!
