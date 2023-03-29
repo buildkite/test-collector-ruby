@@ -10,15 +10,12 @@ RSpec.describe Buildkite::TestCollector::CI do
     let(:number) { "424242" }
     let(:job_id) { "242424" }
     let(:message) { "bananas are tasty" }
-    let(:debug) { "true" }
     let(:version) { Buildkite::TestCollector::VERSION }
     let(:name) { "ruby-#{Buildkite::TestCollector::NAME}" }
     let(:test_value) { "test_value" }
 
     before do
       allow(ENV).to receive(:[]).and_call_original
-
-      fake_env("BUILDKITE_ANALYTICS_DEBUG_ENABLED", debug)
 
       # these have to be reset or these tests will fail on these platforms
       fake_env("CI", nil)
@@ -67,7 +64,6 @@ RSpec.describe Buildkite::TestCollector::CI do
           "number" => bk_number,
           "job_id" => bk_job_id,
           "message" => bk_message,
-          "debug" => debug,
           "version" => version,
           "collector" => name,
           "test" => test_value,
@@ -99,7 +95,6 @@ RSpec.describe Buildkite::TestCollector::CI do
             "number" => number,
             "job_id" => job_id,
             "message" => message,
-            "debug" => debug,
             "execution_name_prefix" => "execution_name_prefix",
             "execution_name_suffix" => "execution_name_suffix",
             "version" => version,
@@ -140,7 +135,6 @@ RSpec.describe Buildkite::TestCollector::CI do
           "branch" => gha_ref,
           "commit_sha" => gha_sha,
           "number" => gha_run_number,
-          "debug" => debug,
           "version" => version,
           "collector" => name,
           "test" => test_value,
@@ -170,7 +164,6 @@ RSpec.describe Buildkite::TestCollector::CI do
             "number" => number,
             "job_id" => job_id,
             "message" => message,
-            "debug" => debug,
             "version" => version,
             "collector" => name,
             "test" => test_value,
@@ -205,7 +198,6 @@ RSpec.describe Buildkite::TestCollector::CI do
           "branch" => c_branch,
           "commit_sha" => c_sha,
           "number" => c_number,
-          "debug" => debug,
           "version" => version,
           "collector" => name,
           "test" => test_value,
@@ -235,7 +227,6 @@ RSpec.describe Buildkite::TestCollector::CI do
             "number" => number,
             "job_id" => job_id,
             "message" => message,
-            "debug" => debug,
             "version" => version,
             "collector" => name,
             "test" => test_value,
@@ -257,7 +248,6 @@ RSpec.describe Buildkite::TestCollector::CI do
         expect(result).to match({
           "CI" => "generic",
           "key" => key,
-          "debug" => debug,
           "version" => version,
           "collector" => name,
           "test" => test_value,
@@ -287,7 +277,6 @@ RSpec.describe Buildkite::TestCollector::CI do
             "number" => number,
             "job_id" => job_id,
             "message" => message,
-            "debug" => debug,
             "version" => version,
             "collector" => name,
             "test" => test_value,
@@ -307,7 +296,6 @@ RSpec.describe Buildkite::TestCollector::CI do
         expect(result).to match({
           "CI" => nil,
           "key" => "845ac829-2ab3-4bbb-9e24-3529755a6d37",
-          "debug" => debug,
           "version" => version,
           "collector" => name,
           "test" => test_value,
@@ -337,7 +325,6 @@ RSpec.describe Buildkite::TestCollector::CI do
             "number" => number,
             "job_id" => job_id,
             "message" => message,
-            "debug" => debug,
             "version" => version,
             "collector" => name,
             "test" => test_value,
