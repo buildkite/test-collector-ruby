@@ -25,7 +25,7 @@ RSpec.describe Buildkite::TestCollector::HTTPClient do
       "run_env": {
         "CI": nil,
         "key": "build-123",
-        "version": "2.0.0.pre",
+        "version": "2.1.0.pre",
         "collector": "ruby-buildkite-test_collector",
         "test": "test_value"
       },
