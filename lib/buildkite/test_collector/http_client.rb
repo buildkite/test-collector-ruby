@@ -10,24 +10,6 @@ module Buildkite::TestCollector
       @authorization_header = "Token token=\"#{Buildkite::TestCollector.api_token}\""
     end
 
-    def post
-      contact_uri = URI.parse(url)
-
-      http = Net::HTTP.new(contact_uri.host, contact_uri.port)
-      http.use_ssl = contact_uri.scheme == "https"
-
-      contact = Net::HTTP::Post.new(contact_uri.path, {
-        "Authorization" => authorization_header,
-        "Content-Type" => "application/json",
-      })
-      contact.body = {
-        run_env: Buildkite::TestCollector::CI.env,
-        format: "websocket"
-      }.to_json
-
-      http.request(contact)
-    end
-
     def post_json(data)
       contact_uri = URI.parse(url)
 
