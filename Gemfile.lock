@@ -3,7 +3,6 @@ PATH
   specs:
     buildkite-test_collector (2.1.0.pre)
       activesupport (>= 4.2)
-      websocket (~> 1.2)
 
 GEM
   remote: https://rubygems.org/
@@ -34,7 +33,6 @@ GEM
     rspec-support (3.10.3)
     tzinfo (2.0.6)
       concurrent-ruby (~> 1.0)
-    websocket (1.2.9)
 
 PLATFORMS
   ruby

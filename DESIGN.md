@@ -2,17 +2,7 @@
 
 ## Threads
 
-The Buildkite ruby collector uses websockets and ActionCable to send and
-receive data with Buildkite. Execution information starts transmitting as soon
-as possible, without waiting for the test suite to finish running.
-
-This gem uses 3 ruby threads:
-
-* main thread: acts as the producer. It collects span data from the
-  test suite and enqueues it into the send queue.
-* write thread: acts as the consumer. Removes data from the send queue and
-  sends it to Buildkite.
-* read thread: receives and processes messages from Buildkite.
+The Buildkite ruby collector uses threads to send data to the Upload API in the background. When the test suite has finished running, the collector waits UPLOAD_SESSION_TIMEOUT seconds for the Upload API requests to finish before exiting.
 
 ## Data
 
