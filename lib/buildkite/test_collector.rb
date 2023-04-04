@@ -8,13 +8,10 @@ end
 require "json"
 require "logger"
 require "net/http"
-require "openssl"
 require "time"
 require "timeout"
 require "tmpdir"
 require "securerandom"
-require "socket"
-require "websocket"
 
 require "active_support/core_ext/object/blank"
 require "active_support/core_ext/hash/indifferent_access"
