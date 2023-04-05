@@ -1,5 +1,8 @@
 # Buildkite Collectors for Ruby
 
+**DEPRECATION NOTICE**
+Versions prior to 2.1.x are unsupported and will not work after mid-2023. Please upgrade to the latest version.
+
 Official [Buildkite Test Analytics](https://buildkite.com/test-analytics) collectors for Ruby test frameworks ✨
 
 ⚒ **Supported test frameworks:** RSpec, Minitest, and [more coming soon](https://github.com/buildkite/test-collector-ruby/issues?q=is%3Aissue+is%3Aopen+label%3A%22test+frameworks%22).
