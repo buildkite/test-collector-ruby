@@ -1,5 +1,8 @@
 # CHANGELOG
 
+## v2.1.0
+- Major change: deprecates websocket connection in favour of sending HTTP requests to the Upload API. In future, websocket support will be completely removed from Buildkite and only version 2.1+ of this gem will continue to work.
+
 ## v2.1.0.pre
 - Minitest plugin to use HTTP Upload API instead of websocket connection to send test data #178 #179 - @niceking
 
@@ -11,7 +14,7 @@
 
 ## v1.5.0
 
-- Send `failure_expanded` from minitest #171 - @nprizal 
+- Send `failure_expanded` from minitest #171 - @nprizal
 
 ## v1.4.2
 
