@@ -46,7 +46,7 @@ RSpec.describe Buildkite::TestCollector::HTTPClient do
     allow(Net::HTTP).to receive(:new).and_return(http_double)
     allow(http_double).to receive(:use_ssl=)
 
-    allow(Net::HTTP::Post).to receive(:new).with("buildkite.localhost", {"Authorization"=>"Token token=\"my-cool-token\"", "Content-Type"=>"application/json"}).and_return(post_double)
+    allow(Net::HTTP::Post).to receive(:new).with("buildkite.localhost", {"Authorization"=>"Token token=\"my-cool-token\"", "Content-Encoding"=>"gzip", "Content-Type"=>"application/json"}).and_return(post_double)
 
     allow(ENV).to receive(:[]).and_call_original
     fake_env("BUILDKITE_ANALYTICS_KEY", "build-123")
