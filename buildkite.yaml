@@ -5,4 +5,4 @@ steps:
       - "bundle exec rake"
     plugins:
       - docker#v3.7.0:
-          image: ruby:latest
+          image: 445615400570.dkr.ecr.us-east-1.amazonaws.com/ecr-public/docker/library/ruby:3.1.4
