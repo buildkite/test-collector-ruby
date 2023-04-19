@@ -39,7 +39,17 @@ RSpec.describe Buildkite::TestCollector::HTTPClient do
         "failure_expanded": [],
         "history": "pie lore"
       }]
-    }
+      }.to_json
+  end
+
+  let(:compressed_body) do
+    str = StringIO.new
+
+    writer = Zlib::GzipWriter.new(str)
+    writer.write(request_body)
+    writer.close
+
+    str.string
   end
 
   before do
@@ -62,7 +72,7 @@ RSpec.describe Buildkite::TestCollector::HTTPClient do
 
   describe "#post_json" do
     it "sends the right data" do
-      expect(post_double).to receive(:body=).with(request_body.to_json)
+      expect(post_double).to receive(:body=).with(compressed_body)
       expect(http_double).to receive(:request).with(post_double)
       subject.post_json([trace])
     end
