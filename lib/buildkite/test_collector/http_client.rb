@@ -19,15 +19,24 @@ module Buildkite::TestCollector
       contact = Net::HTTP::Post.new(contact_uri.path, {
         "Authorization" => authorization_header,
         "Content-Type" => "application/json",
+        "Content-Encoding" => "gzip",
       })
 
       data_set = data.map(&:as_hash)
 
-      contact.body = {
+      body = {
         run_env: Buildkite::TestCollector::CI.env,
         format: "json",
         data: data_set
       }.to_json
+
+      compressed_body = StringIO.new
+
+      writer = Zlib::GzipWriter.new(compressed_body)
+      writer.write(body)
+      writer.close
+
+      contact.body = compressed_body.string
 
       http.request(contact)
     end

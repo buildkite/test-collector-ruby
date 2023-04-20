@@ -39,14 +39,24 @@ RSpec.describe Buildkite::TestCollector::HTTPClient do
         "failure_expanded": [],
         "history": "pie lore"
       }]
-    }
+      }.to_json
+  end
+
+  let(:compressed_body) do
+    str = StringIO.new
+
+    writer = Zlib::GzipWriter.new(str)
+    writer.write(request_body)
+    writer.close
+
+    str.string
   end
 
   before do
     allow(Net::HTTP).to receive(:new).and_return(http_double)
     allow(http_double).to receive(:use_ssl=)
 
-    allow(Net::HTTP::Post).to receive(:new).with("buildkite.localhost", {"Authorization"=>"Token token=\"my-cool-token\"", "Content-Type"=>"application/json"}).and_return(post_double)
+    allow(Net::HTTP::Post).to receive(:new).with("buildkite.localhost", {"Authorization"=>"Token token=\"my-cool-token\"", "Content-Encoding"=>"gzip", "Content-Type"=>"application/json"}).and_return(post_double)
 
     allow(ENV).to receive(:[]).and_call_original
     fake_env("BUILDKITE_ANALYTICS_KEY", "build-123")
@@ -62,7 +72,7 @@ RSpec.describe Buildkite::TestCollector::HTTPClient do
 
   describe "#post_json" do
     it "sends the right data" do
-      expect(post_double).to receive(:body=).with(request_body.to_json)
+      expect(post_double).to receive(:body=).with(compressed_body)
       expect(http_double).to receive(:request).with(post_double)
       subject.post_json([trace])
     end
