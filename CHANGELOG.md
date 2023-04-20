@@ -1,5 +1,8 @@
 # CHANGELOG
 
+## v2.2.0
+- Gzip payload of request to Upload API #183 - @niceking
+
 ## v2.1.0
 - Major change: deprecates websocket connection in favour of sending HTTP requests to the Upload API. In future, websocket support will be completely removed from Buildkite and only version 2.1+ of this gem will continue to work.
 
