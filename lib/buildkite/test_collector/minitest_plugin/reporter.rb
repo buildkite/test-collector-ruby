@@ -21,8 +21,10 @@ module Buildkite::TestCollector::MinitestPlugin
     def report
       super
 
-      Buildkite::TestCollector.session.send_remaining_data
-      Buildkite::TestCollector.session.close
+      if Buildkite::TestCollector.session
+        Buildkite::TestCollector.session.send_remaining_data
+        Buildkite::TestCollector.session.close
+      end
     end
   end
 end
