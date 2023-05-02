@@ -3,7 +3,7 @@
 RSpec.describe Buildkite::TestCollector::CI do
   describe ".env" do
     let(:ci) { "true" }
-    let(:key) { SecureRandom.uuid }
+    let(:key) { Buildkite::TestCollector::Uuid.call }
     let(:url) { "http://example.com" }
     let(:branch) { "not-main" }
     let(:sha) { "a2c5ef54" }

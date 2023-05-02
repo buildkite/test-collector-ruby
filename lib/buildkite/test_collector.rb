@@ -11,7 +11,6 @@ require "net/http"
 require "time"
 require "timeout"
 require "tmpdir"
-require "securerandom"
 
 require "active_support/core_ext/object/blank"
 require "active_support/core_ext/hash/indifferent_access"
@@ -26,6 +25,7 @@ require_relative "test_collector/network"
 require_relative "test_collector/object"
 require_relative "test_collector/tracer"
 require_relative "test_collector/session"
+require_relative "test_collector/secure_random"
 
 module Buildkite
   module TestCollector
@@ -73,6 +73,8 @@ module Buildkite
       Buildkite::TestCollector::Object.configure
 
       ActiveSupport::Notifications.subscribe("sql.active_record") do |name, start, finish, id, payload|
+        puts start.inspect
+        puts finish.inspect
         Buildkite::TestCollector::Uploader.tracer&.backfill(:sql, finish - start, **{ query: payload[:sql] })
       end
     end
