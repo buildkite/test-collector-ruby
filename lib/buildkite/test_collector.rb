@@ -11,7 +11,6 @@ require "net/http"
 require "time"
 require "timeout"
 require "tmpdir"
-require "securerandom"
 
 require "active_support/core_ext/object/blank"
 require "active_support/core_ext/hash/indifferent_access"
@@ -26,6 +25,7 @@ require_relative "test_collector/network"
 require_relative "test_collector/object"
 require_relative "test_collector/tracer"
 require_relative "test_collector/session"
+require_relative "test_collector/uuid"
 
 module Buildkite
   module TestCollector
