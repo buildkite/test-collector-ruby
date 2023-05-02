@@ -30,7 +30,7 @@ RSpec.configure do |config|
 
   config.after(:suite) do
     if Buildkite::TestCollector.artifact_path
-      filename = File.join(Buildkite::TestCollector.artifact_path, "buildkite-test-collector-rspec-#{SecureRandom.uuid}.json.gz")
+      filename = File.join(Buildkite::TestCollector.artifact_path, "buildkite-test-collector-rspec-#{Buildkite::TestCollector::Uuid.call}.json.gz")
       data_set = { results: Buildkite::TestCollector.uploader.traces.values.map(&:as_hash) }
       File.open(filename, "wb") do |f|
         gz = Zlib::GzipWriter.new(f)
