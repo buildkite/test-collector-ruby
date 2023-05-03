@@ -239,7 +239,7 @@ RSpec.describe Buildkite::TestCollector::CI do
       before do
         fake_env("CI", ci)
 
-        allow(SecureRandom).to receive(:uuid) { "845ac829-2ab3-4bbb-9e24-3529755a6d37" }
+        allow(Buildkite::TestCollector::UUID).to receive(:call) { "845ac829-2ab3-4bbb-9e24-3529755a6d37" }
       end
 
       it "returns all env" do
@@ -287,7 +287,7 @@ RSpec.describe Buildkite::TestCollector::CI do
 
     context "when not running on a CI platform" do
       before do
-        allow(SecureRandom).to receive(:uuid) { "845ac829-2ab3-4bbb-9e24-3529755a6d37" }
+        allow(Buildkite::TestCollector::UUID).to receive(:call) { "845ac829-2ab3-4bbb-9e24-3529755a6d37" }
       end
 
       it "returns all env" do
