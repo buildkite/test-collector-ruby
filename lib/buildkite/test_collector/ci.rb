@@ -21,7 +21,7 @@ class Buildkite::TestCollector::CI
 
     {
       "CI" => nil,
-      "key" => Buildkite::TestCollector::Uuid.call,
+      "key" => Buildkite::TestCollector::UUID.call,
     }
   end
 
@@ -44,7 +44,7 @@ class Buildkite::TestCollector::CI
   def generic
     {
       "CI" => "generic",
-      "key" => Buildkite::TestCollector::Uuid.call,
+      "key" => Buildkite::TestCollector::UUID.call,
     }
   end
 

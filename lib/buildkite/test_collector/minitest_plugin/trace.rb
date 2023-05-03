@@ -16,7 +16,7 @@ module Buildkite::TestCollector::MinitestPlugin
     FILE_PATH_REGEX = /^(.*?\.(rb|feature))/
 
     def initialize(example, history:)
-      @id = Buildkite::TestCollector::Uuid.call
+      @id = Buildkite::TestCollector::UUID.call
       @example = example
       @history = history
     end
