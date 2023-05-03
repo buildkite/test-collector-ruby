@@ -2,7 +2,7 @@
 
 require "securerandom"
 
-class Buildkite::TestCollector::Uuid
+class Buildkite::TestCollector::UUID
   GET_UUID = SecureRandom.method(:uuid)
   private_constant :GET_UUID
 
