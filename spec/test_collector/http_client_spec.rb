@@ -31,7 +31,6 @@ RSpec.describe Buildkite::TestCollector::HTTPClient do
       },
       "format": "json",
       "data": [{
-        "id": trace.id,
         "scope": "i love to eat pies",
         "name": "mince and cheese",
         "location": "123 Pie St",
