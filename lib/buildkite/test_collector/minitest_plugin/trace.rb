@@ -4,7 +4,7 @@ module Buildkite::TestCollector::MinitestPlugin
   class Trace
     attr_accessor :example
     attr_writer :failure_reason, :failure_expanded
-    attr_reader :id, :history
+    attr_reader :history
 
     RESULT_CODES = {
       '.' => 'passed',
@@ -16,7 +16,6 @@ module Buildkite::TestCollector::MinitestPlugin
     FILE_PATH_REGEX = /^(.*?\.(rb|feature))/
 
     def initialize(example, history:)
-      @id = Buildkite::TestCollector::UUID.call
       @example = example
       @history = history
     end
@@ -31,7 +30,6 @@ module Buildkite::TestCollector::MinitestPlugin
 
     def as_hash
       strip_invalid_utf8_chars(
-        id: id,
         scope: example.class.name,
         name: example.name,
         location: location,

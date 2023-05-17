@@ -3,12 +3,11 @@
 module Buildkite::TestCollector::RSpecPlugin
   class Trace
     attr_accessor :example, :failure_reason, :failure_expanded
-    attr_reader :id, :history
+    attr_reader :history
 
     FILE_PATH_REGEX = /^(.*?\.(rb|feature))/
 
     def initialize(example, history:, failure_reason: nil, failure_expanded: [])
-      @id = Buildkite::TestCollector::UUID.call
       @example = example
       @history = history
       @failure_reason = failure_reason
@@ -25,7 +24,6 @@ module Buildkite::TestCollector::RSpecPlugin
 
     def as_hash
       strip_invalid_utf8_chars(
-        id: id,
         scope: example.example_group.metadata[:full_description],
         name: example.description,
         location: example.location,
