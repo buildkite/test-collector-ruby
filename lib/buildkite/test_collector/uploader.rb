@@ -24,7 +24,8 @@ module Buildkite::TestCollector
       Net::OpenTimeout,
       OpenSSL::SSL::SSLError,
       OpenSSL::SSL::SSLErrorWaitReadable,
-      EOFError
+      EOFError,
+      Errno::ETIMEDOUT
     ]
 
     def self.tracer
@@ -44,6 +45,8 @@ module Buildkite::TestCollector
           if (upload_attempts += 1) < MAX_UPLOAD_ATTEMPTS
             retry
           end
+        rescue StandardError => e
+          $stderr.puts "#{Buildkite::TestCollector::NAME} #{Buildkite::TestCollector::VERSION} experienced an error when sending your data, you may be missing some executions for this run."
         end
       end
     end
