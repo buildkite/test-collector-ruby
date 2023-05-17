@@ -24,7 +24,8 @@ module Buildkite::TestCollector
       Net::OpenTimeout,
       OpenSSL::SSL::SSLError,
       OpenSSL::SSL::SSLErrorWaitReadable,
-      EOFError
+      EOFError,
+      Errno::ETIMEDOUT
     ]
 
     def self.tracer
