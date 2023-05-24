@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## v2.3.0
+- Stop sending execution id and safeguard SecureRandom.uuid #192 - @niceking
+- Rescue from StandardError when sending upload request #191 - @niceking
+- Fix nil pointer #188 - @ChrisBr
+
 ## v2.2.0
 - Gzip payload of request to Upload API #183 - @niceking
 
