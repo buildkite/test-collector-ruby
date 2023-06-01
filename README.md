@@ -74,7 +74,7 @@ git push origin add-buildkite-test-analytics
 ```
 
 ### VCR
-If your test suites use [VCR](https://github.com/vcr/vcr) to interact with HTTP, you need to allow them to make an actual request to Test Analytics.
+If your test suites use [VCR](https://github.com/vcr/vcr) to stub network requests, you'll need to modify the config to allow actual network requests to Test Analytics.
 
 ```
 VCR.configure do |c|
