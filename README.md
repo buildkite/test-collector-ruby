@@ -73,6 +73,15 @@ git commit -am "Add Buildkite Test Analytics"
 git push origin add-buildkite-test-analytics
 ```
 
+### VCR
+If your test suites use [VCR](https://github.com/vcr/vcr) to interact with HTTP, you need to allow them to make an actual request to Test Analytics.
+
+```
+VCR.configure do |c|
+  c.ignore_hosts "analytics-api.buildkite.com"
+end
+```
+
 ## 🗨️ Annotations
 
 This gem allows adding custom annotations to the span data sent to Buildkite using the [.annotate](https://github.com/buildkite/test-collector-ruby/blob/d9fe11341e4aa470e766febee38124b644572360/lib/buildkite/test_collector.rb#L64) method. For example:
