@@ -47,6 +47,7 @@ module Buildkite::TestCollector
           end
         rescue StandardError => e
           $stderr.puts "#{Buildkite::TestCollector::NAME} #{Buildkite::TestCollector::VERSION} experienced an error when sending your data, you may be missing some executions for this run."
+          $stderr.puts e
         end
       end
     end
