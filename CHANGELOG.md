@@ -1,5 +1,8 @@
 # CHANGELOG
 
+## v2.3.1
+- Log standard error raised during upload #195 - @nprizal
+
 ## v2.3.0
 - Stop sending execution id and safeguard SecureRandom.uuid #192 - @niceking
 - Rescue from StandardError when sending upload request #191 - @niceking
