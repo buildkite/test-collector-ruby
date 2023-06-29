@@ -38,6 +38,8 @@ class Buildkite::TestCollector::CI
       "execution_name_suffix" => ENV["BUILDKITE_ANALYTICS_EXECUTION_NAME_SUFFIX"],
       "version" => Buildkite::TestCollector::VERSION,
       "collector" => "ruby-#{Buildkite::TestCollector::NAME}",
+      "build_number" => ENV["BUILDKITE_BUILD_NUMBER"],
+      "build_id" => ENV["BUILDKITE_BUILD_ID"]
     }.compact
   end
 
@@ -58,6 +60,8 @@ class Buildkite::TestCollector::CI
       "number" => ENV["BUILDKITE_BUILD_NUMBER"],
       "job_id" => ENV["BUILDKITE_JOB_ID"],
       "message" => ENV["BUILDKITE_MESSAGE"],
+      "build_number" => ENV["BUILDKITE_BUILD_NUMBER"],
+      "build_id" => ENV["BUILDKITE_BUILD_ID"]
     }
   end
 
@@ -69,6 +73,8 @@ class Buildkite::TestCollector::CI
       "branch" => ENV["GITHUB_REF_NAME"],
       "commit_sha" => ENV["GITHUB_SHA"],
       "number" => ENV["GITHUB_RUN_NUMBER"],
+      "build_number" => ENV["GITHUB_RUN_NUMBER"],
+      "build_id" => ENV["GITHUB_RUN_ID"]
     }
   end
 
@@ -80,6 +86,8 @@ class Buildkite::TestCollector::CI
       "branch" => ENV["CIRCLE_BRANCH"],
       "commit_sha" => ENV["CIRCLE_SHA1"],
       "number" => ENV["CIRCLE_BUILD_NUM"],
+      "build_number" => ENV["CIRCLE_BUILD_NUM"],
+      "build_id" => ENV["CIRCLE_WORKFLOW_ID"]
     }
   end
 end
