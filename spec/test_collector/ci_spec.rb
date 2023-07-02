@@ -61,12 +61,13 @@ RSpec.describe Buildkite::TestCollector::CI do
           "url" => bk_build_url,
           "branch" => bk_branch,
           "commit_sha" => bk_sha,
-          "number" => bk_number,
           "job_id" => bk_job_id,
           "message" => bk_message,
           "version" => version,
           "collector" => name,
           "test" => test_value,
+          "build_number" => bk_number,
+          "build_id" => bk_build_uuid
         })
       end
 
@@ -92,7 +93,6 @@ RSpec.describe Buildkite::TestCollector::CI do
             "url" => url,
             "branch" => branch,
             "commit_sha" => sha,
-            "number" => number,
             "job_id" => job_id,
             "message" => message,
             "execution_name_prefix" => "execution_name_prefix",
@@ -100,6 +100,8 @@ RSpec.describe Buildkite::TestCollector::CI do
             "version" => version,
             "collector" => name,
             "test" => test_value,
+            "build_number" => number,
+            "build_id" => bk_build_uuid
           })
         end
       end
@@ -131,13 +133,14 @@ RSpec.describe Buildkite::TestCollector::CI do
         expect(result).to match({
           "CI" => "github_actions",
           "key" => "some_action-4242-1",
-          "url" => "https://github.com/rofl/lol/actions/runs/2424",
+          "url" => "https://github.com/rofl/lol/actions/runs/#{gha_run_id}",
           "branch" => gha_ref,
           "commit_sha" => gha_sha,
-          "number" => gha_run_number,
           "version" => version,
           "collector" => name,
           "test" => test_value,
+          "build_number" => gha_run_number,
+          "build_id" => gha_run_id
         })
       end
 
@@ -161,12 +164,13 @@ RSpec.describe Buildkite::TestCollector::CI do
             "url" => url,
             "branch" => branch,
             "commit_sha" => sha,
-            "number" => number,
             "job_id" => job_id,
             "message" => message,
             "version" => version,
             "collector" => name,
             "test" => test_value,
+            "build_number" => number,
+            "build_id" => gha_run_id
           })
         end
       end
@@ -193,14 +197,15 @@ RSpec.describe Buildkite::TestCollector::CI do
 
         expect(result).to match({
           "CI" => "circleci",
-          "key" => "4242-2424",
+          "key" => "#{c_workflow_id}-#{c_number}",
           "url" => c_url,
           "branch" => c_branch,
           "commit_sha" => c_sha,
-          "number" => c_number,
           "version" => version,
           "collector" => name,
           "test" => test_value,
+          "build_number" => c_number,
+          "build_id" => c_workflow_id
         })
       end
 
@@ -224,12 +229,13 @@ RSpec.describe Buildkite::TestCollector::CI do
             "url" => url,
             "branch" => branch,
             "commit_sha" => sha,
-            "number" => number,
             "job_id" => job_id,
             "message" => message,
             "version" => version,
             "collector" => name,
             "test" => test_value,
+            "build_number" => number,
+            "build_id" => c_workflow_id
           })
         end
       end
@@ -274,12 +280,12 @@ RSpec.describe Buildkite::TestCollector::CI do
             "url" => url,
             "branch" => branch,
             "commit_sha" => sha,
-            "number" => number,
             "job_id" => job_id,
             "message" => message,
             "version" => version,
             "collector" => name,
             "test" => test_value,
+            "build_number" => number,
           })
         end
       end
@@ -322,12 +328,12 @@ RSpec.describe Buildkite::TestCollector::CI do
             "url" => url,
             "branch" => branch,
             "commit_sha" => sha,
-            "number" => number,
             "job_id" => job_id,
             "message" => message,
             "version" => version,
             "collector" => name,
             "test" => test_value,
+            "build_number" => number,
           })
         end
       end
