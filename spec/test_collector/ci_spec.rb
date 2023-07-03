@@ -66,7 +66,7 @@ RSpec.describe Buildkite::TestCollector::CI do
           "version" => version,
           "collector" => name,
           "test" => test_value,
-          "build_number" => bk_number,
+          "number" => bk_number,
           "build_id" => bk_build_uuid
         })
       end
@@ -100,7 +100,7 @@ RSpec.describe Buildkite::TestCollector::CI do
             "version" => version,
             "collector" => name,
             "test" => test_value,
-            "build_number" => number,
+            "number" => number,
             "build_id" => bk_build_uuid
           })
         end
@@ -139,8 +139,8 @@ RSpec.describe Buildkite::TestCollector::CI do
           "version" => version,
           "collector" => name,
           "test" => test_value,
-          "build_number" => gha_run_number,
-          "build_id" => gha_run_id
+          "number" => gha_run_number,
+          "build_id" => "#{gha_run_id}-#{gha_run_attempt}"
         })
       end
 
@@ -169,8 +169,8 @@ RSpec.describe Buildkite::TestCollector::CI do
             "version" => version,
             "collector" => name,
             "test" => test_value,
-            "build_number" => number,
-            "build_id" => gha_run_id
+            "number" => number,
+            "build_id" => "#{gha_run_id}-#{gha_run_attempt}"
           })
         end
       end
@@ -197,14 +197,14 @@ RSpec.describe Buildkite::TestCollector::CI do
 
         expect(result).to match({
           "CI" => "circleci",
-          "key" => "#{c_workflow_id}-#{c_number}",
+          "key" => c_workflow_id,
           "url" => c_url,
           "branch" => c_branch,
           "commit_sha" => c_sha,
           "version" => version,
           "collector" => name,
           "test" => test_value,
-          "build_number" => c_number,
+          "number" => c_number,
           "build_id" => c_workflow_id
         })
       end
@@ -234,7 +234,7 @@ RSpec.describe Buildkite::TestCollector::CI do
             "version" => version,
             "collector" => name,
             "test" => test_value,
-            "build_number" => number,
+            "number" => number,
             "build_id" => c_workflow_id
           })
         end
@@ -285,7 +285,7 @@ RSpec.describe Buildkite::TestCollector::CI do
             "version" => version,
             "collector" => name,
             "test" => test_value,
-            "build_number" => number,
+            "number" => number,
           })
         end
       end
@@ -333,7 +333,7 @@ RSpec.describe Buildkite::TestCollector::CI do
             "version" => version,
             "collector" => name,
             "test" => test_value,
-            "build_number" => number,
+            "number" => number,
           })
         end
       end

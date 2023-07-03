@@ -37,8 +37,8 @@ class Buildkite::TestCollector::CI
       "execution_name_suffix" => ENV["BUILDKITE_ANALYTICS_EXECUTION_NAME_SUFFIX"],
       "version" => Buildkite::TestCollector::VERSION,
       "collector" => "ruby-#{Buildkite::TestCollector::NAME}",
-      "build_number" => ENV["BUILDKITE_ANALYTICS_NUMBER"],
-      "build_id" => ENV["BUILDKITE_BUILD_ID"]
+      "number" => ENV["BUILDKITE_ANALYTICS_NUMBER"],
+      "build_id" => ENV["BUILDKITE_ANALYTICS_BUILD_ID"]
     }.compact
   end
 
@@ -58,7 +58,7 @@ class Buildkite::TestCollector::CI
       "commit_sha" => ENV["BUILDKITE_COMMIT"],
       "job_id" => ENV["BUILDKITE_JOB_ID"],
       "message" => ENV["BUILDKITE_MESSAGE"],
-      "build_number" => ENV["BUILDKITE_BUILD_NUMBER"],
+      "number" => ENV["BUILDKITE_BUILD_NUMBER"],
       "build_id" => ENV["BUILDKITE_BUILD_ID"]
     }
   end
@@ -70,19 +70,19 @@ class Buildkite::TestCollector::CI
       "url" => File.join("https://github.com", ENV["GITHUB_REPOSITORY"], "actions/runs", ENV["GITHUB_RUN_ID"]),
       "branch" => ENV["GITHUB_REF_NAME"],
       "commit_sha" => ENV["GITHUB_SHA"],
-      "build_number" => ENV["GITHUB_RUN_NUMBER"],
-      "build_id" => ENV["GITHUB_RUN_ID"]
+      "number" => ENV["GITHUB_RUN_NUMBER"],
+      "build_id" => "#{ENV["GITHUB_RUN_ID"]}-#{ENV["GITHUB_RUN_ATTEMPT"]}"
     }
   end
 
   def circleci
     {
       "CI" => "circleci",
-      "key" => "#{ENV["CIRCLE_WORKFLOW_ID"]}-#{ENV["CIRCLE_BUILD_NUM"]}",
+      "key" => ENV["CIRCLE_WORKFLOW_ID"],
       "url" => ENV["CIRCLE_BUILD_URL"],
       "branch" => ENV["CIRCLE_BRANCH"],
       "commit_sha" => ENV["CIRCLE_SHA1"],
-      "build_number" => ENV["CIRCLE_BUILD_NUM"],
+      "number" => ENV["CIRCLE_BUILD_NUM"],
       "build_id" => ENV["CIRCLE_WORKFLOW_ID"]
     }
   end
