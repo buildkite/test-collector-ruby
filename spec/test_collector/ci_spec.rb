@@ -178,6 +178,7 @@ RSpec.describe Buildkite::TestCollector::CI do
 
     context "when running on CircleCI" do
       let(:c_workflow_id) { "4242" }
+      let(:c_workflow_workspace_id) { "1234" }
       let(:c_number) { "2424" }
       let(:c_url) { "http://example.com/circle" }
       let(:c_branch) { "main" }
@@ -186,10 +187,10 @@ RSpec.describe Buildkite::TestCollector::CI do
       before do
         fake_env("CI", ci)
         fake_env("CIRCLE_WORKFLOW_ID", c_workflow_id)
-        fake_env("CIRCLE_BUILD_NUM", c_number)
         fake_env("CIRCLE_BUILD_URL", c_url)
         fake_env("CIRCLE_BRANCH", c_branch)
         fake_env("CIRCLE_SHA1", c_sha)
+        fake_env("CIRCLE_WORKFLOW_WORKSPACE_ID", c_workflow_workspace_id)
       end
 
       it "returns all env" do
@@ -204,8 +205,8 @@ RSpec.describe Buildkite::TestCollector::CI do
           "version" => version,
           "collector" => name,
           "test" => test_value,
-          "number" => c_number,
-          "build_id" => c_workflow_id
+          "number" => c_workflow_id,
+          "build_id" => "#{c_workflow_workspace_id}-#{c_workflow_id}"
         })
       end
 
@@ -235,7 +236,7 @@ RSpec.describe Buildkite::TestCollector::CI do
             "collector" => name,
             "test" => test_value,
             "number" => number,
-            "build_id" => c_workflow_id
+            "build_id" => "#{c_workflow_workspace_id}-#{c_workflow_id}"
           })
         end
       end

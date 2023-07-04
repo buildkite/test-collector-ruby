@@ -16,7 +16,7 @@ class Buildkite::TestCollector::CI
   def ci_env
     return buildkite if ENV["BUILDKITE_BUILD_ID"]
     return github_actions if ENV["GITHUB_RUN_NUMBER"]
-    return circleci if ENV["CIRCLE_BUILD_NUM"]
+    return circleci if ENV["CIRCLE_WORKFLOW_ID"]
     return generic if ENV["CI"]
 
     {
@@ -82,8 +82,8 @@ class Buildkite::TestCollector::CI
       "url" => ENV["CIRCLE_BUILD_URL"],
       "branch" => ENV["CIRCLE_BRANCH"],
       "commit_sha" => ENV["CIRCLE_SHA1"],
-      "number" => ENV["CIRCLE_BUILD_NUM"],
-      "build_id" => ENV["CIRCLE_WORKFLOW_ID"]
+      "number" => ENV["CIRCLE_WORKFLOW_ID"],
+      "build_id" => "#{ENV["CIRCLE_WORKFLOW_WORKSPACE_ID"]}-#{ENV["CIRCLE_WORKFLOW_ID"]}"
     }
   end
 end
