@@ -82,8 +82,8 @@ class Buildkite::TestCollector::CI
       "url" => ENV["CIRCLE_BUILD_URL"],
       "branch" => ENV["CIRCLE_BRANCH"],
       "commit_sha" => ENV["CIRCLE_SHA1"],
-      "number" => ENV["CIRCLE_WORKFLOW_ID"],
-      "build_id" => "#{ENV["CIRCLE_WORKFLOW_WORKSPACE_ID"]}-#{ENV["CIRCLE_WORKFLOW_ID"]}"
+      "number" => ENV["CIRCLE_WORKFLOW_ID"], # There is no human readable ENV in CircleCi
+      "build_id" => ENV["CIRCLE_WORKFLOW_ID"] # Retries in CircleCi generate a new workflow id each time
     }
   end
 end
