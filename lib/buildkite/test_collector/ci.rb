@@ -17,6 +17,7 @@ class Buildkite::TestCollector::CI
     return buildkite if ENV["BUILDKITE_BUILD_ID"]
     return github_actions if ENV["GITHUB_RUN_NUMBER"]
     return circleci if ENV["CIRCLE_BUILD_NUM"]
+    return codeship if ENV["CI_NAME"] == "codeship"
     return generic if ENV["CI"]
 
     {
@@ -80,6 +81,18 @@ class Buildkite::TestCollector::CI
       "branch" => ENV["CIRCLE_BRANCH"],
       "commit_sha" => ENV["CIRCLE_SHA1"],
       "number" => ENV["CIRCLE_BUILD_NUM"],
+    }
+  end
+
+  def codeship
+    {
+      "CI" => "codeship",
+      "key" => "#{ENV["CI_BUILD_ID"]}",
+      "url" => ENV["CI_PULL_REQUEST"],
+      "branch" => ENV["CI_BRANCH"],
+      "commit_sha" => ENV["CI_COMMIT_ID"],
+      "number" => nil,
+      "message" => ENV["CI_COMMIT_MESSAGE"],
     }
   end
 end
