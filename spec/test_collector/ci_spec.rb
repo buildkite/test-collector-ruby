@@ -235,6 +235,71 @@ RSpec.describe Buildkite::TestCollector::CI do
       end
     end
 
+    context "when running on Codeship" do
+      let(:c_branch) { "main" }
+      let(:c_build_id) { "build_id" }
+      let(:c_pull_url) { "http://github.com/codeship" }
+      let(:c_sha) { "3683a9a92ec0f3055849cd5488e8e9347c6e2878" }
+      let(:c_message) { "merge something into main" }
+
+      before do
+        fake_env("CI_NAME", "codeship")
+        fake_env("CI_BUILD_ID", c_build_id)
+        fake_env("CI_PULL_REQUEST", c_pull_url)
+        fake_env("CI_BRANCH", c_branch)
+        fake_env("CI_COMMIT_ID", c_sha)
+        fake_env("CI_COMMIT_MESSAGE", c_message)
+      end
+
+      it "returns all env" do
+        result = Buildkite::TestCollector::CI.env
+
+        expect(result).to match({
+          "CI" => "codeship",
+          "key" => c_build_id,
+          "url" => c_pull_url,
+          "branch" => c_branch,
+          "commit_sha" => c_sha,
+          "number" => nil,
+          "message" => c_message,
+          "version" => version,
+          "collector" => name,
+          "test" => test_value,
+        })
+      end
+
+      context "when setting the analytics env" do
+        before do
+          fake_env("CI_NAME", "codeship")
+          fake_env("BUILDKITE_ANALYTICS_KEY", key)
+          fake_env("BUILDKITE_ANALYTICS_URL", url)
+          fake_env("BUILDKITE_ANALYTICS_BRANCH", branch)
+          fake_env("BUILDKITE_ANALYTICS_SHA", sha)
+          fake_env("BUILDKITE_ANALYTICS_NUMBER", number)
+          fake_env("BUILDKITE_ANALYTICS_JOB_ID", job_id)
+          fake_env("BUILDKITE_ANALYTICS_MESSAGE", message)
+        end
+
+        it "returns the analytics env" do
+          result = Buildkite::TestCollector::CI.env
+
+          expect(result).to match({
+            "CI" => "codeship",
+            "key" => key,
+            "url" => url,
+            "branch" => branch,
+            "commit_sha" => sha,
+            "number" => number,
+            "job_id" => job_id,
+            "message" => message,
+            "version" => version,
+            "collector" => name,
+            "test" => test_value,
+          })
+        end
+      end
+    end
+
     context "when running on a generic CI platform" do
       before do
         fake_env("CI", ci)

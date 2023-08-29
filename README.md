@@ -7,7 +7,7 @@ Official [Buildkite Test Analytics](https://buildkite.com/test-analytics) collec
 
 ⚒ **Supported test frameworks:** RSpec, Minitest, and [more coming soon](https://github.com/buildkite/test-collector-ruby/issues?q=is%3Aissue+is%3Aopen+label%3A%22test+frameworks%22).
 
-📦 **Supported CI systems:** Buildkite, GitHub Actions, CircleCI, and others via the `BUILDKITE_ANALYTICS_*` environment variables.
+📦 **Supported CI systems:** Buildkite, GitHub Actions, CircleCI, Codeship, and others via the `BUILDKITE_ANALYTICS_*` environment variables.
 
 ## 👉 Installing
 
