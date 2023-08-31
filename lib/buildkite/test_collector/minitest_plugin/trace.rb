@@ -74,7 +74,7 @@ module Buildkite::TestCollector::MinitestPlugin
         # remove the first line of message from the first failure
         # to avoid duplicate line in Test Analytics UI
         messages = strip_invalid_utf8_chars(failure.message).split("\n")
-        messages = messages[1..] if index.zero?
+        messages = messages[1..-1] if index.zero?
 
         {
           expanded: messages,
