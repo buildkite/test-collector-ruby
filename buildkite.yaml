@@ -19,7 +19,6 @@ steps:
           - "gem install bundler:2.3.25"
           - "bundle"
           - "bundle exec rake"
-        soft_fail: true
         plugins:
           - docker#v3.7.0:
               # Images for older Ruby versions aren't available on AWS ECR
