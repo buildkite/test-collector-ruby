@@ -38,7 +38,7 @@ module Buildkite::TestCollector::MinitestPlugin
         failure_reason: failure_reason,
         failure_expanded: failure_expanded,
         history: history,
-      ).with_indifferent_access.compact
+      ).with_indifferent_access.select { |_, value| !value.nil? }
     end
 
     private
@@ -50,7 +50,7 @@ module Buildkite::TestCollector::MinitestPlugin
     end
 
     def file_name
-      @file_name ||= File.join('./', source_location[0].delete_prefix(project_dir))
+      @file_name ||= File.join('./', source_location[0].sub(/\A#{project_dir}/, ""))
     end
 
     def line_number
@@ -74,7 +74,7 @@ module Buildkite::TestCollector::MinitestPlugin
         # remove the first line of message from the first failure
         # to avoid duplicate line in Test Analytics UI
         messages = strip_invalid_utf8_chars(failure.message).split("\n")
-        messages = messages[1..] if index.zero?
+        messages = messages[1..-1] if index.zero?
 
         {
           expanded: messages,
