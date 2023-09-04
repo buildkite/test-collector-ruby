@@ -1,8 +1,32 @@
 steps:
-  - label: ":rspec: Tests"
+  - label: ":rspec: Tests :ruby: {{matrix}}"
     command:
       - "bundle"
       - "bundle exec rake"
     plugins:
       - docker#v3.7.0:
-          image: 445615400570.dkr.ecr.us-east-1.amazonaws.com/ecr-public/docker/library/ruby:3.1.4
+          image: "445615400570.dkr.ecr.us-east-1.amazonaws.com/ecr-public/docker/library/ruby:{{matrix}}"
+    matrix:
+      - "latest"
+      - "3.2"
+      - "3.1"
+      - "3.0"
+      - "2.7"
+  - group: ":rspec: Legacy Ruby :ruby:"
+    steps:
+      - label: ":rspec: Tests :ruby: {{matrix}}"
+        command:
+          - "gem install bundler:2.3.25"
+          - "bundle"
+          - "bundle exec rake"
+        soft_fail: true
+        plugins:
+          - docker#v3.7.0:
+              # Images for older Ruby versions aren't available on AWS ECR
+              # so fall back to Docker Hub
+              image: "ruby:{{matrix}}"
+        matrix:
+          - "2.6"
+          - "2.5"
+          - "2.4"
+          - "2.3"
