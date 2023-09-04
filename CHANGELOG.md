@@ -1,20 +1,31 @@
 # CHANGELOG
 
+## v2.3.2
+
+- Add support for Codeship #198 - @swebb
+- Restore compatibility with older Ruby versions #201 - @gchan
+- Report Ruby version to Test Analytics #203 - @gchan
+
 ## v2.3.1
+
 - Log standard error raised during upload #195 - @nprizal
 
 ## v2.3.0
+
 - Stop sending execution id and safeguard SecureRandom.uuid #192 - @niceking
 - Rescue from StandardError when sending upload request #191 - @niceking
 - Fix nil pointer #188 - @ChrisBr
 
 ## v2.2.0
+
 - Gzip payload of request to Upload API #183 - @niceking
 
 ## v2.1.0
+
 - Major change: deprecates websocket connection in favour of sending HTTP requests to the Upload API. In future, websocket support will be completely removed from Buildkite and only version 2.1+ of this gem will continue to work.
 
 ## v2.1.0.pre
+
 - Minitest plugin to use HTTP Upload API instead of websocket connection to send test data #178 #179 - @niceking
 
 ## v2.0.0.pre
@@ -32,6 +43,7 @@
 - Update collector argument in the Analytics::API payload #170 - @KatieWright26
 
 ## v1.4.1
+
 - Add in support to create file with trace data #167
 
 ## v1.3.1

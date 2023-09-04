@@ -2,7 +2,7 @@
 
 module Buildkite
   module TestCollector
-    VERSION = "2.3.1"
+    VERSION = "2.3.2"
     NAME = "buildkite-test_collector"
   end
 end
