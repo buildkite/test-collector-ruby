@@ -37,6 +37,7 @@ class Buildkite::TestCollector::CI
       "message" => ENV["BUILDKITE_ANALYTICS_MESSAGE"],
       "execution_name_prefix" => ENV["BUILDKITE_ANALYTICS_EXECUTION_NAME_PREFIX"],
       "execution_name_suffix" => ENV["BUILDKITE_ANALYTICS_EXECUTION_NAME_SUFFIX"],
+      "language_version" => RUBY_VERSION,
       "version" => Buildkite::TestCollector::VERSION,
       "collector" => "ruby-#{Buildkite::TestCollector::NAME}",
     }.select { |_, value| !value.nil? }

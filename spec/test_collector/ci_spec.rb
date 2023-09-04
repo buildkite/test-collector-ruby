@@ -11,6 +11,7 @@ RSpec.describe Buildkite::TestCollector::CI do
     let(:job_id) { "242424" }
     let(:message) { "bananas are tasty" }
     let(:version) { Buildkite::TestCollector::VERSION }
+    let(:language_version) { RUBY_VERSION }
     let(:name) { "ruby-#{Buildkite::TestCollector::NAME}" }
     let(:test_value) { "test_value" }
 
@@ -64,6 +65,7 @@ RSpec.describe Buildkite::TestCollector::CI do
           "number" => bk_number,
           "job_id" => bk_job_id,
           "message" => bk_message,
+          "language_version" => language_version,
           "version" => version,
           "collector" => name,
           "test" => test_value,
@@ -97,6 +99,7 @@ RSpec.describe Buildkite::TestCollector::CI do
             "message" => message,
             "execution_name_prefix" => "execution_name_prefix",
             "execution_name_suffix" => "execution_name_suffix",
+            "language_version" => language_version,
             "version" => version,
             "collector" => name,
             "test" => test_value,
@@ -135,6 +138,7 @@ RSpec.describe Buildkite::TestCollector::CI do
           "branch" => gha_ref,
           "commit_sha" => gha_sha,
           "number" => gha_run_number,
+          "language_version" => language_version,
           "version" => version,
           "collector" => name,
           "test" => test_value,
@@ -164,6 +168,7 @@ RSpec.describe Buildkite::TestCollector::CI do
             "number" => number,
             "job_id" => job_id,
             "message" => message,
+            "language_version" => language_version,
             "version" => version,
             "collector" => name,
             "test" => test_value,
@@ -198,6 +203,7 @@ RSpec.describe Buildkite::TestCollector::CI do
           "branch" => c_branch,
           "commit_sha" => c_sha,
           "number" => c_number,
+          "language_version" => language_version,
           "version" => version,
           "collector" => name,
           "test" => test_value,
@@ -227,6 +233,7 @@ RSpec.describe Buildkite::TestCollector::CI do
             "number" => number,
             "job_id" => job_id,
             "message" => message,
+            "language_version" => language_version,
             "version" => version,
             "collector" => name,
             "test" => test_value,
@@ -262,6 +269,7 @@ RSpec.describe Buildkite::TestCollector::CI do
           "commit_sha" => c_sha,
           "number" => nil,
           "message" => c_message,
+          "language_version" => language_version,
           "version" => version,
           "collector" => name,
           "test" => test_value,
@@ -292,6 +300,7 @@ RSpec.describe Buildkite::TestCollector::CI do
             "number" => number,
             "job_id" => job_id,
             "message" => message,
+            "language_version" => language_version,
             "version" => version,
             "collector" => name,
             "test" => test_value,
@@ -313,6 +322,7 @@ RSpec.describe Buildkite::TestCollector::CI do
         expect(result).to match({
           "CI" => "generic",
           "key" => key,
+          "language_version" => language_version,
           "version" => version,
           "collector" => name,
           "test" => test_value,
@@ -342,6 +352,7 @@ RSpec.describe Buildkite::TestCollector::CI do
             "number" => number,
             "job_id" => job_id,
             "message" => message,
+            "language_version" => language_version,
             "version" => version,
             "collector" => name,
             "test" => test_value,
@@ -361,6 +372,7 @@ RSpec.describe Buildkite::TestCollector::CI do
         expect(result).to match({
           "CI" => nil,
           "key" => "845ac829-2ab3-4bbb-9e24-3529755a6d37",
+          "language_version" => language_version,
           "version" => version,
           "collector" => name,
           "test" => test_value,
@@ -390,6 +402,7 @@ RSpec.describe Buildkite::TestCollector::CI do
             "number" => number,
             "job_id" => job_id,
             "message" => message,
+            "language_version" => language_version,
             "version" => version,
             "collector" => name,
             "test" => test_value,
