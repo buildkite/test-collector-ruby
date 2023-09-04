@@ -7,6 +7,7 @@ steps:
       - docker#v3.7.0:
           image: "445615400570.dkr.ecr.us-east-1.amazonaws.com/ecr-public/docker/library/ruby:{{matrix}}"
     matrix:
+      - "latest"
       - "3.2.2"
       - "3.1.4"
       - "3.0.6"
