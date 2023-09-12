@@ -32,6 +32,7 @@ RSpec.configure do |config|
     $stdout.puts Thread.current if FAILED_TESTS.include?(example.id)
     $stdout.puts "🐛 run the test" if FAILED_TESTS.include?(example.id)
     example.run
+    $stdout.puts "🐛 end of run the test" if FAILED_TESTS.include?(example.id)
     Thread.current[:_buildkite_tracer] = nil
 
     $stdout.puts "🐛 finalize the tracer" if FAILED_TESTS.include?(example.id)
