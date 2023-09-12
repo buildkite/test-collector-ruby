@@ -26,6 +26,7 @@ module Buildkite::TestCollector::RSpecPlugin
 
     def handle_failed_example(notification)
       $stdout.puts "🤡 start of handle_failed_example"
+      $stdout.puts Thread.current
       example = notification.example
       trace = Buildkite::TestCollector.uploader.traces[example.id]
       $stdout.puts "🤡 example id: #{example.id}"
