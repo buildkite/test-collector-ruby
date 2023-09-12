@@ -24,13 +24,32 @@ module Buildkite::TestCollector::RSpecPlugin
       end
     end
 
+    def handle_failed_example(notification)
+      $stdout.puts "🤡 start of handle_failed_example"
+      example = notification.example
+      trace = Buildkite::TestCollector.uploader.traces[example.id]
+      $stdout.puts "🤡 example id: #{example.id}"
+
+      if trace
+        $stdout.puts "🤡 found trace"
+        trace.example = example
+        $stdout.puts "🤡 execution result: #{example.execution_result}"
+        if example.execution_result.status == :failed
+          trace.failure_reason, trace.failure_expanded = failure_info(notification)
+        end
+        $stdout.puts "🤡 adding example to queue"
+        Buildkite::TestCollector.session.add_example_to_send_queue(example.id)
+      end
+      $stdout.puts "🤡 end of handle_failed_example"
+    end
+
     def dump_summary(_notification)
       Buildkite::TestCollector.session.send_remaining_data
       Buildkite::TestCollector.session.close
     end
 
     alias_method :example_passed, :handle_example
-    alias_method :example_failed, :handle_example
+    alias_method :example_failed, :handle_failed_example
     alias_method :example_pending, :handle_example
 
     private
