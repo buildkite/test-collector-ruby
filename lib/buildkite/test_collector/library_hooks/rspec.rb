@@ -14,21 +14,23 @@ RSpec.configure do |config|
   end
 
   config.around(:each) do |example|
-    tracer = Buildkite::TestCollector::Tracer.new
+    begin
+      tracer = Buildkite::TestCollector::Tracer.new
 
-    # The _buildkite prefix here is added as a safeguard against name collisions
-    # as we are in the main thread
-    Thread.current[:_buildkite_tracer] = tracer
-    example.run
-  # example.run can raise an exception when there is another around hook that raises an exception.
-  # We need to ensure that we always clean up the resource and add the trace to the traces
-  ensure
-    Thread.current[:_buildkite_tracer] = nil
+      # The _buildkite prefix here is added as a safeguard against name collisions
+      # as we are in the main thread
+      Thread.current[:_buildkite_tracer] = tracer
+      example.run
+      # example.run can raise an exception when there is another around hook that raises an exception.
+      # We need to ensure that we always clean up the resource and add the trace to the traces
+    ensure
+      Thread.current[:_buildkite_tracer] = nil
 
-    tracer.finalize
+      tracer.finalize
 
-    trace = Buildkite::TestCollector::RSpecPlugin::Trace.new(example, history: tracer.history)
-    Buildkite::TestCollector.uploader.traces[example.id] = trace
+      trace = Buildkite::TestCollector::RSpecPlugin::Trace.new(example, history: tracer.history)
+      Buildkite::TestCollector.uploader.traces[example.id] = trace
+    end
   end
 
   config.after(:suite) do
