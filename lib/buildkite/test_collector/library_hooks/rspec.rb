@@ -20,6 +20,9 @@ RSpec.configure do |config|
     # as we are in the main thread
     Thread.current[:_buildkite_tracer] = tracer
     example.run
+  # example.run can raise an exception when there is another around hook that raises an exception.
+  # We need to ensure that we always clean up the resource and add the trace to the traces
+  ensure
     Thread.current[:_buildkite_tracer] = nil
 
     tracer.finalize
