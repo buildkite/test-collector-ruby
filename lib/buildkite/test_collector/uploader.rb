@@ -8,6 +8,10 @@ module Buildkite::TestCollector
       @traces ||= {}
     end
 
+    def self.response
+      @response ||= {}
+    end
+
     REQUEST_EXCEPTIONS = [
       URI::InvalidURIError,
       Net::HTTPBadResponse,
@@ -40,7 +44,8 @@ module Buildkite::TestCollector
       Thread.new do
         response = begin
           upload_attempts ||= 0
-          http.post_json(data)
+          @response = http.post_json(data)
+          @response
         rescue *Buildkite::TestCollector::Uploader::RETRYABLE_UPLOAD_ERRORS => e
           if (upload_attempts += 1) < MAX_UPLOAD_ATTEMPTS
             retry

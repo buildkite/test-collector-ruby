@@ -21,9 +21,8 @@ module Buildkite::TestCollector::TestLinksPlugin
     end
 
     def dump_summary(_notification)
-      # Buildkite::TestCollector.session.send_remaining_data
-      @output.puts Buildkite::TestCollector.session.upload_response.inspect
-
+      response = Buildkite::TestCollector::Uploader.response.body.inspect
+      @output.puts response.inspect
       @output.puts "\n\nTest Analytics failures:\n"
 
       @failed_examples.each do |example|
