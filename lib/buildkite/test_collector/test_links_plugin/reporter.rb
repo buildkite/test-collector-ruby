@@ -21,13 +21,16 @@ module Buildkite::TestCollector::TestLinksPlugin
     end
 
     def dump_summary(_notification)
-      response = Buildkite::TestCollector::Uploader.response.body.inspect
-      @output.puts response.inspect
+      return false unless Buildkite::TestCollector.api_token
+
+      response = Buildkite::TestCollector::Uploader.response
+      res = JSON.parse(response.body)
+
       @output.puts "\n\nTest Analytics failures:\n"
 
       @failed_examples.each do |example|
         scope_name_digest = generate_scope_name_digest(example)
-        url = "http://buildkite.localhost/organizations/buildkite/analytics/suites/ruby-rbenv-example/tests/#{scope_name_digest}"
+        url = res["suite_url"] + "/tests/#{scope_name_digest}"
         content = "#{example[:scope]} #{example[:name]}"
 
         @output.puts "\e]1339;url=#{url};content=#{content}\a"
