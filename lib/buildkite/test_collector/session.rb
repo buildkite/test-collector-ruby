@@ -40,6 +40,10 @@ module Buildkite::TestCollector
       @upload_threads.each { |t| t&.kill }
     end
 
+    def upload_response
+      Buildkite::TestCollector.uploader.traces.values_at(*@send_queue_ids).compact
+    end
+
     private
 
     def upload_data(ids)
