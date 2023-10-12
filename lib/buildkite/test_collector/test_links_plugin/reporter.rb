@@ -22,25 +22,28 @@ module Buildkite::TestCollector::TestLinksPlugin
 
     def dump_summary(_notification)
       return false unless Buildkite::TestCollector.api_token
-
-      begin
-        response = Buildkite::TestCollector::Uploader.response
-        res = JSON.parse(response.body)
-        suite_url = res['suite_url']
-      rescue StandardError => e
-        @output.puts 'Error: cannot find test suite'
-        retun
-      end
+      return false unless suite_url
 
       @output.puts "\n\nTest Analytics failures:\n\n"
+
       @failed_examples.each do |example|
         scope_name_digest = generate_scope_name_digest(example)
         url = suite_url + "/tests/#{scope_name_digest}?scope_name_digest=true"
-        @output.puts "#{example[:scope]} #{example[:name]} \x1b]1339;url=#{url};content='View in Test Analytics'\a"
+        hyperlink = "\x1b[31m#{%(\x1b]1339;url=#{url};content="#{example[:scope]} #{example[:name]}"\x07)}\x1b[0m"
+        @output.puts hyperlink
       end
     end
 
     private
+
+    def suite_url
+      response = Buildkite::TestCollector::Uploader.response
+      res = JSON.parse(response.body)
+      res['suite_url']
+    rescue StandardError => e
+      @output.puts 'Error: cannot find test suite'
+      @output.puts e
+    end
 
     def generate_scope_name_digest(result)
       Digest::SHA256.hexdigest(result[:scope].to_s + result[:name].to_s)
