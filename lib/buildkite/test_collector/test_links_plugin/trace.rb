@@ -4,8 +4,6 @@ module Buildkite::TestCollector::TestLinksPlugin
   class Trace
     attr_accessor :example
 
-    FILE_PATH_REGEX = /^(.*?\.(rb|feature))/
-
     def initialize(example)
       @example = example
     end
