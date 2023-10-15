@@ -45,7 +45,6 @@ module Buildkite::TestCollector
         response = begin
           upload_attempts ||= 0
           @response = http.post_json(data)
-          @response
         rescue *Buildkite::TestCollector::Uploader::RETRYABLE_UPLOAD_ERRORS => e
           if (upload_attempts += 1) < MAX_UPLOAD_ATTEMPTS
             retry
