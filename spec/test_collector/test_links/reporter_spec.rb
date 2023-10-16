@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 require 'buildkite/test_collector/test_links_plugin/reporter'
-require 'buildkite/test_collector/test_links_plugin/trace'
 
 RSpec.describe Buildkite::TestCollector::TestLinksPlugin::Reporter do
   let(:example_group) { OpenStruct.new(metadata: { full_description: 'i love to eat pies' }) }
@@ -14,7 +13,6 @@ RSpec.describe Buildkite::TestCollector::TestLinksPlugin::Reporter do
     )
   end
 
-  subject(:trace) { Buildkite::TestCollector::TestLinksPlugin::Trace.new(example) }
   let(:suite_url) { 'https://example.com/suite/12345' }
   let(:response) { OpenStruct.new(body: { suite_url: suite_url }.to_json) }
 
@@ -46,9 +44,10 @@ RSpec.describe Buildkite::TestCollector::TestLinksPlugin::Reporter do
     )
     io = StringIO.new
     reporter = Buildkite::TestCollector::TestLinksPlugin::Reporter.new(io)
-    trace_scope = trace.as_hash[:scope].to_s
-    trace_name = trace.as_hash[:name].to_s
-    scope_name_digest = Digest::SHA256.hexdigest(trace_scope + trace_name)
+    scope = example.example_group.metadata[:full_description].to_s
+    name = example.description.to_s
+
+    scope_name_digest = Digest::SHA256.hexdigest(scope + name)
 
     allow(Buildkite::TestCollector.uploader).to receive(:response).and_return(response)
     allow(reporter).to receive(:generate_scope_name_digest).and_return(scope_name_digest)
@@ -61,10 +60,10 @@ RSpec.describe Buildkite::TestCollector::TestLinksPlugin::Reporter do
     expect(io.string.strip).to include('Test Analytics failures:')
 
     # Displays a test link
-    expect(io.string.strip).to include("#{suite_url}/tests/#{scope_name_digest}?scope_name_digest=true")
+    expect(io.string.strip).to include("#{suite_url}/tests/#{scope_name_digest}")
 
     # Displays a test name
-    expect(io.string.strip).to include("#{trace_scope} #{trace_name}")
+    expect(io.string.strip).to include("#{scope} #{name}")
 
     reset_io(io)
   end
