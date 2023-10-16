@@ -33,7 +33,7 @@ module Buildkite::TestCollector::TestLinksPlugin
 
       @failed_examples.each do |example|
         scope_name_digest = generate_scope_name_digest(example)
-        url += "/tests/#{scope_name_digest}?scope_name_digest=true"
+        url += "/tests/#{scope_name_digest}"
         hyperlink = "\x1b[31m#{%(\x1b]1339;url=#{url};content="#{example[:scope]} #{example[:name]}"\x07)}\x1b[0m"
         @output.puts hyperlink
       end
