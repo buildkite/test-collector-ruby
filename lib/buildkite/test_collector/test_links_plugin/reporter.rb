@@ -46,8 +46,7 @@ module Buildkite::TestCollector::TestLinksPlugin
       res = JSON.parse(response.body)
       res['suite_url']
     rescue StandardError => e
-      @output.puts 'Error: cannot find test suite'
-      @output.puts e
+      $stderr.puts e
     end
 
     def generate_scope_name_digest(result)

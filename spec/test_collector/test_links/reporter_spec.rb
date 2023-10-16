@@ -5,7 +5,7 @@ require 'buildkite/test_collector/test_links_plugin/reporter'
 RSpec.describe Buildkite::TestCollector::TestLinksPlugin::Reporter do
   let(:example_group) { OpenStruct.new(metadata: { full_description: 'i love to eat pies' }) }
   let(:execution_result) { OpenStruct.new(status: :failed) }
-  let(:example) do
+  let(:failed_example) do
     OpenStruct.new(
       example_group: example_group,
       description: 'mince and cheese',
@@ -16,7 +16,7 @@ RSpec.describe Buildkite::TestCollector::TestLinksPlugin::Reporter do
   let(:suite_url) { 'https://example.com/suite/12345' }
   let(:response) { OpenStruct.new(body: { suite_url: suite_url }.to_json) }
 
-  it 'test reporter works with only passed examples' do
+  it 'does not render summary if all tests passed' do
     Buildkite::TestCollector.configure(
       hook: :rspec,
       token: 'fake',
@@ -24,10 +24,8 @@ RSpec.describe Buildkite::TestCollector::TestLinksPlugin::Reporter do
     )
     io = StringIO.new
     reporter = Buildkite::TestCollector::TestLinksPlugin::Reporter.new(io)
-    a_example = fake_example(status: :passed)
-    trace = fake_trace(a_example)
-    allow(Buildkite::TestCollector.uploader).to receive(:traces) { trace }
-    notification = RSpec::Core::Notifications::ExampleNotification.for(a_example)
+    passed_example = fake_example(status: :passed)
+    notification = RSpec::Core::Notifications::ExampleNotification.for(passed_example)
 
     reporter.dump_summary(notification)
 
@@ -36,7 +34,7 @@ RSpec.describe Buildkite::TestCollector::TestLinksPlugin::Reporter do
     reset_io(io)
   end
 
-  it 'test reporter works with a failed example' do
+  it 'does not render summary if there is no suite_url' do
     Buildkite::TestCollector.configure(
       hook: :rspec,
       token: 'fake',
@@ -44,14 +42,52 @@ RSpec.describe Buildkite::TestCollector::TestLinksPlugin::Reporter do
     )
     io = StringIO.new
     reporter = Buildkite::TestCollector::TestLinksPlugin::Reporter.new(io)
-    scope = example.example_group.metadata[:full_description].to_s
-    name = example.description.to_s
+    allow(Buildkite::TestCollector.uploader).to receive(:response).and_return(OpenStruct.new(body: { suite_url: nil }.to_json))
+    notification = RSpec::Core::Notifications::ExampleNotification.for(failed_example)
+
+    reporter.example_failed(notification)
+    reporter.dump_summary(notification)
+
+    expect(io.string.strip).to be_empty
+
+    reset_io(io)
+  end
+
+  it 'rdoes not render summary if there is no token' do
+    Buildkite::TestCollector.configure(
+      hook: :rspec,
+      token: nil,
+      url: 'http://fake.buildkite.localhost/v1/uploads'
+    )
+    io = StringIO.new
+    reporter = Buildkite::TestCollector::TestLinksPlugin::Reporter.new(io)
+    allow(Buildkite::TestCollector.uploader).to receive(:response).and_return(response)
+    notification = RSpec::Core::Notifications::ExampleNotification.for(failed_example)
+
+    reporter.example_failed(notification)
+    reporter.dump_summary(notification)
+
+    expect(io.string.strip).to be_empty
+
+    reset_io(io)
+  end
+
+  it 'renders a summary when tests have failed' do
+    Buildkite::TestCollector.configure(
+      hook: :rspec,
+      token: 'fake',
+      url: 'http://fake.buildkite.localhost/v1/uploads'
+    )
+    io = StringIO.new
+    reporter = Buildkite::TestCollector::TestLinksPlugin::Reporter.new(io)
+    scope = failed_example.example_group.metadata[:full_description].to_s
+    name = failed_example.description.to_s
 
     scope_name_digest = Digest::SHA256.hexdigest(scope + name)
 
     allow(Buildkite::TestCollector.uploader).to receive(:response).and_return(response)
     allow(reporter).to receive(:generate_scope_name_digest).and_return(scope_name_digest)
-    notification = RSpec::Core::Notifications::ExampleNotification.for(example)
+    notification = RSpec::Core::Notifications::ExampleNotification.for(failed_example)
 
     reporter.example_failed(notification)
     reporter.dump_summary(notification)
