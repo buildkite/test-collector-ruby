@@ -32,13 +32,13 @@ RSpec.describe Buildkite::TestCollector::TestLinksPlugin::Reporter do
     name = failed_example.description.to_s
     scope_name_digest = Digest::SHA256.hexdigest(scope + name)
 
-    summary = RSpec::Core::Notifications::SummaryNotification.new(
+    notification = RSpec::Core::Notifications::SummaryNotification.new(
       10.0,
       examples,
       failed_examples
     )
 
-    reporter.dump_failures(summary)
+    reporter.dump_failures(notification)
 
     # Displays the summary title
     expect(io.string.strip).to include('Test Analytics failures:')
@@ -62,13 +62,13 @@ RSpec.describe Buildkite::TestCollector::TestLinksPlugin::Reporter do
     reporter = Buildkite::TestCollector::TestLinksPlugin::Reporter.new(io)
     allow(Buildkite::TestCollector.uploader).to receive(:summary).and_return(response)
 
-    summary = RSpec::Core::Notifications::SummaryNotification.new(
+    notification = RSpec::Core::Notifications::SummaryNotification.new(
       10.0,
       examples,
       []
     )
 
-    reporter.dump_failures(summary)
+    reporter.dump_failures(notification)
 
     expect(io.string.strip).to be_empty
 
@@ -85,13 +85,13 @@ RSpec.describe Buildkite::TestCollector::TestLinksPlugin::Reporter do
     reporter = Buildkite::TestCollector::TestLinksPlugin::Reporter.new(io)
     allow(Buildkite::TestCollector.uploader).to receive(:summary).and_return(OpenStruct.new(suite_url: nil))
 
-    summary = RSpec::Core::Notifications::SummaryNotification.new(
+    notification = RSpec::Core::Notifications::SummaryNotification.new(
       10.0,
       examples,
       failed_examples
     )
 
-    reporter.dump_failures(summary)
+    reporter.dump_failures(notification)
 
     expect(io.string.strip).to be_empty
 
@@ -108,13 +108,13 @@ RSpec.describe Buildkite::TestCollector::TestLinksPlugin::Reporter do
     reporter = Buildkite::TestCollector::TestLinksPlugin::Reporter.new(io)
     allow(Buildkite::TestCollector.uploader).to receive(:summary).and_return(response)
 
-    summary = RSpec::Core::Notifications::SummaryNotification.new(
+    notification = RSpec::Core::Notifications::SummaryNotification.new(
       10.0,
       examples,
       failed_examples
     )
 
-    reporter.dump_failures(summary)
+    reporter.dump_failures(notification)
 
     expect(io.string.strip).to be_empty
 
