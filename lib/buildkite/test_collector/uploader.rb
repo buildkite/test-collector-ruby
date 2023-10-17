@@ -8,10 +8,6 @@ module Buildkite::TestCollector
       @traces ||= {}
     end
 
-    def self.response
-      @response ||= {}
-    end
-
     REQUEST_EXCEPTIONS = [
       URI::InvalidURIError,
       Net::HTTPBadResponse,
@@ -44,7 +40,7 @@ module Buildkite::TestCollector
       Thread.new do
         response = begin
           upload_attempts ||= 0
-          @response = http.post_json(data)
+          http.post_json(data)
         rescue *Buildkite::TestCollector::Uploader::RETRYABLE_UPLOAD_ERRORS => e
           if (upload_attempts += 1) < MAX_UPLOAD_ATTEMPTS
             retry
@@ -54,6 +50,15 @@ module Buildkite::TestCollector
           $stderr.puts "#{Buildkite::TestCollector::NAME} #{Buildkite::TestCollector::VERSION} experienced an error when sending your data, you may be missing some executions for this run."
         end
       end
+    end
+
+    def self.summary
+      return false unless Buildkite::TestCollector.api_token
+
+      http = Buildkite::TestCollector::HTTPClient.new("#{Buildkite::TestCollector.url}/summary")
+      http.summary_links
+    rescue StandardError => e
+      $stderr.puts e
     end
   end
 end
