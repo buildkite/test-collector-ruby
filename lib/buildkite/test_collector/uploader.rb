@@ -56,7 +56,7 @@ module Buildkite::TestCollector
       return false unless Buildkite::TestCollector.api_token
 
       http = Buildkite::TestCollector::HTTPClient.new("#{Buildkite::TestCollector.url}/summary")
-      http.summary_links
+      http.summary
     rescue StandardError => e
       $stderr.puts e
     end
