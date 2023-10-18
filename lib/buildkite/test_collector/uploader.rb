@@ -55,7 +55,7 @@ module Buildkite::TestCollector
     def self.metadata
       return false unless Buildkite::TestCollector.api_token
 
-      http = Buildkite::TestCollector::HTTPClient.new("#{Buildkite::TestCollector.url}/metadata")
+      http = Buildkite::TestCollector::HTTPClient.new(Buildkite::TestCollector.url)
       http.metadata
     rescue StandardError => e
       $stderr.puts e

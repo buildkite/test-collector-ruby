@@ -42,7 +42,7 @@ module Buildkite::TestCollector
     end
 
     def metadata
-      contact_uri = URI.parse(url)
+      contact_uri = URI.parse("#{url}/metadata")
 
       http = Net::HTTP.new(contact_uri.host, contact_uri.port)
       http.use_ssl = contact_uri.scheme == "https"
