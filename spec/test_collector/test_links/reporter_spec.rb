@@ -26,7 +26,7 @@ RSpec.describe Buildkite::TestCollector::TestLinksPlugin::Reporter do
     )
     io = StringIO.new
     reporter = Buildkite::TestCollector::TestLinksPlugin::Reporter.new(io)
-    allow(Buildkite::TestCollector.uploader).to receive(:summary).and_return(response)
+    allow(Buildkite::TestCollector.uploader).to receive(:metadata).and_return(response)
 
     scope = failed_example.example_group.metadata[:full_description].to_s
     name = failed_example.description.to_s
@@ -60,7 +60,7 @@ RSpec.describe Buildkite::TestCollector::TestLinksPlugin::Reporter do
     )
     io = StringIO.new
     reporter = Buildkite::TestCollector::TestLinksPlugin::Reporter.new(io)
-    allow(Buildkite::TestCollector.uploader).to receive(:summary).and_return(response)
+    allow(Buildkite::TestCollector.uploader).to receive(:metadata).and_return(response)
 
     notification = RSpec::Core::Notifications::SummaryNotification.new(
       10.0,
@@ -83,7 +83,7 @@ RSpec.describe Buildkite::TestCollector::TestLinksPlugin::Reporter do
     )
     io = StringIO.new
     reporter = Buildkite::TestCollector::TestLinksPlugin::Reporter.new(io)
-    allow(Buildkite::TestCollector.uploader).to receive(:summary).and_return(OpenStruct.new(suite_url: nil))
+    allow(Buildkite::TestCollector.uploader).to receive(:metadata).and_return(OpenStruct.new(suite_url: nil))
 
     notification = RSpec::Core::Notifications::SummaryNotification.new(
       10.0,
@@ -106,7 +106,7 @@ RSpec.describe Buildkite::TestCollector::TestLinksPlugin::Reporter do
     )
     io = StringIO.new
     reporter = Buildkite::TestCollector::TestLinksPlugin::Reporter.new(io)
-    allow(Buildkite::TestCollector.uploader).to receive(:summary).and_return(response)
+    allow(Buildkite::TestCollector.uploader).to receive(:metadata).and_return(response)
 
     notification = RSpec::Core::Notifications::SummaryNotification.new(
       10.0,

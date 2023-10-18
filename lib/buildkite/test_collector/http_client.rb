@@ -41,7 +41,7 @@ module Buildkite::TestCollector
       http.request(contact)
     end
 
-    def summary
+    def metadata
       contact_uri = URI.parse(url)
 
       http = Net::HTTP.new(contact_uri.host, contact_uri.port)

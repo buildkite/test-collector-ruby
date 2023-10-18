@@ -30,7 +30,7 @@ module Buildkite::TestCollector::TestLinksPlugin
     private
 
     def suite_url
-      response = Buildkite::TestCollector.uploader.summary
+      response = Buildkite::TestCollector.uploader.metadata
       res = JSON.parse(response.body)
       res['suite_url']
     rescue StandardError => e

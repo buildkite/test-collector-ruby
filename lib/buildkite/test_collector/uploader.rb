@@ -52,11 +52,11 @@ module Buildkite::TestCollector
       end
     end
 
-    def self.summary
+    def self.metadata
       return false unless Buildkite::TestCollector.api_token
 
-      http = Buildkite::TestCollector::HTTPClient.new("#{Buildkite::TestCollector.url}/summary")
-      http.summary
+      http = Buildkite::TestCollector::HTTPClient.new("#{Buildkite::TestCollector.url}/metadata")
+      http.metadata
     rescue StandardError => e
       $stderr.puts e
     end
