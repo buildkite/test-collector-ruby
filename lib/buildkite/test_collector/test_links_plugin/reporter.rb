@@ -10,13 +10,13 @@ module Buildkite::TestCollector::TestLinksPlugin
 
     def dump_failures(notification)
       # Do not display summary if no failed examples
-      return false unless notification.failed_examples.length.positive?
+      return unless notification.failed_examples.present?
 
       # Check if a Test Analytics token is set
-      return false unless Buildkite::TestCollector.api_token
+      return unless Buildkite::TestCollector.api_token
 
-      # If the suite_url fails to be generated, then we are unable to create the test links
-      return false unless (url = suite_url)
+      # If the suite_url does not exist, then we are unable to create the test links
+      return unless (url = metadata['suite_url'])
 
       @output << "\n\nTest Analytics failures:\n\n\t"
 
@@ -29,14 +29,6 @@ module Buildkite::TestCollector::TestLinksPlugin
 
     private
 
-    def suite_url
-      response = Buildkite::TestCollector.uploader.metadata
-      res = JSON.parse(response.body)
-      res['suite_url']
-    rescue StandardError => e
-      $stderr.puts e
-    end
-
     def generate_scope_name_digest(scope, name)
       Digest::SHA256.hexdigest(scope.to_s + name.to_s)
     end
@@ -47,6 +39,16 @@ module Buildkite::TestCollector::TestLinksPlugin
       scope_name_digest = generate_scope_name_digest(scope, name)
       test_url = "#{url}/tests/#{scope_name_digest}"
       "\x1b[31m#{%(\x1b]1339;url=#{test_url};content="#{scope} #{name}"\x07)}\x1b[0m"
+    end
+
+    def metadata
+      return unless Buildkite::TestCollector.api_token
+
+      http = Buildkite::TestCollector::HTTPClient.new(Buildkite::TestCollector.url)
+      metadata = http.metadata
+      JSON.parse(metadata.body)
+    rescue StandardError => e
+      $stderr.puts e
     end
   end
 end
