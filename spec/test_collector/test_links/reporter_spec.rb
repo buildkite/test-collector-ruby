@@ -37,7 +37,7 @@ RSpec.describe Buildkite::TestCollector::TestLinksPlugin::Reporter do
       failed_examples
     )
 
-    expect(Buildkite::TestCollector::HTTPClient).to receive(:new).and_return(http_client_double)
+    expect(Buildkite::TestCollector::HTTPClient).to receive(:new).and_return(http_client)
     expect(http_client).to receive(:metadata).and_return(metadata_response)
 
     reporter.dump_failures(notification)
@@ -113,8 +113,8 @@ RSpec.describe Buildkite::TestCollector::TestLinksPlugin::Reporter do
       failed_examples
     )
 
-    expect(Buildkite::TestCollector::HTTPClient).to receive(:new).and_return(http_client_double)
-    expect(http_client_double).to receive(:metadata).and_return(OpenStruct.new(body: { suite_url: nil }.to_json))
+    expect(Buildkite::TestCollector::HTTPClient).to receive(:new).and_return(http_client)
+    expect(http_client).to receive(:metadata).and_return(OpenStruct.new(body: { suite_url: nil }.to_json))
 
     reporter.dump_failures(notification)
 
