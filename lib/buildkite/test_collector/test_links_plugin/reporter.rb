@@ -18,11 +18,11 @@ module Buildkite::TestCollector::TestLinksPlugin
       # If the suite_url does not exist, then we are unable to create the test links
       return unless (url = metadata['suite_url'])
 
-      @output << "\n\nTest Analytics failures:\n\n\t"
+      @output << "\n\nTest Analytics failures:\n\n"
 
       @output << notification.failed_examples.map do |example|
         failed_example_output(example, url)
-      end.join("\n\t")
+      end.join("\n")
 
       @output << "\n\n"
     end
