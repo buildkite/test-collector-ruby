@@ -15,8 +15,14 @@ module Buildkite::TestCollector::TestLinksPlugin
       # Check if a Test Analytics token is set
       return unless Buildkite::TestCollector.api_token
 
+      metadata = fetch_metadata
+      
+      return if metadata.nil?
+
+      url = metadata.fetch('suite_url')
+
       # If the suite_url does not exist, then we are unable to create the test links
-      return unless (url = metadata['suite_url'])
+      return unless url
 
       @output << "\n\nTest Analytics failures:\n\n"
 
@@ -41,14 +47,19 @@ module Buildkite::TestCollector::TestLinksPlugin
       "\x1b[31m#{%(\x1b]1339;url=#{test_url};content="#{scope} #{name}"\x07)}\x1b[0m"
     end
 
-    def metadata
+    def fetch_metadata
       return unless Buildkite::TestCollector.api_token
 
       http = Buildkite::TestCollector::HTTPClient.new(Buildkite::TestCollector.url)
-      metadata = http.metadata
-      JSON.parse(metadata.body)
+      response = http.metadata
+
+      metadata = if response.code == 200 
+        JSON.parse(response.body)
+      end
+
+      
     rescue StandardError => e
-      $stderr.puts e
+      # Don't need to output anything here
     end
   end
 end
