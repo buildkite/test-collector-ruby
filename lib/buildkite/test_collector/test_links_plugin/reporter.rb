@@ -16,18 +16,16 @@ module Buildkite::TestCollector::TestLinksPlugin
       return unless Buildkite::TestCollector.api_token
 
       metadata = fetch_metadata
-      
+
       return if metadata.nil?
 
-      url = metadata.fetch('suite_url')
-
       # If the suite_url does not exist, then we are unable to create the test links
-      return unless url
+      return if metadata['suite_url'].nil?
 
       @output << "\n\nTest Analytics failures:\n\n"
 
       @output << notification.failed_examples.map do |example|
-        failed_example_output(example, url)
+        failed_example_output(example, metadata['suite_url'])
       end.join("\n")
 
       @output << "\n\n"
@@ -53,11 +51,7 @@ module Buildkite::TestCollector::TestLinksPlugin
       http = Buildkite::TestCollector::HTTPClient.new(Buildkite::TestCollector.url)
       response = http.metadata
 
-      metadata = if response.code == 200 
-        JSON.parse(response.body)
-      end
-
-      
+      JSON.parse(response.body) if response.code == '200'
     rescue StandardError => e
       # Don't need to output anything here
     end
