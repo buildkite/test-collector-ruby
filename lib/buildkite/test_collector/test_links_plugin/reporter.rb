@@ -17,9 +17,10 @@ module Buildkite::TestCollector::TestLinksPlugin
 
       metadata = fetch_metadata
 
+      # return if metadata was not fetched successfully
       return if metadata.nil?
 
-      # If the suite_url does not exist, then we are unable to create the test links
+      # return if suite url is nil
       return if metadata['suite_url'].nil?
 
       @output << "\n\nTest Analytics failures:\n\n"
@@ -53,7 +54,7 @@ module Buildkite::TestCollector::TestLinksPlugin
 
       JSON.parse(response.body) if response.code == '200'
     rescue StandardError => e
-      # Don't need to output anything here
+      # We don't need to output anything here
     end
   end
 end

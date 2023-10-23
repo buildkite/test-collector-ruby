@@ -3,123 +3,109 @@
 require 'buildkite/test_collector/test_links_plugin/reporter'
 
 RSpec.describe Buildkite::TestCollector::TestLinksPlugin::Reporter do
-  let(:example_group) { OpenStruct.new(metadata: { full_description: 'i love to eat pies' }) }
-  let(:execution_result) { OpenStruct.new(status: :failed) }
-  let(:failed_example) do
-    OpenStruct.new(
-      example_group: example_group,
-      description: 'mince and cheese',
-      execution_result: execution_result
-    )
-  end
   let(:examples) { RSpec.world.filtered_examples }
-  let(:failed_examples) { [failed_example] }
+  let(:http_client) { double('Buildkite::TestCollector::HTTPClient') }
   let(:suite_url) { 'https://example.com/suite/12345' }
-  let(:http_client) { instance_double('Buildkite::TestCollector::HTTPClient') }
-  let(:metadata_response) { OpenStruct.new(body: { suite_url: suite_url }.to_json) }
+  let(:response) { { suite_url: suite_url }.to_json }
+  let(:io) { StringIO.new }
+  let(:reporter) { Buildkite::TestCollector::TestLinksPlugin::Reporter.new(io) }
 
-  it 'renders a summary when tests have failed' do
+  before do
+    allow(Buildkite::TestCollector::HTTPClient).to receive(:new).and_return(http_client)
     Buildkite::TestCollector.configure(
       hook: :rspec,
-      token: 'fake',
+      token: 'fake_token',
       url: 'http://fake.buildkite.localhost/v1/uploads'
     )
-    io = StringIO.new
-    reporter = Buildkite::TestCollector::TestLinksPlugin::Reporter.new(io)
+  end
 
-    scope = failed_example.example_group.metadata[:full_description].to_s
-    name = failed_example.description.to_s
-    scope_name_digest = Digest::SHA256.hexdigest(scope + name)
-
-    notification = RSpec::Core::Notifications::SummaryNotification.new(
-      10.0,
-      examples,
-      failed_examples
-    )
-
-    expect(Buildkite::TestCollector::HTTPClient).to receive(:new).and_return(http_client)
-    expect(http_client).to receive(:metadata).and_return(metadata_response)
-
-    reporter.dump_failures(notification)
-
-    # Displays the summary title
-    expect(io.string.strip).to include('Test Analytics failures:')
-
-    # Displays a test link
-    expect(io.string.strip).to include("#{suite_url}/tests/#{scope_name_digest}")
-
-    # Displays a test name
-    expect(io.string.strip).to include("#{scope} #{name}")
-
+  after do
     reset_io(io)
   end
 
-  it 'does not render summary if all tests passed' do
-    Buildkite::TestCollector.configure(
-      hook: :rspec,
-      token: 'fake',
-      url: 'http://fake.buildkite.localhost/v1/uploads'
-    )
-    io = StringIO.new
-    reporter = Buildkite::TestCollector::TestLinksPlugin::Reporter.new(io)
+  context 'when tests have failed' do
+    let!(:failed_example) do
+      OpenStruct.new(
+        example_group: OpenStruct.new(metadata: { full_description: 'I love to eat pies' }),
+        description: 'mince and cheese',
+        execution_result: OpenStruct.new(status: :failed)
+      )
+    end
+    let!(:notification) { RSpec::Core::Notifications::SummaryNotification.new(10.0, examples, [failed_example]) }
 
-    notification = RSpec::Core::Notifications::SummaryNotification.new(
-      10.0,
-      examples,
-      []
-    )
+    context 'there is no token' do
+      before do
+        Buildkite::TestCollector.configure(hook: :rspec, token: nil, url: 'http://fake.buildkite.localhost/v1/uploads')
+      end
 
-    reporter.dump_failures(notification)
+      it 'does not render summary' do
+        reporter.dump_failures(notification)
+        expect(io.string.strip).to be_empty
+      end
 
-    expect(io.string.strip).to be_empty
+      it 'does not request metadata' do
+        reporter.dump_failures(notification)
+        expect(Buildkite::TestCollector::HTTPClient).not_to receive(:new)
+      end
+    end
 
-    reset_io(io)
+    context 'fetch_metadata does not return a suite_url' do
+      it 'does not render summary' do
+        allow(http_client).to receive(:metadata).and_return(OpenStruct.new(code: '200',
+                                                                           body: { suite_url: nil }.to_json))
+        reporter.dump_failures(notification)
+
+        expect(io.string.strip).to be_empty
+      end
+    end
+
+    context 'fetch_metadata throws an error' do
+      it 'does not render summary' do
+        allow(http_client).to receive(:metadata).and_return(StandardError)
+        reporter.dump_failures(notification)
+
+        expect(io.string.strip).to be_empty
+      end
+    end
+
+    context 'fetch_metadata has a non 200 response' do
+      it 'does not render summary' do
+        allow(http_client).to receive(:metadata).and_return(OpenStruct.new(code: '500', body: response))
+        reporter.dump_failures(notification)
+
+        # dump_failures should not out put anything
+        expect(io.string.strip).to be_empty
+      end
+    end
+
+    context 'fetch_metadata is successful and a token exists' do
+      it 'renders summary' do
+        scope = failed_example.example_group.metadata[:full_description].to_s
+        name = failed_example.description.to_s
+        scope_name_digest = Digest::SHA256.hexdigest(scope + name)
+
+        allow(http_client).to receive(:metadata).and_return(OpenStruct.new(code: '200', body: response))
+        reporter.dump_failures(notification)
+
+        expect(io.string.strip).to include('Test Analytics failures:')
+        expect(io.string.strip).to include("#{suite_url}/tests/#{scope_name_digest}")
+        expect(io.string.strip).to include("#{scope} #{name}")
+      end
+    end
   end
 
-  it 'does not render summary if there is no token' do
-    Buildkite::TestCollector.configure(
-      hook: :rspec,
-      token: nil,
-      url: 'http://fake.buildkite.localhost/v1/uploads'
-    )
-    io = StringIO.new
-    reporter = Buildkite::TestCollector::TestLinksPlugin::Reporter.new(io)
+  context 'when all tests passed' do
+    before do
+      notification = RSpec::Core::Notifications::SummaryNotification.new(10.0, examples, [])
+      reporter.dump_failures(notification)
+    end
 
-    notification = RSpec::Core::Notifications::SummaryNotification.new(
-      10.0,
-      examples,
-      failed_examples
-    )
+    it 'does not render summary' do
+      expect(io.string.strip).to be_empty
+    end
 
-    reporter.dump_failures(notification)
-
-    expect(io.string.strip).to be_empty
-
-    reset_io(io)
-  end
-
-  it 'does not render summary if there is no suite_url' do
-    Buildkite::TestCollector.configure(
-      hook: :rspec,
-      token: 'fake',
-      url: 'http://fake.buildkite.localhost/v1/uploads'
-    )
-    io = StringIO.new
-    reporter = Buildkite::TestCollector::TestLinksPlugin::Reporter.new(io)
-
-    notification = RSpec::Core::Notifications::SummaryNotification.new(
-      10.0,
-      examples,
-      failed_examples
-    )
-
-    expect(Buildkite::TestCollector::HTTPClient).to receive(:new).and_return(http_client)
-    expect(http_client).to receive(:metadata).and_return(OpenStruct.new(body: { suite_url: nil }.to_json))
-
-    reporter.dump_failures(notification)
-
-    expect(io.string.strip).to be_empty
-
-    reset_io(io)
+    it 'does not request metadata' do
+      expect(Buildkite::TestCollector::HTTPClient).not_to receive(:new)
+    end
   end
 end
