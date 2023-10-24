@@ -3,7 +3,7 @@
 require 'buildkite/test_collector/test_links_plugin/reporter'
 
 RSpec.describe Buildkite::TestCollector::TestLinksPlugin::Reporter do
-  let(:examples) { RSpec.world.filtered_examples }
+  let(:passed_example) { fake_example(status: :passed) }
   let(:http_client) { double('Buildkite::TestCollector::HTTPClient') }
   let(:suite_url) { 'https://example.com/suite/12345' }
   let(:response) { { suite_url: suite_url }.to_json }
@@ -12,6 +12,7 @@ RSpec.describe Buildkite::TestCollector::TestLinksPlugin::Reporter do
 
   before do
     allow(Buildkite::TestCollector::HTTPClient).to receive(:new).and_return(http_client)
+
     Buildkite::TestCollector.configure(
       hook: :rspec,
       token: 'fake_token',
@@ -24,14 +25,8 @@ RSpec.describe Buildkite::TestCollector::TestLinksPlugin::Reporter do
   end
 
   context 'when tests have failed' do
-    let!(:failed_example) do
-      OpenStruct.new(
-        example_group: OpenStruct.new(metadata: { full_description: 'I love to eat pies' }),
-        description: 'mince and cheese',
-        execution_result: OpenStruct.new(status: :failed)
-      )
-    end
-    let!(:notification) { RSpec::Core::Notifications::SummaryNotification.new(10.0, examples, [failed_example]) }
+    let!(:failed_example) { fake_example(status: :failed) }
+    let!(:notification) { RSpec::Core::Notifications::SummaryNotification.new(10.0, [passed_example], [failed_example]) }
 
     context 'there is no token' do
       before do
@@ -80,8 +75,8 @@ RSpec.describe Buildkite::TestCollector::TestLinksPlugin::Reporter do
 
     context 'fetch_metadata is successful and a token exists' do
       it 'renders summary' do
-        scope = failed_example.example_group.metadata[:full_description].to_s
-        name = failed_example.description.to_s
+        scope = failed_example.full_description
+        name = failed_example.description
         scope_name_digest = Digest::SHA256.hexdigest(scope + name)
 
         allow(http_client).to receive(:metadata).and_return(OpenStruct.new(code: '200', body: response))
@@ -96,7 +91,7 @@ RSpec.describe Buildkite::TestCollector::TestLinksPlugin::Reporter do
 
   context 'when all tests passed' do
     before do
-      notification = RSpec::Core::Notifications::SummaryNotification.new(10.0, examples, [])
+      notification = RSpec::Core::Notifications::SummaryNotification.new(10.0, [passed_example], [])
       reporter.dump_failures(notification)
     end
 
