@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## v2.3.3
+
+- Added feature to output links to Test Analytic tests within the log
+
 ## v2.3.2
 
 - Add support for Codeship #198 - @swebb
