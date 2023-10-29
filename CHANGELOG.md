@@ -2,7 +2,7 @@
 
 ## v2.3.3
 
-- Added feature to output links to Test Analytic tests within the log
+- Added feature to output links to Test Analytic tests within the log @meghan-kradolfer
 
 ## v2.3.2
 
