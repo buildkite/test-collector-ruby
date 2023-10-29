@@ -35,7 +35,7 @@ module Buildkite::TestCollector::TestLinksPlugin
     private
 
     def generate_scope_name_digest(scope, name)
-      Digest::SHA256.hexdigest(scope.to_s + name.to_s)
+      Digest::SHA256.hexdigest(scope + name)
     end
 
     def failed_example_output(example, url)
