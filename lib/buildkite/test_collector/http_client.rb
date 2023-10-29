@@ -41,6 +41,20 @@ module Buildkite::TestCollector
       http.request(contact)
     end
 
+    def metadata
+      contact_uri = URI.parse("#{url}/metadata")
+
+      http = Net::HTTP.new(contact_uri.host, contact_uri.port)
+      http.use_ssl = contact_uri.scheme == "https"
+
+      contact = Net::HTTP::Get.new(contact_uri.path, {
+        "Authorization" => authorization_header,
+        "Content-Type" => "application/json"
+      })
+
+      http.request(contact)
+    end
+
     private
 
     attr :url
