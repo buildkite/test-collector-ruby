@@ -11,10 +11,10 @@ require_relative "../test_links_plugin/formatter"
 Buildkite::TestCollector.uploader = Buildkite::TestCollector::Uploader
 
 RSpec.configure do |config|
+  config.default_formatter = Buildkite::TestCollector::TestLinksPlugin::Formatter
+
   config.before(:suite) do
     config.add_formatter Buildkite::TestCollector::RSpecPlugin::Reporter
-    # config.add_formatter Buildkite::TestCollector::TestLinksPlugin::Reporter
-    config.add_formatter Buildkite::TestCollector::TestLinksPlugin::Formatter
   end
 
   config.around(:each) do |example|

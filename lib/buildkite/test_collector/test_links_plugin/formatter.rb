@@ -10,7 +10,7 @@ module Buildkite::TestCollector::TestLinksPlugin
     def dump_failures(notification)
       return if notification.failure_notifications.empty?
 
-      notifications = NotificationDecorator.new(notification)
+      notifications = CustomNotification.new(notification)
       output.puts notifications.fully_formatted_failed_examples
     end
   end
