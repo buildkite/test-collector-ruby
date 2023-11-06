@@ -45,7 +45,7 @@ module Buildkite::TestCollector::TestLinksPlugin
       name = example.description
       scope_name_digest = generate_scope_name_digest(scope, name)
       test_url = "#{url}/tests/#{scope_name_digest}"
-      "🔗 \x1b[37m#{%(\x1b]1339;url=#{test_url};content="#{scope} #{name}"\x07)}\x1b[m"
+      "🔗 \x1b[4m\x1b[37m#{%(\x1b]1339;url=#{test_url};content="#{scope} #{name}"\x07)}\x1b[m"
     end
 
     def fetch_metadata
