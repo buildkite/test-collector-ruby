@@ -1,14 +1,14 @@
 # frozen_string_literal: true
 
-require 'buildkite/test_collector/test_links_plugin/reporter'
+require 'buildkite/test_collector/test_links_plugin/formatter'
 
-RSpec.describe Buildkite::TestCollector::TestLinksPlugin::Reporter do
+RSpec.describe Buildkite::TestCollector::TestLinksPlugin::Formatter do
   let(:passed_example) { fake_example(status: :passed) }
   let(:http_client) { double('Buildkite::TestCollector::HTTPClient') }
   let(:suite_url) { 'https://example.com/suite/12345' }
   let(:response) { { suite_url: suite_url }.to_json }
   let(:io) { StringIO.new }
-  let(:reporter) { Buildkite::TestCollector::TestLinksPlugin::Reporter.new(io) }
+  let(:formatter) { Buildkite::TestCollector::TestLinksPlugin::Formatter.new(io) }
 
   before do
     allow(Buildkite::TestCollector::HTTPClient).to receive(:new).and_return(http_client)
@@ -36,12 +36,12 @@ RSpec.describe Buildkite::TestCollector::TestLinksPlugin::Reporter do
       end
 
       it 'does not render summary' do
-        reporter.dump_failures(notification)
+        formatter.dump_failures(notification)
         expect(io.string.strip).to be_empty
       end
 
       it 'does not request metadata' do
-        reporter.dump_failures(notification)
+        formatter.dump_failures(notification)
         expect(Buildkite::TestCollector::HTTPClient).not_to receive(:new)
       end
     end
@@ -50,7 +50,7 @@ RSpec.describe Buildkite::TestCollector::TestLinksPlugin::Reporter do
       it 'does not render summary' do
         allow(http_client).to receive(:metadata)
                           .and_return(OpenStruct.new(code: '200', body: { suite_url: nil }.to_json))
-        reporter.dump_failures(notification)
+        formatter.dump_failures(notification)
 
         expect(io.string.strip).to be_empty
       end
@@ -59,7 +59,7 @@ RSpec.describe Buildkite::TestCollector::TestLinksPlugin::Reporter do
     context 'fetch_metadata throws an error' do
       it 'does not render summary' do
         allow(http_client).to receive(:metadata).and_return(StandardError)
-        reporter.dump_failures(notification)
+        formatter.dump_failures(notification)
 
         expect(io.string.strip).to be_empty
       end
@@ -68,7 +68,7 @@ RSpec.describe Buildkite::TestCollector::TestLinksPlugin::Reporter do
     context 'fetch_metadata has a non 200 response' do
       it 'does not render summary' do
         allow(http_client).to receive(:metadata).and_return(OpenStruct.new(code: '500', body: response))
-        reporter.dump_failures(notification)
+        formatter.dump_failures(notification)
 
         # dump_failures should not out put anything
         expect(io.string.strip).to be_empty
@@ -82,7 +82,7 @@ RSpec.describe Buildkite::TestCollector::TestLinksPlugin::Reporter do
         scope_name_digest = Digest::SHA256.hexdigest(scope + name)
 
         allow(http_client).to receive(:metadata).and_return(OpenStruct.new(code: '200', body: response))
-        reporter.dump_failures(notification)
+        formatter.dump_failures(notification)
 
         expect(io.string.strip).to include('Test Analytics failures:')
         expect(io.string.strip).to include("#{suite_url}/tests/#{scope_name_digest}")
@@ -97,7 +97,7 @@ RSpec.describe Buildkite::TestCollector::TestLinksPlugin::Reporter do
     end
 
     before do
-      reporter.dump_failures(notification)
+      formatter.dump_failures(notification)
     end
 
     it 'does not render summary' do
