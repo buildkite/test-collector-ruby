@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 module Buildkite::TestCollector::TestLinksPlugin
-  class Reporter
+  class Formatter
     RSpec::Core::Formatters.register self, :dump_failures
 
     def initialize(output)
@@ -23,7 +23,9 @@ module Buildkite::TestCollector::TestLinksPlugin
       # return if suite url is nil
       return if metadata['suite_url'].nil?
 
-      @output << "\n\nTest Analytics failures:\n\n"
+      @output << "\n\n🔥 \x1b[31mTest Analytics failures 🔥\n"
+      @output << '_____________________________'
+      @output << "\n\n"
 
       @output << notification.failed_examples.map do |example|
         failed_example_output(example, metadata['suite_url'])
@@ -43,7 +45,7 @@ module Buildkite::TestCollector::TestLinksPlugin
       name = example.description
       scope_name_digest = generate_scope_name_digest(scope, name)
       test_url = "#{url}/tests/#{scope_name_digest}"
-      "\x1b[31m#{%(\x1b]1339;url=#{test_url};content="#{scope} #{name}"\x07)}\x1b[0m"
+      "🔗 \x1b[4m\x1b[37m#{%(\x1b]1339;url=#{test_url};content="#{scope} #{name}"\x07)}\x1b[m"
     end
 
     def fetch_metadata
