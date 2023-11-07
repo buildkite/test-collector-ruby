@@ -23,8 +23,8 @@ module Buildkite::TestCollector::TestLinksPlugin
       # return if suite url is nil
       return if metadata['suite_url'].nil?
 
-      @output << "\n\n🔥 \x1b[31mTest Analytics failures:\n"
-      @output << '___________________________'
+      @output << "\n\n🔥 \x1b[31mTest Analytics failures 🔥\n"
+      @output << '_____________________________'
       @output << "\n\n"
 
       @output << notification.failed_examples.map do |example|
