@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## v2.4.0
+
+- Feature release: Output links to Test Analytic tests within the rspec log @meghan-kradolfer
+
 ## v2.3.2
 
 - Add support for Codeship #198 - @swebb
