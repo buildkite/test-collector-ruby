@@ -4,59 +4,116 @@ require "net/http"
 
 module Buildkite::TestCollector
   class HTTPClient
-    attr :authorization_header
     def initialize(url)
       @url = url
       @authorization_header = "Token token=\"#{Buildkite::TestCollector.api_token}\""
     end
 
     def post_json(data)
-      contact_uri = URI.parse(url)
+      instructions = prepare_upload
 
-      http = Net::HTTP.new(contact_uri.host, contact_uri.port)
-      http.use_ssl = contact_uri.scheme == "https"
-
-      contact = Net::HTTP::Post.new(contact_uri.path, {
-        "Authorization" => authorization_header,
-        "Content-Type" => "application/json",
-        "Content-Encoding" => "gzip",
-      })
-
-      data_set = data.map(&:as_hash)
-
-      body = {
+      # TODO: rethink the data structure.
+      # This is what was being posted to the API, but now we're uploading direct to storage.
+      # Perhaps just a more efficient representation of data?
+      # Or do we need some/all of run_env to identify the upload/run?
+      # Perhaps that can be entirely encoded in the key.
+      # Ideally something efficient/binary, but probably stick with Ruby's stdlib, probably JSON.
+      payload = JSON.generate(
         run_env: Buildkite::TestCollector::CI.env,
         format: "json",
-        data: data_set
-      }.to_json
+        data: data.map(&:as_hash),
+      )
 
       compressed_body = StringIO.new
 
-      writer = Zlib::GzipWriter.new(compressed_body)
-      writer.write(body)
-      writer.close
+      gz = Zlib::GzipWriter.new(compressed_body)
+      gz.write(payload)
+      gz.close
 
-      contact.body = compressed_body.string
+      request = instructions.method.new(instructions.url.path, {
+        "Content-Type" => instructions.content_type,
+        "Content-Encoding" => "gzip",
+      })
 
-      http.request(contact)
+      request.body = compressed_body.string
+
+      http = Net::HTTP.new(instructions.url.host, instructions.url.port)
+      http.use_ssl = instructions.url.scheme == "https"
+      http.request(request)
     end
 
     def metadata
-      contact_uri = URI.parse("#{url}/metadata")
+      url = URI.parse("#{url}/metadata")
 
-      http = Net::HTTP.new(contact_uri.host, contact_uri.port)
-      http.use_ssl = contact_uri.scheme == "https"
-
-      contact = Net::HTTP::Get.new(contact_uri.path, {
+      request = Net::HTTP::Get.new(url.path, {
         "Authorization" => authorization_header,
         "Content-Type" => "application/json"
       })
 
-      http.request(contact)
+      http = Net::HTTP.new(url.host, url.port)
+      http.use_ssl = url.scheme == "https"
+      http.request(request)
     end
 
     private
 
-    attr :url
+    attr_reader :url
+    attr_reader :authorization_header
+
+    def prepare_upload
+      url = URI.parse(Buildkite::TestCollector.upload_prepare_url)
+
+      request = Net::HTTP::Post.new(url.path, {
+        "Authorization" => authorization_header,
+        "Content-Type" => "application/json",
+      })
+
+      request.body = JSON.generate(
+        run_env: Buildkite::TestCollector::CI.env,
+        format: "json",
+      )
+
+      http = Net::HTTP.new(url.host, url.port)
+      http.use_ssl = url.scheme == "https"
+      response = http.request(request)
+
+      unless response.is_a?(Net::HTTPSuccess)
+        # TODO: error handling
+      end
+
+      unless response.content_type == "application/json"
+        # TODO: error handling
+      end
+
+      data = JSON.parse(response.body).fetch("upload")
+
+      UploadInstructions.new(
+        data.fetch("method"),
+        data.fetch("url"),
+        data.fetch("content_type"),
+      )
+    end
+
+    class UploadInstructions
+      def initialize(method:, url:, content_type:)
+        @method = method
+        @url = url
+        @content_type = content_type
+      end
+
+      def method
+        case @method.upcase
+        when "POST" then Net::HTTP::Post
+        when "PUT" then Net::HTTP::Put
+        else raise "Invalid method: #{method}"
+        end
+      end
+
+      def url
+        @parsed_url ||= URI.parse(@url)
+      end
+
+      attr_reader :content_type
+    end
   end
 end
