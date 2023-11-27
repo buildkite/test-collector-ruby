@@ -41,6 +41,12 @@ module Buildkite
       attr_accessor :artifact_path
       attr_accessor :env
       attr_accessor :batch_size
+
+      def upload_prepare_url
+        return nil unless url # prior to .configure
+
+        "#{url}/prepare"
+      end
     end
 
     def self.configure(hook:, token: nil, url: nil, tracing_enabled: true, artifact_path: nil, env: {})
