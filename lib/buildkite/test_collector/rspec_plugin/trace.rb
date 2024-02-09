@@ -60,7 +60,7 @@ module Buildkite::TestCollector::RSpecPlugin
     end
 
     def shared_example?
-      example.metadata[:shared_group_inclusion_backtrace].any?
+      !example.metadata[:shared_group_inclusion_backtrace].empty?
     end
 
     def shared_example_call_location
