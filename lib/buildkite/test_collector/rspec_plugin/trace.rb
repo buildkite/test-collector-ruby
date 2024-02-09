@@ -32,7 +32,7 @@ module Buildkite::TestCollector::RSpecPlugin
         failure_reason: failure_reason,
         failure_expanded: failure_expanded,
         history: history,
-      ).with_indifferent_access.select { |_, value| !value.nil? }
+      ).select { |_, value| !value.nil? }
     end
 
     private

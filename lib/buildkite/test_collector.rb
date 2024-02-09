@@ -12,7 +12,6 @@ require "time"
 require "timeout"
 require "tmpdir"
 
-require "active_support/core_ext/hash/indifferent_access"
 require "active_support/notifications"
 
 require_relative "test_collector/version"

@@ -43,7 +43,7 @@ module Buildkite::TestCollector
           duration: end_at - start_at,
           detail: detail,
           children: children.map(&:as_hash),
-        }.with_indifferent_access
+        }
       end
     end
 
