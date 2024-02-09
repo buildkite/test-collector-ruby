@@ -8,6 +8,7 @@ end
 require "json"
 require "logger"
 require "net/http"
+require "openssl"
 require "time"
 require "timeout"
 require "tmpdir"
