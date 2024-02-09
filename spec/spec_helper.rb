@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "buildkite/test_collector"
+require "active_support/notifications"
 
 Dir["spec/support/**/*.rb"].each { |f| require File.expand_path(f) }
 

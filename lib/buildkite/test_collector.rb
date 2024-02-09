@@ -12,8 +12,6 @@ require "time"
 require "timeout"
 require "tmpdir"
 
-require "active_support/notifications"
-
 require_relative "test_collector/version"
 require_relative "test_collector/error"
 require_relative "test_collector/ci"
@@ -69,6 +67,10 @@ module Buildkite
 
       Buildkite::TestCollector::Network.configure
       Buildkite::TestCollector::Object.configure
+
+      return unless defined?(ActiveSupport)
+
+      require "active_support/notifications"
 
       ActiveSupport::Notifications.subscribe("sql.active_record") do |name, start, finish, id, payload|
         Buildkite::TestCollector::Uploader.tracer&.backfill(:sql, finish - start, **{ query: payload[:sql] })
