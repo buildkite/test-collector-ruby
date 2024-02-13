@@ -12,6 +12,8 @@ module Buildkite::TestCollector::MinitestPlugin
       super
 
       if Buildkite::TestCollector.uploader
+        return if (result.passed? or result.skipped?) and Buildkite::TestCollector.failures_only
+
         if trace = Buildkite::TestCollector.uploader.traces[result.source_location]
           Buildkite::TestCollector.session.add_example_to_send_queue(result.source_location)
         end
