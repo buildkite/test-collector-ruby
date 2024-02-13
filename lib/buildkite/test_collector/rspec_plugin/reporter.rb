@@ -13,8 +13,9 @@ module Buildkite::TestCollector::RSpecPlugin
 
     def handle_example(notification)
       example = notification.example
-      trace = Buildkite::TestCollector.uploader.traces[example.id]
+      return if example.execution_result.status != :failed and Buildkite::TestCollector.failures_only
 
+      trace = Buildkite::TestCollector.uploader.traces[example.id]
       if trace
         trace.example = example
         if example.execution_result.status == :failed

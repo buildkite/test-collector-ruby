@@ -8,7 +8,7 @@ class FakeExecutionResult
     @status = status
     @skipped = skipped
     @pending_fixed = pending_fixed
-    @exception = status == :failed ? StandardError.new("fake error") : nil
+    @exception = (status == :failed or status == :pending) ? StandardError.new("fake error") : nil
   end
   def example_skipped?
     @skipped
@@ -16,12 +16,15 @@ class FakeExecutionResult
   def pending_fixed?
     @pending_fixed
   end
+  def pending_exception
+    @exception
+  end
 end
 
 module RSpecExampleTraceHelpers
   def fake_example(status:)
     example = double("RSpec::Core::Example")
-    allow(example).to receive(:execution_result) { FakeExecutionResult.new(status: :failed) }
+    allow(example).to receive(:execution_result) { FakeExecutionResult.new(status: status) }
     allow(example).to receive(:id) { "spec/fake/fake_spec[1:2:3]" }
     allow(example).to receive(:full_description) { "this is a fake example full description" }
     allow(example).to receive(:description) { "fake example name" }
