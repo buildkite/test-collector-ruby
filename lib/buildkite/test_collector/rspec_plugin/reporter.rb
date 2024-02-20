@@ -40,6 +40,10 @@ module Buildkite::TestCollector::RSpecPlugin
       RSpec::Core::MultipleExceptionError
     ]
 
+    def blank?(string)
+      string.nil? || string.strip.empty?
+    end
+
     def failure_info(notification)
       failure_expanded = []
 
@@ -73,9 +77,9 @@ module Buildkite::TestCollector::RSpecPlugin
     def format_message_lines(message_lines)
       message_lines.map! { |l| strip_diff_colors(l) }
       # the first line is sometimes blank, depending on the error reported
-      message_lines.shift if message_lines.first.blank?
+      message_lines.shift if blank?(message_lines.first)
       # the last line is sometimes blank, depending on the error reported
-      message_lines.pop if message_lines.last.blank?
+      message_lines.pop if blank?(message_lines.last)
       message_lines
     end
 

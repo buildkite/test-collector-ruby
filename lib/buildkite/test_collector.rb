@@ -8,13 +8,10 @@ end
 require "json"
 require "logger"
 require "net/http"
+require "openssl"
 require "time"
 require "timeout"
 require "tmpdir"
-
-require "active_support/core_ext/object/blank"
-require "active_support/core_ext/hash/indifferent_access"
-require "active_support/notifications"
 
 require_relative "test_collector/version"
 require_relative "test_collector/error"
@@ -71,6 +68,10 @@ module Buildkite
 
       Buildkite::TestCollector::Network.configure
       Buildkite::TestCollector::Object.configure
+
+      return unless defined?(ActiveSupport)
+
+      require "active_support/notifications"
 
       ActiveSupport::Notifications.subscribe("sql.active_record") do |name, start, finish, id, payload|
         Buildkite::TestCollector::Uploader.tracer&.backfill(:sql, finish - start, **{ query: payload[:sql] })

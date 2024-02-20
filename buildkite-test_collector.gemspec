@@ -24,8 +24,7 @@ Gem::Specification.new do |spec|
 
   spec.required_ruby_version = Gem::Requirement.new(">= 2.3.0")
 
-  spec.add_dependency "activesupport", ">= 4.2"
-
+  spec.add_development_dependency "activesupport", ">= 4.2"
   spec.add_development_dependency "rspec-core", '~> 3.10'
   spec.add_development_dependency "rspec-expectations", '~> 3.10'
 end

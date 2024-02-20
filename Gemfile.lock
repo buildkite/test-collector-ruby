@@ -2,7 +2,6 @@ PATH
   remote: .
   specs:
     buildkite-test_collector (2.4.0)
-      activesupport (>= 4.2)
 
 GEM
   remote: https://rubygems.org/
@@ -38,6 +37,7 @@ PLATFORMS
   ruby
 
 DEPENDENCIES
+  activesupport (>= 4.2)
   buildkite-test_collector!
   rake (~> 13.0)
   rspec (~> 3.0)

@@ -32,7 +32,7 @@ module Buildkite::TestCollector::RSpecPlugin
         failure_reason: failure_reason,
         failure_expanded: failure_expanded,
         history: history,
-      ).with_indifferent_access.select { |_, value| !value.nil? }
+      ).select { |_, value| !value.nil? }
     end
 
     private
@@ -60,7 +60,7 @@ module Buildkite::TestCollector::RSpecPlugin
     end
 
     def shared_example?
-      example.metadata[:shared_group_inclusion_backtrace].any?
+      !example.metadata[:shared_group_inclusion_backtrace].empty?
     end
 
     def shared_example_call_location

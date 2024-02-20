@@ -10,7 +10,7 @@ module Buildkite::TestCollector::TestLinksPlugin
 
     def dump_failures(notification)
       # Do not display summary if no failed examples
-      return unless notification.failed_examples.present?
+      return if notification.failed_examples.empty?
 
       # Check if a Test Analytics token is set
       return unless Buildkite::TestCollector.api_token
