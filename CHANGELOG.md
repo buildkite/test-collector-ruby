@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## v2.5.0
+
+- Remove ActiveSupport as a primary dependancy #212 - @pat
+
 ## v2.4.0
 
 - Feature release: Output links to Test Analytic tests within the rspec log @meghan-kradolfer
