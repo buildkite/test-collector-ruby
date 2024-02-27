@@ -16,8 +16,8 @@ steps:
     soft_fail: true
     agents:
       nsc-cache-tag: test-collector-ruby/3.3-rc
-      # nsc-experimental-containerd-cache-tag: test-collector-ruby/container-cache
-      nsc-experimental-containerd-cache-relative-path: containers
+      nsc-experimental-containerd-cache-tag: test-collector-ruby/container-cache
+      nsc-experimental-containerd-cache-size: 50g
 
   - label: ":rspec: Tests :ruby: {{matrix}}"
     command:
@@ -39,8 +39,8 @@ steps:
       - "2.7"
     agents:
       nsc-cache-tag: test-collector-ruby/{{matrix}}
-      # nsc-experimental-containerd-cache-tag: test-collector-ruby/container-cache
-      nsc-experimental-containerd-cache-relative-path: containers
+      nsc-experimental-containerd-cache-tag: test-collector-ruby/container-cache
+      nsc-experimental-containerd-cache-size: 50g
 
   - group: ":rspec: Legacy Ruby :ruby:"
     steps:
@@ -66,5 +66,5 @@ steps:
           - "2.3"
         agents:
           nsc-cache-tag: test-collector-ruby/{{matrix}}
-          # nsc-experimental-containerd-cache-tag: test-collector-ruby/container-cache
-          nsc-experimental-containerd-cache-relative-path: containers
+          nsc-experimental-containerd-cache-tag: test-collector-ruby/container-cache
+          nsc-experimental-containerd-cache-size: 50g
