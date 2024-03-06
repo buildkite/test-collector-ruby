@@ -50,8 +50,8 @@ module Buildkite
       self.batch_size = ENV.fetch("BUILDKITE_ANALYTICS_UPLOAD_BATCH_SIZE") { DEFAULT_UPLOAD_BATCH_SIZE }.to_i
 
       trace_min_ms_string = ENV["BUILDKITE_ANALYTICS_TRACE_MIN_MS"]
-      if trace_min_ms_string && !trace_min_ms_string.empty?
-        self.trace_min_duration = Float(trace_min_ms_string) / 1000
+      self.trace_min_duration = if trace_min_ms_string && !trace_min_ms_string.empty?
+        Float(trace_min_ms_string) / 1000
       end
 
       self.hook_into(hook)
