@@ -410,5 +410,18 @@ RSpec.describe Buildkite::TestCollector::CI do
         end
       end
     end
+
+    context "with trace_min_duration" do
+      before do
+        fake_env("BUILDKITE_ANALYTICS_TRACE_MIN_MS", "123")
+        Buildkite::TestCollector.configure(hook: :rspec)
+      end
+
+      it "includes trace_min_duration in run_env" do
+        expect(Buildkite::TestCollector::CI.env).to include(
+          "trace_min_duration" => "0.123",
+        )
+      end
+    end
   end
 end
