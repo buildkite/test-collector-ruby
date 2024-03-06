@@ -55,10 +55,10 @@ module Buildkite::TestCollector
       class IncompleteSpan < StandardError; end
     end
 
-    def initialize(min_seconds: nil)
+    def initialize(min_duration: nil)
       @top = Span.new(:top, MonotonicTime.call, nil, {})
       @stack = [@top]
-      @min_seconds = min_seconds
+      @min_duration = min_duration
     end
 
     def enter(section, **detail)
@@ -71,12 +71,12 @@ module Buildkite::TestCollector
       current_span.end_at = MonotonicTime.call
       duration = current_span.duration
       @stack.pop
-      current_span.children.pop if @min_seconds && duration < @min_seconds
+      current_span.children.pop if @min_duration && duration < @min_duration
       nil # avoid ambiguous return type/value
     end
 
     def backfill(section, duration, **detail)
-      return if @min_seconds && duration < @min_seconds
+      return if @min_duration && duration < @min_duration
       now = MonotonicTime.call
       new_entry = Span.new(section, now - duration, now, detail)
       current_span.children << new_entry

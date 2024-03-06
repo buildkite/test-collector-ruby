@@ -17,7 +17,7 @@ RSpec.configure do |config|
 
   config.around(:each) do |example|
     tracer = Buildkite::TestCollector::Tracer.new(
-      min_seconds: Buildkite::TestCollector.trace_min_seconds,
+      min_duration: Buildkite::TestCollector.trace_min_duration,
     )
 
     # The _buildkite prefix here is added as a safeguard against name collisions

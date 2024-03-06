@@ -1,8 +1,8 @@
 # frozen_string_literal: true
 
 RSpec.describe Buildkite::TestCollector::Tracer do
-  subject(:tracer) { Buildkite::TestCollector::Tracer.new(min_seconds: min_seconds) }
-  let(:min_seconds) { nil }
+  subject(:tracer) { Buildkite::TestCollector::Tracer.new(min_duration: min_duration) }
+  let(:min_duration) { nil }
 
   it "can produce an empty :top span" do
     history = tracer.finalize.history
@@ -93,8 +93,8 @@ RSpec.describe Buildkite::TestCollector::Tracer do
       })
     end
 
-    describe "filtering traces by min_seconds" do
-      let(:min_seconds) { 2.0 }
+    describe "filtering traces by min_duration" do
+      let(:min_duration) { 2.0 }
 
       it "can filter traces by duration" do
         monotonic_time_queue << 10.0
