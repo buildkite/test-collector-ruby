@@ -2,6 +2,7 @@
 
 require "buildkite/test_collector/minitest_plugin/trace"
 require "minitest"
+require "pathname"
 
 RSpec.describe Buildkite::TestCollector::MinitestPlugin::Trace do
   subject(:trace) { Buildkite::TestCollector::MinitestPlugin::Trace.new(example, history: history) }
@@ -88,7 +89,7 @@ RSpec.describe Buildkite::TestCollector::MinitestPlugin::Trace do
       let(:rails) { double("Rails", root: Pathname.new("./")) }
 
       it "sets the filename" do
-        Rails = rails
+        stub_const("Rails", rails)
         expect(trace.as_hash[:file_name].split("/").last).to eq("method_double.rb")
       end
     end
