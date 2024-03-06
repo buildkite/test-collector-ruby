@@ -35,21 +35,30 @@ module Buildkite::TestCollector
         @children = []
       end
 
+      def duration
+        raise IncompleteSpan if end_at.nil?
+
+        end_at - start_at
+      end
+
       def as_hash
         {
           section: section,
           start_at: start_at,
           end_at: end_at,
-          duration: end_at - start_at,
+          duration: duration,
           detail: detail,
           children: children.map(&:as_hash),
         }
       end
+
+      class IncompleteSpan < StandardError; end
     end
 
-    def initialize
+    def initialize(min_seconds: nil)
       @top = Span.new(:top, MonotonicTime.call, nil, {})
       @stack = [@top]
+      @min_seconds = min_seconds
     end
 
     def enter(section, **detail)
@@ -60,11 +69,16 @@ module Buildkite::TestCollector
 
     def leave
       current_span.end_at = MonotonicTime.call
+      duration = current_span.duration
       @stack.pop
+      current_span.children.pop if @min_seconds && duration < @min_seconds
+      nil # avoid ambiguous return type/value
     end
 
     def backfill(section, duration, **detail)
-      new_entry = Span.new(section, MonotonicTime.call - duration, MonotonicTime.call, detail)
+      return if @min_seconds && duration < @min_seconds
+      now = MonotonicTime.call
+      new_entry = Span.new(section, now - duration, now, detail)
       current_span.children << new_entry
     end
 

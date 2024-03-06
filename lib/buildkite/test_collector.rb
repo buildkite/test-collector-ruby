@@ -38,6 +38,7 @@ module Buildkite
       attr_accessor :artifact_path
       attr_accessor :env
       attr_accessor :batch_size
+      attr_accessor :trace_min_seconds
     end
 
     def self.configure(hook:, token: nil, url: nil, tracing_enabled: true, artifact_path: nil, env: {})
@@ -47,6 +48,12 @@ module Buildkite
       self.artifact_path = artifact_path
       self.env = env
       self.batch_size = ENV.fetch("BUILDKITE_ANALYTICS_UPLOAD_BATCH_SIZE") { DEFAULT_UPLOAD_BATCH_SIZE }.to_i
+
+      trace_min_seconds_string = ENV["BUILDKITE_ANALYTICS_TRACE_MIN_SECONDS"]
+      if trace_min_seconds_string && !trace_min_seconds_string.empty?
+        self.trace_min_seconds = Float(trace_min_seconds_string)
+      end
+
       self.hook_into(hook)
     end
 
