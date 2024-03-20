@@ -21,6 +21,7 @@ module Buildkite::TestCollector
     end
 
     def send_remaining_data
+      $stdout.puts "🤡 sending #{@send_queue_ids.count} items in the send queue"
       return if @send_queue_ids.empty?
 
       upload_data(@send_queue_ids)
