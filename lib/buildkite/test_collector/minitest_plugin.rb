@@ -9,7 +9,11 @@ require_relative "minitest_plugin/trace"
 module Buildkite::TestCollector::MinitestPlugin
   def before_setup
     super
-    tracer = Buildkite::TestCollector::Tracer.new
+
+    tracer = Buildkite::TestCollector::Tracer.new(
+      min_duration: Buildkite::TestCollector.trace_min_duration,
+    )
+
     # The _buildkite prefix here is added as a safeguard against name collisions
     # as we are in the main thread
     Thread.current[:_buildkite_tracer] = tracer

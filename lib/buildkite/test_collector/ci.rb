@@ -40,6 +40,7 @@ class Buildkite::TestCollector::CI
       "language_version" => RUBY_VERSION,
       "version" => Buildkite::TestCollector::VERSION,
       "collector" => "ruby-#{Buildkite::TestCollector::NAME}",
+      "trace_min_duration" => Buildkite::TestCollector.trace_min_duration&.to_s,
     }.select { |_, value| !value.nil? }
   end
 
