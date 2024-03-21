@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## v2.6.0
+
+- Trace spans can be filtered by minimum duration #215 - @pda
+
 ## v2.5.0
 
 - Remove ActiveSupport as a primary dependancy #212 - @pat
