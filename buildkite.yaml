@@ -1,3 +1,6 @@
+agents:
+  queue: hosted
+
 steps:
   - label: ":rspec: Tests :ruby: 3.3-rc"
     command:
@@ -5,7 +8,7 @@ steps:
       - "bundle exec rake"
     plugins:
       - docker#v3.7.0:
-          image: "445615400570.dkr.ecr.us-east-1.amazonaws.com/ecr-public/docker/library/ruby:3.3-rc"
+          image: "public.ecr.aws/docker/library/ruby:3.3-rc"
     soft_fail: true
 
   - label: ":rspec: Tests :ruby: {{matrix}}"
@@ -14,7 +17,7 @@ steps:
       - "bundle exec rake"
     plugins:
       - docker#v3.7.0:
-          image: "445615400570.dkr.ecr.us-east-1.amazonaws.com/ecr-public/docker/library/ruby:{{matrix}}"
+          image: "public.ecr.aws/docker/library/ruby:{{matrix}}"
     matrix:
       - "latest"
       - "3.2"
