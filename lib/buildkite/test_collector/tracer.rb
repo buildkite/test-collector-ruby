@@ -71,7 +71,16 @@ module Buildkite::TestCollector
       current_span.end_at = MonotonicTime.call
       duration = current_span.duration
       @stack.pop
-      current_span.children.pop if @min_duration && duration < @min_duration
+
+      if @min_duration && duration < @min_duration
+        current_span.children.pop
+        return nil
+      end
+
+      if Buildkite::TestCollector.trace_ignore_span.call(current_span.children.last)
+        current_span.children.pop
+      end
+
       nil # avoid ambiguous return type/value
     end
 

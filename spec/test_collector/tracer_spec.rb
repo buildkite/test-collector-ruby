@@ -69,6 +69,53 @@ RSpec.describe Buildkite::TestCollector::Tracer do
     })
   end
 
+  context "span filtering" do
+    let(:ignore_span_callback) do
+      ->(span) { span.section == :ignore_me }
+    end
+
+    before do
+      allow(Buildkite::TestCollector).to receive(:trace_ignore_span).and_return(ignore_span_callback)
+    end
+
+    it "can filter out spans using provided ignore_span_callback" do
+      tracer.backfill(:sql, 12.34, query: "SELECT hello FROM world")
+
+      begin
+        tracer.enter(:ignore_me, i_am_very: "unexciting")
+      ensure
+        tracer.leave
+      end
+
+      begin
+        tracer.enter(:http, url: "https://example.com/")
+      ensure
+        tracer.leave
+      end
+
+      history = tracer.finalize.history
+
+      expect(history[:children]).to match([
+        {
+          section: :sql,
+          start_at: kind_of(Float),
+          end_at: kind_of(Float),
+          duration: kind_of(Float),
+          detail: {query: "SELECT hello FROM world"},
+          children: []
+        },
+        {
+          section: :http,
+          start_at: kind_of(Float),
+          end_at: kind_of(Float),
+          duration: kind_of(Float),
+          detail: {url: "https://example.com/"},
+          children: []
+        },
+      ])
+    end
+  end
+
   context "with mocked MonotonicTime" do
     before do
       allow(Buildkite::TestCollector::Tracer::MonotonicTime).to receive(:call) do
