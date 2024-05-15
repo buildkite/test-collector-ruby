@@ -58,7 +58,6 @@ module Buildkite::TestCollector
     def initialize(min_duration: nil)
       @top = Span.new(:top, MonotonicTime.call, nil, {})
       @stack = [@top]
-      @min_duration = min_duration
     end
 
     def enter(section, **detail)
@@ -69,26 +68,17 @@ module Buildkite::TestCollector
 
     def leave
       current_span.end_at = MonotonicTime.call
-      duration = current_span.duration
       @stack.pop
 
-      if @min_duration && duration < @min_duration
-        current_span.children.pop
-        return nil
-      end
-
-      if Buildkite::TestCollector.trace_ignore_span.call(current_span.children.last)
-        current_span.children.pop
-      end
+      current_span.children.pop unless retain_span?(current_span.children.last)
 
       nil # avoid ambiguous return type/value
     end
 
     def backfill(section, duration, **detail)
-      return if @min_duration && duration < @min_duration
       now = MonotonicTime.call
       new_entry = Span.new(section, now - duration, now, detail)
-      current_span.children << new_entry
+      current_span.children << new_entry if retain_span?(new_entry)
     end
 
     def current_span
@@ -103,6 +93,16 @@ module Buildkite::TestCollector
 
     def history
       @top.as_hash
+    end
+
+    private
+
+    def retain_span?(span)
+      return true unless Buildkite::TestCollector.span_filters
+
+      Buildkite::TestCollector.span_filters.all? do |filter|
+        filter.call(span)
+      end
     end
   end
 end
