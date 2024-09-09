@@ -23,13 +23,20 @@ RSpec.configure do |config|
     # The _buildkite prefix here is added as a safeguard against name collisions
     # as we are in the main thread
     Thread.current[:_buildkite_tracer] = tracer
-    example.run
-    Thread.current[:_buildkite_tracer] = nil
+    # It's important to use begin/ensure here, because otherwise if other hooks fail,
+    # the cleanup code won't run, meaning we will miss some data.
+    #
+    # Having said that, this behavior isn't documented by RSpec.
+    begin
+      example.run
+    ensure
+      Thread.current[:_buildkite_tracer] = nil
 
-    tracer.finalize
+      tracer.finalize
 
-    trace = Buildkite::TestCollector::RSpecPlugin::Trace.new(example, history: tracer.history)
-    Buildkite::TestCollector.uploader.traces[example.id] = trace
+      trace = Buildkite::TestCollector::RSpecPlugin::Trace.new(example, history: tracer.history)
+      Buildkite::TestCollector.uploader.traces[example.id] = trace
+    end
   end
 
   config.after(:suite) do
