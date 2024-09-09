@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## v2.6.1
+
+- Fix missing failed examples if rspec hooks fail #221 - @zhming0
+
 ## v2.6.0
 
 - Trace spans can be filtered by minimum duration #215 - @pda
