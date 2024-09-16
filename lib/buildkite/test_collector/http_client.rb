@@ -38,7 +38,13 @@ module Buildkite::TestCollector
 
       contact.body = compressed_body.string
 
-      http.request(contact)
+      response = http.request(contact)
+
+      if response.is_a?(Net::HTTPSuccess)
+        response
+      else
+        raise "HTTP Request Failed: #{response.code} #{response.message}"
+      end
     end
 
     def metadata

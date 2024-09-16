@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require 'ostruct'
+
 RSpec.describe Buildkite::TestCollector::HTTPClient do
   subject { described_class.new("buildkite.localhost") }
 
@@ -19,6 +21,7 @@ RSpec.describe Buildkite::TestCollector::HTTPClient do
 
   let(:http_double) { double("Net::HTTP_double") }
   let(:post_double) { double("Net::HTTP::Post") }
+  let(:response) { double("Net::HTTPResponse") }
 
   let(:request_body) do
     {
@@ -72,9 +75,19 @@ RSpec.describe Buildkite::TestCollector::HTTPClient do
 
   describe "#post_json" do
     it "sends the right data" do
+      allow(response).to receive(:is_a?).with(Net::HTTPSuccess).and_return(true)
       expect(post_double).to receive(:body=).with(compressed_body)
-      expect(http_double).to receive(:request).with(post_double)
+      expect(http_double).to receive(:request).with(post_double).and_return(response)
       subject.post_json([trace])
+    end
+
+    it "throw error in a server error" do
+      allow(response).to receive(:is_a?).with(Net::HTTPSuccess).and_return(false)
+      allow(response).to receive(:code).and_return("500")
+      allow(response).to receive(:message).and_return("Internal Server Error")
+      expect(post_double).to receive(:body=).with(compressed_body)
+      expect(http_double).to receive(:request).with(post_double).and_return(response)
+      expect { subject.post_json([trace]) }.to raise_error(RuntimeError, "HTTP Request Failed: 500 Internal Server Error")
     end
   end
 end
