@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    buildkite-test_collector (2.6.1)
+    buildkite-test_collector (2.7.0)
 
 GEM
   remote: https://rubygems.org/

@@ -1,5 +1,15 @@
 # CHANGELOG
 
+## v2.7.0
+
+Features:
+
+- Add configurable span filters #220 - @catkins
+
+Fixes:
+
+- Correctly report HTTP error during upload #223 - @zhming0
+
 ## v2.6.1
 
 - Fix missing failed examples if rspec hooks fail #221 - @zhming0
