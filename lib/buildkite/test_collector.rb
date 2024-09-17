@@ -28,7 +28,6 @@ module Buildkite
   module TestCollector
     DEFAULT_URL = "https://analytics-api.buildkite.com/v1/uploads"
     DEFAULT_UPLOAD_BATCH_SIZE = 500
-
     class << self
       attr_accessor :api_token
       attr_accessor :url
@@ -39,6 +38,7 @@ module Buildkite
       attr_accessor :env
       attr_accessor :batch_size
       attr_accessor :trace_min_duration
+      attr_accessor :span_filters
     end
 
     def self.configure(hook:, token: nil, url: nil, tracing_enabled: true, artifact_path: nil, env: {})
@@ -52,6 +52,11 @@ module Buildkite
       trace_min_ms_string = ENV["BUILDKITE_ANALYTICS_TRACE_MIN_MS"]
       self.trace_min_duration = if trace_min_ms_string && !trace_min_ms_string.empty?
         Float(trace_min_ms_string) / 1000
+      end
+
+      self.span_filters = []
+      unless self.trace_min_duration.nil?
+        self.span_filters << MinDurationSpanFilter.new(self.trace_min_duration)
       end
 
       self.hook_into(hook)
@@ -82,6 +87,16 @@ module Buildkite
 
       ActiveSupport::Notifications.subscribe("sql.active_record") do |name, start, finish, id, payload|
         Buildkite::TestCollector::Uploader.tracer&.backfill(:sql, finish - start, **{ query: payload[:sql] })
+      end
+    end
+
+    class MinDurationSpanFilter
+      def initialize(min_duration)
+        @min_duration = min_duration
+      end
+
+      def call(span)
+        span.duration > @min_duration
       end
     end
   end

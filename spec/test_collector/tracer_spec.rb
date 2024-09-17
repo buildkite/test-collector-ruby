@@ -1,8 +1,8 @@
 # frozen_string_literal: true
 
 RSpec.describe Buildkite::TestCollector::Tracer do
-  subject(:tracer) { Buildkite::TestCollector::Tracer.new(min_duration: min_duration) }
-  let(:min_duration) { nil }
+  subject(:tracer) { Buildkite::TestCollector::Tracer.new }
+  before { Buildkite::TestCollector.span_filters = [] }
 
   it "can produce an empty :top span" do
     history = tracer.finalize.history
@@ -69,6 +69,49 @@ RSpec.describe Buildkite::TestCollector::Tracer do
     })
   end
 
+  context "span filtering" do
+    let(:filter) { ->(span) { span.section != :ignore_me } }
+    before { Buildkite::TestCollector.span_filters << filter }
+    after { Buildkite::TestCollector.span_filters.delete(filter) }
+
+    it "can filter out spans using provided ignore_span_callback" do
+      tracer.backfill(:sql, 12.34, query: "SELECT hello FROM world")
+
+      begin
+        tracer.enter(:ignore_me, i_am_very: "unexciting")
+      ensure
+        tracer.leave
+      end
+
+      begin
+        tracer.enter(:http, url: "https://example.com/")
+      ensure
+        tracer.leave
+      end
+
+      history = tracer.finalize.history
+
+      expect(history[:children]).to match([
+        {
+          section: :sql,
+          start_at: kind_of(Float),
+          end_at: kind_of(Float),
+          duration: kind_of(Float),
+          detail: {query: "SELECT hello FROM world"},
+          children: []
+        },
+        {
+          section: :http,
+          start_at: kind_of(Float),
+          end_at: kind_of(Float),
+          duration: kind_of(Float),
+          detail: {url: "https://example.com/"},
+          children: []
+        },
+      ])
+    end
+  end
+
   context "with mocked MonotonicTime" do
     before do
       allow(Buildkite::TestCollector::Tracer::MonotonicTime).to receive(:call) do
@@ -95,6 +138,11 @@ RSpec.describe Buildkite::TestCollector::Tracer do
 
     describe "filtering traces by min_duration" do
       let(:min_duration) { 2.0 }
+      before do
+        fake_env("BUILDKITE_ANALYTICS_TOKEN", "token")
+        fake_env("BUILDKITE_ANALYTICS_TRACE_MIN_MS", (min_duration * 1000).to_s)
+        Buildkite::TestCollector.configure(hook: :minitest)
+      end
 
       it "can filter traces by duration" do
         monotonic_time_queue << 10.0
@@ -110,7 +158,7 @@ RSpec.describe Buildkite::TestCollector::Tracer do
         monotonic_time_queue << 25.0
         tracer.leave
 
-        # skipped by #backfill: monotonic_time_queue << 30.2
+        monotonic_time_queue << 30.2
         tracer.backfill(:fast_backfill, 0.2)
 
         monotonic_time_queue << 43.5
