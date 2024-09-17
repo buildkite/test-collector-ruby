@@ -25,7 +25,8 @@ module Buildkite::TestCollector
       OpenSSL::SSL::SSLError,
       OpenSSL::SSL::SSLErrorWaitReadable,
       EOFError,
-      Errno::ETIMEDOUT
+      Errno::ETIMEDOUT,
+      # TODO: some retries for server-side error would be great.
     ]
 
     def self.tracer
@@ -38,7 +39,7 @@ module Buildkite::TestCollector
       http = Buildkite::TestCollector::HTTPClient.new(Buildkite::TestCollector.url)
 
       Thread.new do
-        response = begin
+        begin
           upload_attempts ||= 0
           http.post_json(data)
         rescue *Buildkite::TestCollector::Uploader::RETRYABLE_UPLOAD_ERRORS => e
