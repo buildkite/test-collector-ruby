@@ -8,7 +8,7 @@ Gem::Specification.new do |spec|
   spec.authors       = ["Buildkite"]
   spec.email         = ["support+analytics@buildkite.com"]
 
-  spec.summary       = "Track test executions and report to Buildkite Test Analytics"
+  spec.summary       = "Track test executions and report to Buildkite Test Engine"
   spec.homepage      = "https://github.com/buildkite/test-collector-ruby"
   spec.license       = "MIT"
 
