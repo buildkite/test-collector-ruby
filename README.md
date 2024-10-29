@@ -3,7 +3,7 @@
 **DEPRECATION NOTICE**
 Versions prior to 2.1.x are unsupported and will not work after mid-2023. Please upgrade to the latest version.
 
-Official [Buildkite Test Analytics](https://buildkite.com/test-analytics) collectors for Ruby test frameworks ✨
+Official [Buildkite Test Engine](https://buildkite.com/platform/test-engine) collectors for Ruby test frameworks ✨
 
 ⚒ **Supported test frameworks:** RSpec, Minitest, and [more coming soon](https://github.com/buildkite/test-collector-ruby/issues?q=is%3Aissue+is%3Aopen+label%3A%22test+frameworks%22).
 
@@ -68,13 +68,13 @@ BUILDKITE_ANALYTICS_TOKEN=xyz rake
 Add the `BUILDKITE_ANALYTICS_TOKEN` secret to your CI, push your changes to a branch, and open a pull request 🎉
 
 ```bash
-git checkout -b add-buildkite-test-analytics
-git commit -am "Add Buildkite Test Analytics"
-git push origin add-buildkite-test-analytics
+git checkout -b add-buildkite-test-engine
+git commit -am "Add Buildkite Test Engine"
+git push origin add-buildkite-test-engine
 ```
 
 ### VCR
-If your test suites use [VCR](https://github.com/vcr/vcr) to stub network requests, you'll need to modify the config to allow actual network requests to Test Analytics.
+If your test suites use [VCR](https://github.com/vcr/vcr) to stub network requests, you'll need to modify the config to allow actual network requests to Test Engine.
 
 ```
 VCR.configure do |c|
@@ -119,7 +119,7 @@ And run the tests:
 bundle exec rspec
 ```
 
-Useful resources for developing collectors include the [Buildkite Test Analytics docs](https://buildkite.com/docs/test-analytics).
+Useful resources for developing collectors include the [Buildkite Test Engine docs](https://buildkite.com/docs/test-engine).
 
 See [DESIGN.md](DESIGN.md) for an overview of the design of this gem.
 

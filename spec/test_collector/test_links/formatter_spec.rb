@@ -84,7 +84,7 @@ RSpec.describe Buildkite::TestCollector::TestLinksPlugin::Formatter do
         allow(http_client).to receive(:metadata).and_return(OpenStruct.new(code: '200', body: response))
         formatter.dump_failures(notification)
 
-        expect(io.string.strip).to include('Test Analytics failures')
+        expect(io.string.strip).to include('Test Engine failures')
         expect(io.string.strip).to include("#{suite_url}/tests/#{scope_name_digest}")
         expect(io.string.strip).to include("#{scope} #{name}")
       end
