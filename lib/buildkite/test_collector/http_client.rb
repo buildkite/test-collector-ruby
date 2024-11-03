@@ -25,7 +25,9 @@ module Buildkite::TestCollector
       data_set = data.map(&:as_hash)
 
       body = {
-        run_env: Buildkite::TestCollector::CI.env,
+        run_env: Buildkite::TestCollector::CI.env.merge({
+          execution_count: data_set.size
+        }),
         format: "json",
         data: data_set
       }.to_json

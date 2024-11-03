@@ -31,7 +31,8 @@ RSpec.describe Buildkite::TestCollector::HTTPClient do
         "language_version" => RUBY_VERSION,
         "version": Buildkite::TestCollector::VERSION,
         "collector": "ruby-buildkite-test_collector",
-        "test": "test_value"
+        "test": "test_value",
+        "execution_count": 1
       },
       "format": "json",
       "data": [{
