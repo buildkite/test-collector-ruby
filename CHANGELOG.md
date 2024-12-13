@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## v2.7.1
+
+- Removes test links from job logs
+- Rename Test Analytics to Test Engine
+
 ## v2.7.0
 
 Features:
