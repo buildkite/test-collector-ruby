@@ -5,6 +5,15 @@ require "active_support/notifications"
 
 Dir["spec/support/**/*.rb"].each { |f| require File.expand_path(f) }
 
+# Set up the various hooks that the collector uses.
+#
+# This provides some coverage for the code in
+# lib/buildkite/test_collector/library_hooks/rspec.rb which is otherwise
+# currently untested. At present this suite is not connected to Buildkite
+# Test Engine so these hooks will all be noops. However this does give us
+# some regression testing for the code that sets up the hooks themselves.
+Buildkite::TestCollector.configure(hook: :rspec)
+
 RSpec.configure do |config|
   # Enable flags like --only-failures and --next-failure
   config.example_status_persistence_file_path = ".rspec_status"
