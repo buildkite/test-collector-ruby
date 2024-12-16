@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## v2.7.2
+
+- Fixes RSpec library hook bug introduced in v2.7.1 #230 - @malclocke
+
 ## v2.7.1
 
 - Removes test links from job logs
