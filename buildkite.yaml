@@ -4,6 +4,7 @@ agents:
 steps:
   - label: ":rspec: Tests :ruby: {{matrix}}"
     command:
+      - "gem install bundler:2.3.25"
       - "bundle"
       - "bundle exec rake"
     plugins:
