@@ -13,19 +13,24 @@ RSpec.describe Buildkite::TestCollector::Uploader do
 
   describe '.upload' do
     it 'posts data to the HTTP client' do
-      expect(http_client_double).to receive(:post_json).with([{some: 'data'}])
-      described_class.upload([{some: 'data'}])
+      expect(http_client_double).to receive(:post_upload).with(
+        data: [{some: 'data'}],
+        run_env: hash_including("collector" => "ruby-buildkite-test_collector"),
+      )
+
+      Buildkite::TestCollector::Uploader.upload([{some: 'data'}])
     end
 
     context 'when there is RuntimeError' do
       before do
-        allow(http_client_double).to receive(:post_json).and_raise(RuntimeError)
+        allow(http_client_double).to receive(:post_upload).and_raise(RuntimeError)
         allow($stderr).to receive(:puts)
       end
 
       it 'logs an error message' do
         expect($stderr).to receive(:puts).with(include("experienced an error when sending your data"))
-        described_class.upload([{some: 'data'}])
+
+        Buildkite::TestCollector::Uploader.upload([{some: 'data'}])
       end
     end
   end
