@@ -25,7 +25,7 @@ module RSpecExampleTraceHelpers
     allow(example).to receive(:id) { "spec/fake/fake_spec[1:2:3]" }
     allow(example).to receive(:full_description) { "this is a fake example full description" }
     allow(example).to receive(:description) { "fake example name" }
-    allow(example).to receive(:metadata) { Hash.new(shared_group_inclusion_backtrace: []) }
+    allow(example).to receive(:metadata) { { shared_group_inclusion_backtrace: [] } }
     allow(example).to receive(:example_group) { OpenStruct.new(metadata: { full_description: 'this is a fake example full description' })}
     example
   end
