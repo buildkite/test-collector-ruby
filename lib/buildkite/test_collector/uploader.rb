@@ -36,7 +36,10 @@ module Buildkite::TestCollector
     def self.upload(data)
       return false unless Buildkite::TestCollector.api_token
 
-      http = Buildkite::TestCollector::HTTPClient.new(Buildkite::TestCollector.url)
+      http = Buildkite::TestCollector::HTTPClient.new(
+        url: Buildkite::TestCollector.url,
+        api_token: Buildkite::TestCollector.api_token,
+      )
 
       Thread.new do
         begin
