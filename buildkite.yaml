@@ -12,6 +12,7 @@ steps:
           image: "public.ecr.aws/docker/library/ruby:{{matrix}}"
     matrix:
       - "latest"
+      - "3.4"
       - "3.3"
       - "3.2"
       - "3.1"
