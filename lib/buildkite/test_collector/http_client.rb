@@ -9,7 +9,7 @@ module Buildkite::TestCollector
       @api_token = api_token
     end
 
-    def post_upload(data:, run_env:)
+    def post_upload(data:, run_env:, tags:)
       endpoint_uri = URI.parse(url)
 
       http = Net::HTTP.new(endpoint_uri.host, endpoint_uri.port)
@@ -25,6 +25,7 @@ module Buildkite::TestCollector
 
       body = {
         run_env: run_env,
+        tags: tags,
         format: "json",
         data: data_set
       }.to_json

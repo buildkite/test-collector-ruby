@@ -33,6 +33,9 @@ RSpec.describe Buildkite::TestCollector::HTTPClient do
       "run_env": {
         "key": "build-123",
       },
+      "tags": {
+        "language.name" => "ruby"
+      },
       "format": "json",
       "data": [
         {
@@ -58,6 +61,7 @@ RSpec.describe Buildkite::TestCollector::HTTPClient do
   end
 
   let(:run_env) { {"key" => "build-123"} }
+  let(:tags) { {"language.name" => "ruby"} }
 
   before do
     allow(Net::HTTP).to receive(:new).and_return(http_double)
@@ -79,6 +83,7 @@ RSpec.describe Buildkite::TestCollector::HTTPClient do
       subject.post_upload(
         data: [trace],
         run_env: run_env,
+        tags: tags,
       )
     end
 
@@ -93,6 +98,7 @@ RSpec.describe Buildkite::TestCollector::HTTPClient do
         subject.post_upload(
           data: [trace],
           run_env: run_env,
+          tags: tags,
         )
       }.to raise_error(RuntimeError, "HTTP Request Failed: 500 Internal Server Error")
     end

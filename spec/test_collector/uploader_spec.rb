@@ -16,6 +16,7 @@ RSpec.describe Buildkite::TestCollector::Uploader do
       expect(http_client_double).to receive(:post_upload).with(
         data: [{some: 'data'}],
         run_env: hash_including("collector" => "ruby-buildkite-test_collector"),
+        tags: {},
       )
 
       Buildkite::TestCollector::Uploader.upload([{some: 'data'}])

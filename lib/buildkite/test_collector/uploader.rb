@@ -47,6 +47,7 @@ module Buildkite::TestCollector
           http.post_upload(
             data: data,
             run_env: Buildkite::TestCollector::CI.env,
+            tags: Buildkite::TestCollector.tags,
           )
 
         rescue *Buildkite::TestCollector::Uploader::RETRYABLE_UPLOAD_ERRORS => e

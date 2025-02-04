@@ -36,17 +36,19 @@ module Buildkite
       attr_accessor :tracing_enabled
       attr_accessor :artifact_path
       attr_accessor :env
+      attr_accessor :tags
       attr_accessor :batch_size
       attr_accessor :trace_min_duration
       attr_accessor :span_filters
     end
 
-    def self.configure(hook:, token: nil, url: nil, tracing_enabled: true, artifact_path: nil, env: {})
+    def self.configure(hook:, token: nil, url: nil, tracing_enabled: true, artifact_path: nil, env: {}, tags: {})
       self.api_token = (token || ENV["BUILDKITE_ANALYTICS_TOKEN"])&.strip
       self.url = url || DEFAULT_URL
       self.tracing_enabled = tracing_enabled
       self.artifact_path = artifact_path
       self.env = env
+      self.tags = tags
       self.batch_size = ENV.fetch("BUILDKITE_ANALYTICS_UPLOAD_BATCH_SIZE") { DEFAULT_UPLOAD_BATCH_SIZE }.to_i
 
       trace_min_ms_string = ENV["BUILDKITE_ANALYTICS_TRACE_MIN_MS"]
