@@ -4,19 +4,18 @@ require "net/http"
 
 module Buildkite::TestCollector
   class HTTPClient
-    attr :authorization_header
-    def initialize(url)
+    def initialize(url:, api_token:)
       @url = url
-      @authorization_header = "Token token=\"#{Buildkite::TestCollector.api_token}\""
+      @api_token = api_token
     end
 
     def post_json(data)
-      contact_uri = URI.parse(url)
+      endpoint_uri = URI.parse(url)
 
-      http = Net::HTTP.new(contact_uri.host, contact_uri.port)
-      http.use_ssl = contact_uri.scheme == "https"
+      http = Net::HTTP.new(endpoint_uri.host, endpoint_uri.port)
+      http.use_ssl = endpoint_uri.scheme == "https"
 
-      contact = Net::HTTP::Post.new(contact_uri.path, {
+      request = Net::HTTP::Post.new(endpoint_uri.path, {
         "Authorization" => authorization_header,
         "Content-Type" => "application/json",
         "Content-Encoding" => "gzip",
@@ -36,9 +35,9 @@ module Buildkite::TestCollector
       writer.write(body)
       writer.close
 
-      contact.body = compressed_body.string
+      request.body = compressed_body.string
 
-      response = http.request(contact)
+      response = http.request(request)
 
       if response.is_a?(Net::HTTPSuccess)
         response
@@ -48,21 +47,25 @@ module Buildkite::TestCollector
     end
 
     def metadata
-      contact_uri = URI.parse("#{url}/metadata")
+      endpoint_uri = URI.parse("#{url}/metadata")
 
-      http = Net::HTTP.new(contact_uri.host, contact_uri.port)
-      http.use_ssl = contact_uri.scheme == "https"
+      http = Net::HTTP.new(endpoint_uri.host, endpoint_uri.port)
+      http.use_ssl = endpoint_uri.scheme == "https"
 
-      contact = Net::HTTP::Get.new(contact_uri.path, {
+      request = Net::HTTP::Get.new(endpoint_uri.path, {
         "Authorization" => authorization_header,
         "Content-Type" => "application/json"
       })
 
-      http.request(contact)
+      http.request(request)
     end
 
     private
 
-    attr :url
+    attr_reader :url
+
+    def authorization_header
+      "Token token=\"#{@api_token}\""
+    end
   end
 end

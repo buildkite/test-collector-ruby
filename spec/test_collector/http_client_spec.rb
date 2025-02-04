@@ -3,7 +3,12 @@
 require 'ostruct'
 
 RSpec.describe Buildkite::TestCollector::HTTPClient do
-  subject { described_class.new("buildkite.localhost") }
+  subject do
+    Buildkite::TestCollector::HTTPClient.new(
+      url: "http://buildkite.localhost/v1/uploads",
+      api_token: "thetoken",
+    )
+  end
 
   let(:example_group) { OpenStruct.new(metadata: { full_description: "i love to eat pies" }) }
   let(:execution_result) { OpenStruct.new(status: :passed) }
@@ -59,7 +64,11 @@ RSpec.describe Buildkite::TestCollector::HTTPClient do
     allow(Net::HTTP).to receive(:new).and_return(http_double)
     allow(http_double).to receive(:use_ssl=)
 
-    allow(Net::HTTP::Post).to receive(:new).with("buildkite.localhost", {"Authorization"=>"Token token=\"my-cool-token\"", "Content-Encoding"=>"gzip", "Content-Type"=>"application/json"}).and_return(post_double)
+    allow(Net::HTTP::Post).to receive(:new).with("/v1/uploads", {
+      "Authorization" => "Token token=\"thetoken\"",
+      "Content-Encoding" => "gzip",
+      "Content-Type" => "application/json",
+    }).and_return(post_double)
 
     allow(ENV).to receive(:[]).and_call_original
     fake_env("BUILDKITE_ANALYTICS_KEY", "build-123")
@@ -70,7 +79,7 @@ RSpec.describe Buildkite::TestCollector::HTTPClient do
     fake_env("GITHUB_RUN_NUMBER", nil)
     fake_env("CIRCLE_BUILD_NUM", nil)
 
-    Buildkite::TestCollector.configure(hook: :rspec, token: "my-cool-token", env: { "test" => "test_value" })
+    Buildkite::TestCollector.configure(hook: :rspec, token: "thetoken", env: { "test" => "test_value" })
   end
 
   describe "#post_json" do
