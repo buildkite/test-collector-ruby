@@ -44,11 +44,14 @@ module Buildkite::TestCollector
       Thread.new do
         begin
           upload_attempts ||= 0
-          http.post_json(data)
+          http.post_upload(
+            data: data,
+            run_env: Buildkite::TestCollector::CI.env,
+          )
+
         rescue *Buildkite::TestCollector::Uploader::RETRYABLE_UPLOAD_ERRORS => e
-          if (upload_attempts += 1) < MAX_UPLOAD_ATTEMPTS
-            retry
-          end
+          retry if (upload_attempts += 1) < MAX_UPLOAD_ATTEMPTS
+
         rescue StandardError => e
           $stderr.puts e
           $stderr.puts "#{Buildkite::TestCollector::NAME} #{Buildkite::TestCollector::VERSION} experienced an error when sending your data, you may be missing some executions for this run."

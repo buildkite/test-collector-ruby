@@ -1,7 +1,8 @@
 # frozen_string_literal: true
 
 RSpec.describe Buildkite::TestCollector::Session do
-  subject { described_class.new }
+  subject { Buildkite::TestCollector::Session.new }
+
   let(:data) do
     {
       "test-1": "test-1-data",
