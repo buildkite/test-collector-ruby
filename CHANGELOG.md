@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## v2.8.0
+
+* Buildkite::TestCollector.tags: specify tags for all executions by @pda in https://github.com/buildkite/test-collector-ruby/pull/235
+* Add Ruby 3.4 to Buildkite build matrix by @gchan in https://github.com/buildkite/test-collector-ruby/pull/236
+
+**Full Changelog**: https://github.com/buildkite/test-collector-ruby/compare/v2.7.2...v2.8.0
+
 ## v2.7.2
 
 - Fixes RSpec library hook bug introduced in v2.7.1 #230 - @malclocke
