@@ -1,0 +1,56 @@
+#!/bin/bash
+
+set -euo pipefail
+
+if [ -z "${GEM_HOST_API_KEY}" ]; then
+  echo "GEM_HOST_API_KEY environment variable not found"
+  exit 1
+fi
+
+if [ -z "${BUILDKITE_TAG}" ]; then
+  echo "BUILDKITE_TAG environment variable not found"
+  exit 1
+fi
+
+cd $(dirname $0)/../..
+
+echo "--- Inspecting tag and version"
+
+echo "BUILDKITE_TAG: ${BUILDKITE_TAG}"
+
+if [[ ! "${BUILDKITE_TAG}" == v* ]]; then
+  echo "We will only try to publish to rubygems when the tag starts with 'v'"
+  exit 1
+fi
+
+VERSION=$(echo "${BUILDKITE_TAG}" | sed "s/^v//")
+GEM_FILENAME="buildkite-test_collector-${VERSION}.gem"
+
+echo "Version to release: ${VERSION}"
+
+echo "--- Building gem"
+
+gem build buildkite-test_collector.gemspec
+
+if [ ! -f "${GEM_FILENAME}" ]; then
+  echo
+  echo "ERROR: Expected compiled gem to be '${GEM_FILENAME}' but file not found"
+  echo "Does the gemspec specify version '${BUILDKITE_TAG}'?"
+  echo
+  echo "Gem files found:"
+  echo
+  ls *.gem
+  echo
+  exit 1
+fi
+
+echo "--- Check if version already exists on rubygems.org"
+
+if [ $(curl -s -o /dev/null -w "%{http_code}" https://rubygems.org/api/v2/rubygems/buildkite-test_collector/versions/${VERSION}.json) == "200" ]; then
+  echo "Gem version ${VERSION} already found on rubygems, skipping release"
+  exit 1
+fi
+
+echo "--- publish gem"
+
+gem push "${GEM_FILENAME}"

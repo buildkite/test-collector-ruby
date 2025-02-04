@@ -1,0 +1,18 @@
+agents:
+  queue: hosted
+
+steps:
+  - block: "OK to release?"
+
+  - command: ".buildkite/steps/release-gem"
+    label: ":rubygems:"
+    if: build.tag != null
+    plugins:
+      - rubygems-oidc#v0.2.0:
+          role: "rg_oidc_akr_fy1x4px4yjwd1rdhkkda"
+      - docker#v5.12.0:
+          image: "ruby:3.4"
+          environment:
+            - GEM_HOST_API_KEY
+            - BUILDKITE_TAG
+
