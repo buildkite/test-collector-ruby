@@ -48,7 +48,7 @@ module Buildkite
       end
 
       self.api_token = (token || ENV["BUILDKITE_ANALYTICS_TOKEN"])&.strip
-      self.url = url || DEFAULT_URL
+      self.url = url || ENV["BUILDKITE_ANALYTICS_ENDPOINT"] || DEFAULT_URL
       self.tracing_enabled = tracing_enabled
       self.artifact_path = artifact_path
       self.env = env
