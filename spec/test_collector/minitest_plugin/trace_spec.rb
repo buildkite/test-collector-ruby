@@ -5,8 +5,24 @@ require "minitest"
 require "pathname"
 
 RSpec.describe Buildkite::TestCollector::MinitestPlugin::Trace do
-  subject(:trace) { Buildkite::TestCollector::MinitestPlugin::Trace.new(example, history: history) }
-  let(:example) { double("Minitest::Test", name: "test_it_passes", test_it_passes: nil, result_code: 'F', failure: failure, failures: [failure, another_failure]) }
+  subject(:trace) do
+    Buildkite::TestCollector::MinitestPlugin::Trace.new(
+      example,
+      history: history,
+      tags: tags,
+    )
+  end
+
+  let(:example) do
+    double(
+      "Minitest::Test",
+      name: "test_it_passes",
+      test_it_passes: nil,
+      result_code: 'F',
+      failure: failure,
+      failures: [failure, another_failure],
+    )
+  end
 
   # failure is either Minitest::Assertion or Minitest::UnexpectedError object. 
   # ref: https://github.com/minitest/minitest/blob/0984e29995a5c0f4dcf3c185442bcb4f493ed5e3/lib/minitest/test.rb#L198
@@ -29,6 +45,8 @@ RSpec.describe Buildkite::TestCollector::MinitestPlugin::Trace do
       ]
     }
   end
+
+  let(:tags) { nil }
 
   describe '#as_hash' do
     it 'removes invalid UTF-8 characters from top level values' do
@@ -94,5 +112,12 @@ RSpec.describe Buildkite::TestCollector::MinitestPlugin::Trace do
       end
     end
 
+    context "with tags" do
+      let(:tags) { { "hello" => "world" } }
+
+      it "includes the tags" do
+        expect(trace.as_hash[:tags]).to eq({ "hello" => "world" })
+      end
+    end
   end
 end

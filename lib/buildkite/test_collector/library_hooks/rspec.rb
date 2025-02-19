@@ -18,21 +18,27 @@ RSpec.configure do |config|
       min_duration: Buildkite::TestCollector.trace_min_duration,
     )
 
-    # The _buildkite prefix here is added as a safeguard against name collisions
-    # as we are in the main thread
+    tags = {}
+
+    # _buildkite prefix reduces chance of collisions in this almost-global (per-fiber) namespace.
     Thread.current[:_buildkite_tracer] = tracer
-    # It's important to use begin/ensure here, because otherwise if other hooks fail,
-    # the cleanup code won't run, meaning we will miss some data.
-    #
-    # Having said that, this behavior isn't documented by RSpec.
+    Thread.current[:_buildkite_tags] = tags
+
+    # example.run can raise errors (including from other middleware/hooks) so clean up in `ensure`.
     begin
       example.run
     ensure
       Thread.current[:_buildkite_tracer] = nil
+      Thread.current[:_buildkite_tags] = nil
 
       tracer.finalize
 
-      trace = Buildkite::TestCollector::RSpecPlugin::Trace.new(example, history: tracer.history)
+      trace = Buildkite::TestCollector::RSpecPlugin::Trace.new(
+        example,
+        history: tracer.history,
+        tags: tags,
+      )
+
       Buildkite::TestCollector.uploader.traces[example.id] = trace
     end
   end

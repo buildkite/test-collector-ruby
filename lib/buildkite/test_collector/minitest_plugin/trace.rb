@@ -5,6 +5,7 @@ module Buildkite::TestCollector::MinitestPlugin
     attr_accessor :example
     attr_writer :failure_reason, :failure_expanded
     attr_reader :history
+    attr_reader :tags
 
     RESULT_CODES = {
       '.' => 'passed',
@@ -15,9 +16,10 @@ module Buildkite::TestCollector::MinitestPlugin
 
     FILE_PATH_REGEX = /^(.*?\.(rb|feature))/
 
-    def initialize(example, history:)
+    def initialize(example, history:, tags: nil)
       @example = example
       @history = history
+      @tags = tags
     end
 
     def result
@@ -38,6 +40,7 @@ module Buildkite::TestCollector::MinitestPlugin
         failure_reason: failure_reason,
         failure_expanded: failure_expanded,
         history: history,
+        tags: tags,
       ).select { |_, value| !value.nil? }
     end
 

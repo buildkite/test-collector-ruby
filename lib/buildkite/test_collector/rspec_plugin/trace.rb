@@ -4,14 +4,16 @@ module Buildkite::TestCollector::RSpecPlugin
   class Trace
     attr_accessor :example, :failure_reason, :failure_expanded
     attr_reader :history
+    attr_reader :tags
 
     FILE_PATH_REGEX = /^(.*?\.(rb|feature))/
 
-    def initialize(example, history:, failure_reason: nil, failure_expanded: [])
+    def initialize(example, history:, failure_reason: nil, failure_expanded: [], tags: nil)
       @example = example
       @history = history
       @failure_reason = failure_reason
       @failure_expanded = failure_expanded
+      @tags = tags
     end
 
     def result
@@ -32,6 +34,7 @@ module Buildkite::TestCollector::RSpecPlugin
         failure_reason: failure_reason,
         failure_expanded: failure_expanded,
         history: history,
+        tags: tags,
       ).select { |_, value| !value.nil? }
     end
 
