@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## v2.9.0
+
+* `Buildkite::TestCollector.tag_execution(key, value)` by @pda in https://github.com/buildkite/test-collector-ruby/pull/240
+
+**Full Changelog**: https://github.com/buildkite/test-collector-ruby/compare/v2.8.0...v2.9.0
+
 ## v2.8.0
 
 * Buildkite::TestCollector.tags: specify tags for all executions by @pda in https://github.com/buildkite/test-collector-ruby/pull/235
