@@ -14,18 +14,29 @@ module Buildkite::TestCollector::MinitestPlugin
       min_duration: Buildkite::TestCollector.trace_min_duration,
     )
 
-    # The _buildkite prefix here is added as a safeguard against name collisions
-    # as we are in the main thread
+    tags = {}
+
+    # _buildkite prefix reduces chance of collisions in this almost-global (per-fiber) namespace.
     Thread.current[:_buildkite_tracer] = tracer
+    Thread.current[:_buildkite_tags] = tags
   end
 
   def after_teardown
     tracer = Thread.current[:_buildkite_tracer]
+    tags = Thread.current[:_buildkite_tags]
+
+    Thread.current[:_buildkite_tracer] = nil
+    Thread.current[:_buildkite_tags] = nil
+
     if !tracer.nil?
-      Thread.current[:_buildkite_tracer] = nil
       tracer.finalize
 
-      trace = Buildkite::TestCollector::MinitestPlugin::Trace.new(self, history: tracer.history)
+      trace = Buildkite::TestCollector::MinitestPlugin::Trace.new(
+        self,
+        history: tracer.history,
+        tags: tags,
+      )
+
       Buildkite::TestCollector.uploader.traces[trace.source_location] = trace
     end
 

@@ -77,6 +77,18 @@ module Buildkite
       tracer&.leave
     end
 
+    # Set a key=value tag on the current test execution.
+    def self.tag_execution(key, value)
+      tags = Thread.current[:_buildkite_tags]
+      raise "_buildkite_tags not available" unless tags
+
+      unless key.is_a?(String) && value.is_a?(String)
+        raise ArgumentError, "tag key and value expected string"
+      end
+
+      tags[key] = value
+    end
+
     def self.enable_tracing!
       return unless self.tracing_enabled
 
