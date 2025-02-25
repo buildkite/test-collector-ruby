@@ -67,43 +67,10 @@ BUILDKITE_ANALYTICS_TOKEN=xyz rake
 
 Add the `BUILDKITE_ANALYTICS_TOKEN` secret to your CI, push your changes to a branch, and open a pull request 🎉
 
-```bash
-git checkout -b add-buildkite-test-engine
-git commit -am "Add Buildkite Test Engine"
-git push origin add-buildkite-test-engine
-```
 
-### VCR
-If your test suites use [VCR](https://github.com/vcr/vcr) to stub network requests, you'll need to modify the config to allow actual network requests to Test Engine.
+## More information
 
-```
-VCR.configure do |c|
-  c.ignore_hosts "analytics-api.buildkite.com"
-end
-```
-
-## 🗨️ Annotations
-
-This gem allows adding custom annotations to the span data sent to Buildkite using the [.annotate](https://github.com/buildkite/test-collector-ruby/blob/d9fe11341e4aa470e766febee38124b644572360/lib/buildkite/test_collector.rb#L64) method. For example:
-
-```ruby
-Buildkite::TestCollector.annotate("User logged in successfully")
-```
-
-This is particularly useful for tests that generate a lot of span data such as system/feature tests.
-
-## 🏷️ Tagging duplicate test executions with a prefix/suffix
-
-For builds that execute the same test multiple times - such as when running the same test suite against multiple versions of ruby/rails - it's possible to tag each test execution with a prefix/suffix. This prefix/suffix is displayed for each execution on the test show page to differentiate the build environment. The prefix/suffix is specified using these environment variables:
-
-```
-BUILDKITE_ANALYTICS_EXECUTION_NAME_PREFIX
-BUILDKITE_ANALYTICS_EXECUTION_NAME_SUFFIX
-```
-
-## 🔜 Roadmap
-
-See the [GitHub 'enhancement' issues](https://github.com/buildkite/test-collector-ruby/issues?q=is%3Aissue+is%3Aopen+label%3Aenhancement) for planned features. Pull requests are always welcome, and we’ll give you feedback and guidance if you choose to contribute 💚
+For more use cases such as custom tags, annotations, and span tracking, please visit our [official Ruby collector documentation](https://buildkite.com/docs/test-engine/ruby-collectors) for details.
 
 ## ⚒ Developing
 
