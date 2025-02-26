@@ -11,10 +11,10 @@ steps:
       - aws-assume-role-with-web-identity#v1.2.0:
           role-arn: "${OIDC_ASSUME_ROLE_ARN:-arn:aws:iam::445615400570:role/pipeline-buildkite-test-collector-ruby-build}"
           session-tags:
-          - organization_slug
-          - organization_id
-          - pipeline_slug
-          - build_branch
+            - organization_slug
+            - organization_id
+            - pipeline_slug
+            - build_branch
 
       - ecr#v2.9.0:
           login: true
