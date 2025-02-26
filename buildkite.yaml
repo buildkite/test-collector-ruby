@@ -18,7 +18,7 @@ steps:
 
       - ecr#v2.9.0:
           login: true
-          account_ids: "445615400570"
+          account_ids: "public.ecr.aws"
           region: "us-east-1"
       - docker#v3.7.0:
           image: "public.ecr.aws/docker/library/ruby:{{matrix}}"
@@ -48,12 +48,12 @@ steps:
               - build_branch
           - ecr#v2.9.0:
               login: true
-              account_ids: "445615400570"
+              account_ids: "public.ecr.aws"
               region: "us-east-1"
           - docker#v3.7.0:
               # Images for older Ruby versions aren't available on AWS ECR
               # so fall back to Docker Hub
-              image: "ruby:{{matrix}}"
+              image: "public.ecr.aws/docker/library/ruby:{{matrix}}"
         matrix:
           - "2.6"
           - "2.5"
