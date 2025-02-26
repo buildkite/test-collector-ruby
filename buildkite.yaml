@@ -53,7 +53,7 @@ steps:
           - docker#v3.7.0:
               # Images for older Ruby versions aren't available on AWS ECR
               # so fall back to Docker Hub
-              image: "public.ecr.aws/docker/library/ruby:{{matrix}}"
+              image: "ruby:{{matrix}}"
         matrix:
           - "2.6"
           - "2.5"
