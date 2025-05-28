@@ -2,6 +2,7 @@
 
 require "buildkite/test_collector"
 require "active_support/notifications"
+require "cucumber"
 
 Dir["spec/support/**/*.rb"].each { |f| require File.expand_path(f) }
 
