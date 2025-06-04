@@ -9,6 +9,9 @@ steps:
       - "bundle exec rake"
       - "bundle exec cucumber"
     plugins:
+      - cluster-secrets#v1.0.0:
+          variables:
+            BUILDKITE_ANALYTICS_TOKEN: test_collector_ruby_suite_token
       - aws-assume-role-with-web-identity#v1.2.0:
           role-arn: "${OIDC_ASSUME_ROLE_ARN:-arn:aws:iam::445615400570:role/pipeline-buildkite-test-collector-ruby-build}"
           session-tags:
@@ -23,6 +26,9 @@ steps:
           region: "us-east-1"
       - docker#v3.7.0:
           image: "public.ecr.aws/docker/library/ruby:{{matrix}}"
+          propogate-environment: true
+          environment:
+            - BUILDKITE_ANALYTICS_TOKEN
     matrix:
       - "latest"
       - "3.4"
