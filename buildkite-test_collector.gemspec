@@ -28,6 +28,7 @@ Gem::Specification.new do |spec|
   spec.add_development_dependency "rspec-core", '~> 3.10'
   spec.add_development_dependency "rspec-expectations", '~> 3.10'
 
+  # When running the legacy CI builds against versions of Ruby pre 2.7 we cannot include cucumber 9 as it's not supported.
   if Gem::Version.new(RUBY_VERSION) >= Gem::Version.new('2.7')
     spec.add_development_dependency "cucumber", '~> 9.0'
   end
