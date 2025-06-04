@@ -70,11 +70,11 @@ RSpec.describe Buildkite::TestCollector do
   context "Cucumber" do
     let(:hook) { :cucumber }
 
-    before do
-      Cucumber::Runtime.new
-    end
-
     if Gem::Version.new(RUBY_VERSION) >= Gem::Version.new('2.7')
+      before do
+        Cucumber::Runtime.new
+      end
+
       it "can configure api_token and url" do
         analytics = Buildkite::TestCollector
         env_overlay["BUILDKITE_ANALYTICS_TOKEN"] = "MyToken"
