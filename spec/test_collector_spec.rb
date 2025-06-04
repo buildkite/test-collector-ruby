@@ -66,4 +66,42 @@ RSpec.describe Buildkite::TestCollector do
       expect(analytics.env).to match env
     end
   end
+
+  context "Cucumber" do
+    let(:hook) { :cucumber }
+
+    if Gem::Version.new(RUBY_VERSION) >= Gem::Version.new('2.7')
+      before do
+        Cucumber::Runtime.new
+      end
+
+      it "can configure api_token and url" do
+        analytics = Buildkite::TestCollector
+        env_overlay["BUILDKITE_ANALYTICS_TOKEN"] = "MyToken"
+
+        analytics.configure(hook: hook)
+
+        expect(analytics.api_token).to eq "MyToken"
+        expect(analytics.url).to eq "https://analytics-api.buildkite.com/v1/uploads"
+      end
+
+      it "can configure custom env" do
+        analytics = Buildkite::TestCollector
+        env = { test: "test value" }
+
+        analytics.configure(hook: hook, env: env)
+
+        expect(analytics.env).to match env
+      end
+    else
+      it "raises an UnsupportedFrameworkError" do
+        analytics = Buildkite::TestCollector
+        env_overlay["BUILDKITE_ANALYTICS_TOKEN"] = "MyToken"
+
+        expect {
+          analytics.configure(hook: hook)
+        }.to raise_error(Buildkite::TestCollector::UnsupportedFrameworkError, "Cucumber is only supported in versions of Ruby >= 2.7")
+      end
+    end
+  end
 end

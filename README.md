@@ -5,7 +5,7 @@ Versions prior to 2.1.x are unsupported and will not work after mid-2023. Please
 
 Official [Buildkite Test Engine](https://buildkite.com/platform/test-engine) collectors for Ruby test frameworks ✨
 
-⚒ **Supported test frameworks:** RSpec, Minitest, and [more coming soon](https://github.com/buildkite/test-collector-ruby/issues?q=is%3Aissue+is%3Aopen+label%3A%22test+frameworks%22).
+⚒ **Supported test frameworks:** RSpec, Minitest, Cucumber, and [more coming soon](https://github.com/buildkite/test-collector-ruby/issues?q=is%3Aissue+is%3Aopen+label%3A%22test+frameworks%22).
 
 📦 **Supported CI systems:** Buildkite, GitHub Actions, CircleCI, Codeship, and others via the `BUILDKITE_ANALYTICS_*` environment variables.
 
@@ -61,6 +61,22 @@ Run your tests locally:
 
 ```shell
 BUILDKITE_ANALYTICS_TOKEN=xyz rake
+```
+
+#### Cucumber
+
+Add the following code to your Cucumber setup file:
+
+```ruby
+# features/support/env.rb
+require 'buildkite/test_collector'
+Buildkite::TestCollector.configure(hook: :cucumber)
+```
+
+Run your tests locally:
+
+```shell
+BUILDKITE_ANALYTICS_TOKEN=xyz cucumber
 ```
 
 ### Step 3
