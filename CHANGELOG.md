@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## v2.10.0
+
+* Add support for Cucumber
+
 ## v2.9.0
 
 * `Buildkite::TestCollector.tag_execution(key, value)` by @pda in https://github.com/buildkite/test-collector-ruby/pull/240
