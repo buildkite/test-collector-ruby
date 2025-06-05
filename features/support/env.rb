@@ -1,4 +1,4 @@
 require 'buildkite/test_collector'
 Buildkite::TestCollector.configure(
-  hook: :cucumber, url: "http://analytics-api.buildkite.localhost/v1/uploads"
+  hook: :cucumber, url: "https://analytics-api.buildkite.com/v1/uploads"
 )
