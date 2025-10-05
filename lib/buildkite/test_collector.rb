@@ -23,6 +23,7 @@ require_relative "test_collector/object"
 require_relative "test_collector/tracer"
 require_relative "test_collector/session"
 require_relative "test_collector/uuid"
+require_relative "test_collector/code_owners"
 
 module Buildkite
   module TestCollector
@@ -40,9 +41,10 @@ module Buildkite
       attr_accessor :batch_size
       attr_accessor :trace_min_duration
       attr_accessor :span_filters
+      attr_accessor :codeowners
     end
 
-    def self.configure(hook:, token: nil, url: nil, tracing_enabled: true, artifact_path: nil, env: {}, tags: {})
+    def self.configure(hook:, token: nil, url: nil, tracing_enabled: true, artifact_path: nil, env: {}, tags: {}, codeowners: nil)
       if hook.to_sym == :cucumber && Gem::Version.new(RUBY_VERSION) < Gem::Version.new('2.7')
         raise UnsupportedFrameworkError.new("Cucumber is only supported in versions of Ruby >= 2.7")
       end
@@ -54,6 +56,10 @@ module Buildkite
       self.env = env
       self.tags = tags
       self.batch_size = ENV.fetch("BUILDKITE_ANALYTICS_UPLOAD_BATCH_SIZE") { DEFAULT_UPLOAD_BATCH_SIZE }.to_i
+
+      if codeowners
+        self.codeowners = Buildkite::TestCollector::CodeOwners.new(File.readlines(codeowners))
+      end
 
       trace_min_ms_string = ENV["BUILDKITE_ANALYTICS_TRACE_MIN_MS"]
       self.trace_min_duration = if trace_min_ms_string && !trace_min_ms_string.empty?

@@ -24,6 +24,12 @@ RSpec.configure do |config|
     Thread.current[:_buildkite_tracer] = tracer
     Thread.current[:_buildkite_tags] = tags
 
+    if Buildkite::TestCollector.codeowners && example.file_path
+      if rule = Buildkite::TestCollector.codeowners.find_rule(example.file_path)
+        Buildkite::TestCollector.tag_execution("team", rule.owners.first)
+      end
+    end
+
     # example.run can raise errors (including from other middleware/hooks) so clean up in `ensure`.
     begin
       example.run
