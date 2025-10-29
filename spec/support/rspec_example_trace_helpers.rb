@@ -19,15 +19,30 @@ class FakeExecutionResult
 end
 
 module RSpecExampleTraceHelpers
-  def fake_example(status:)
-    example = double("RSpec::Core::Example")
-    allow(example).to receive(:execution_result) { FakeExecutionResult.new(status: :failed) }
-    allow(example).to receive(:id) { "spec/fake/fake_spec[1:2:3]" }
-    allow(example).to receive(:full_description) { "this is a fake example full description" }
-    allow(example).to receive(:description) { "fake example name" }
-    allow(example).to receive(:metadata) { { shared_group_inclusion_backtrace: [] } }
-    allow(example).to receive(:example_group) { OpenStruct.new(metadata: { full_description: 'this is a fake example full description' })}
-    example
+  def fake_example(opts = {})
+    status = opts.delete(:status) || :failed
+    execution_result = opts.delete(:execution_result) || FakeExecutionResult.new(status: status)
+    file_path = opts.delete(:file_path) || "./spec/fake/fake_spec.rb"
+    id = opts.delete(:id) || "#{file_path}[1:2:3]"
+    full_description = opts.delete(:full_description) || "this is a fake example full description"
+    description = opts.delete(:description) || "fake example name"
+    metadata = opts.delete(:metadata) || { shared_group_inclusion_backtrace: [] }
+    example_group = opts.delete(:example_group) || OpenStruct.new(metadata: { full_description: full_description })
+
+    if opts.length > 0
+      raise ArgumentError, "fake_example: unknown option(s) #{opts.keys.to_s}"
+    end
+
+    instance_double(
+      RSpec::Core::Example,
+      execution_result: execution_result,
+      file_path: file_path,
+      id: id,
+      full_description: full_description,
+      description: description,
+      metadata: metadata,
+      example_group: example_group
+    )
   end
 
   def fake_trace(a_example)
