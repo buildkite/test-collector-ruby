@@ -1,10 +1,11 @@
 # frozen_string_literal: true
 
 module Buildkite::TestCollector::MinitestPlugin
-  class Trace
+  class Trace < Buildkite::TestCollector::Trace
     attr_accessor :example
     attr_writer :failure_reason, :failure_expanded
     attr_reader :history
+    attr_reader :location_prefix
     attr_reader :tags
 
     RESULT_CODES = {
@@ -16,10 +17,11 @@ module Buildkite::TestCollector::MinitestPlugin
 
     FILE_PATH_REGEX = /^(.*?\.(rb|feature))/
 
-    def initialize(example, history:, tags: nil)
+    def initialize(example, history:, tags: nil, trace: nil, location_prefix: nil)
       @example = example
       @history = history
       @tags = tags
+      @location_prefix = location_prefix
     end
 
     def result
@@ -30,21 +32,15 @@ module Buildkite::TestCollector::MinitestPlugin
       @source_location ||= example.method(example.name).source_location
     end
 
-    def as_hash
-      strip_invalid_utf8_chars(
-        scope: example.class.name,
-        name: example.name,
-        location: location,
-        file_name: file_name,
-        result: result,
-        failure_reason: failure_reason,
-        failure_expanded: failure_expanded,
-        history: history,
-        tags: tags,
-      ).select { |_, value| !value.nil? }
+    private
+
+    def scope
+      example.class.name
     end
 
-    private
+    def name
+      example.name
+    end
 
     def location
       if file_name
@@ -83,18 +79,6 @@ module Buildkite::TestCollector::MinitestPlugin
           expanded: messages,
           backtrace: failure.backtrace
         }
-      end
-    end
-
-    def strip_invalid_utf8_chars(object)
-      if object.is_a?(Hash)
-        Hash[object.map { |key, value| [key, strip_invalid_utf8_chars(value)] }]
-      elsif object.is_a?(Array)
-        object.map { |value| strip_invalid_utf8_chars(value) }
-      elsif object.is_a?(String)
-        object.encode('UTF-8', :invalid => :replace, :undef => :replace)
-      else
-        object
       end
     end
   end

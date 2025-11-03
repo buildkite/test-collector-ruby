@@ -23,6 +23,7 @@ module RSpecExampleTraceHelpers
     status = opts.delete(:status) || :failed
     execution_result = opts.delete(:execution_result) || FakeExecutionResult.new(status: status)
     file_path = opts.delete(:file_path) || "./spec/fake/fake_spec.rb"
+    location = opts.delete(:location) || "#{file_path}:42"
     id = opts.delete(:id) || "#{file_path}[1:2:3]"
     full_description = opts.delete(:full_description) || "this is a fake example full description"
     description = opts.delete(:description) || "fake example name"
@@ -37,6 +38,7 @@ module RSpecExampleTraceHelpers
       RSpec::Core::Example,
       execution_result: execution_result,
       file_path: file_path,
+      location: location,
       id: id,
       full_description: full_description,
       description: description,

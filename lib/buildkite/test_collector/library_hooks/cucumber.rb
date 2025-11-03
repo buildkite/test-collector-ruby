@@ -52,6 +52,7 @@ After do |scenario|
       failure_reason:   failure_reason,
       failure_expanded: failure_expanded,
       tags:             tags,
+      location_prefix:  Buildkite::TestCollector.location_prefix,
     )
 
     Buildkite::TestCollector.uploader.traces[scenario.location.to_s] = trace

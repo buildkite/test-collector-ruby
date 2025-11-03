@@ -1,18 +1,19 @@
 # frozen_string_literal: true
 
 module Buildkite::TestCollector::CucumberPlugin
-  class Trace
+  class Trace < Buildkite::TestCollector::Trace
     attr_accessor :scenario, :failure_reason, :failure_expanded
-    attr_reader :history, :tags
+    attr_reader :history, :tags, :location_prefix
 
     FILE_PATH_REGEX = /^(.*?\.(rb|feature))/
 
-    def initialize(scenario, history:, failure_reason: nil, failure_expanded: [], tags: nil)
+    def initialize(scenario, history:, failure_reason: nil, failure_expanded: [], tags: nil, location_prefix: nil)
       @scenario         = scenario
       @history          = history
       @failure_reason   = failure_reason
       @failure_expanded = failure_expanded
       @tags             = tags
+      @location_prefix  = location_prefix
     end
 
     def result
@@ -25,41 +26,30 @@ module Buildkite::TestCollector::CucumberPlugin
       end
     end
 
-    def as_hash
-      parser = Gherkin::Parser.new
-      document = parser.parse(File.read(file_name))
-      feature_name = document.feature.name
-
-      strip_invalid_utf8_chars(
-        scope:          feature_name,
-        name:           scenario.name,
-        location:       scenario.location&.to_s,
-        file_name:      file_name,
-        result:         result,
-        failure_reason: failure_reason,
-        failure_expanded: failure_expanded,
-        history:        history,
-        tags:           tags,
-      ).select { |_, v| !v.nil? }
-    end
-
     private
 
-    def file_name
-      @file_name ||= scenario.location&.to_s[FILE_PATH_REGEX]
+    def gherkin_parser
+      @gherkin_parser ||= Gherkin::Parser.new
     end
 
-    def strip_invalid_utf8_chars(object)
-      case object
-      when Hash
-        object.transform_values { |v| strip_invalid_utf8_chars(v) }
-      when Array
-        object.map { |v| strip_invalid_utf8_chars(v) }
-      when String
-        object.encode('UTF-8', invalid: :replace, undef: :replace)
-      else
-        object
-      end
+    def document
+      @document ||= gherkin_parser.parse(File.read(file_name))
+    end
+
+    def scope
+      document.feature.name
+    end
+
+    def name
+      scenario.name
+    end
+
+    def location
+      scenario.location&.to_s
+    end
+
+    def file_name
+      @file_name ||= location&.to_s[FILE_PATH_REGEX]
     end
   end
 end
