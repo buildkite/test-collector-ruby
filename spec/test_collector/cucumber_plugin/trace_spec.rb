@@ -10,9 +10,12 @@ if Gem::Version.new(RUBY_VERSION) >= Gem::Version.new('2.7')
         example,
         history: history,
         failure_reason: "This test failed",
-        failure_expanded: "PICNIC: Problem in chair, not in computer"
+        failure_expanded: "PICNIC: Problem in chair, not in computer",
+        location_prefix: location_prefix,
       )
     end
+
+    let(:location_prefix) { nil }
 
     let(:example) do
       double(
@@ -53,6 +56,24 @@ if Gem::Version.new(RUBY_VERSION) >= Gem::Version.new('2.7')
         history_json = trace.as_hash[:history].to_json
 
         expect(history_json).to include('347611.734956')
+      end
+
+      it "sets the file_name and location" do
+        expect(trace.as_hash).to include(
+          file_name: "spec/support/fixtures/features/a.feature",
+          location: "spec/support/fixtures/features/a.feature",
+        )
+      end
+
+      context "when a location_prefix is set" do
+        let(:location_prefix) { "some/prefix" }
+
+        it "prepends the location_prefix to file_name and location" do
+          expect(trace.as_hash).to include(
+            file_name: "some/prefix/spec/support/fixtures/features/a.feature",
+            location: "some/prefix/spec/support/fixtures/features/a.feature",
+          )
+        end
       end
     end
   end

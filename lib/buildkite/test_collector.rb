@@ -20,6 +20,7 @@ require_relative "test_collector/http_client"
 require_relative "test_collector/uploader"
 require_relative "test_collector/network"
 require_relative "test_collector/object"
+require_relative "test_collector/trace"
 require_relative "test_collector/tracer"
 require_relative "test_collector/session"
 require_relative "test_collector/uuid"
@@ -35,6 +36,7 @@ module Buildkite
       attr_accessor :session
       attr_accessor :tracing_enabled
       attr_accessor :artifact_path
+      attr_accessor :location_prefix
       attr_accessor :env
       attr_accessor :tags
       attr_accessor :batch_size
@@ -42,7 +44,7 @@ module Buildkite
       attr_accessor :span_filters
     end
 
-    def self.configure(hook:, token: nil, url: nil, tracing_enabled: true, artifact_path: nil, env: {}, tags: {})
+    def self.configure(hook:, token: nil, url: nil, tracing_enabled: true, artifact_path: nil, location_prefix: nil, env: {}, tags: {})
       if hook.to_sym == :cucumber && Gem::Version.new(RUBY_VERSION) < Gem::Version.new('2.7')
         raise UnsupportedFrameworkError.new("Cucumber is only supported in versions of Ruby >= 2.7")
       end
@@ -51,6 +53,7 @@ module Buildkite
       self.url = url || DEFAULT_URL
       self.tracing_enabled = tracing_enabled
       self.artifact_path = artifact_path
+      self.location_prefix = location_prefix || ENV["BUILDKITE_ANALYTICS_LOCATION_PREFIX"]
       self.env = env
       self.tags = tags
       self.batch_size = ENV.fetch("BUILDKITE_ANALYTICS_UPLOAD_BATCH_SIZE") { DEFAULT_UPLOAD_BATCH_SIZE }.to_i

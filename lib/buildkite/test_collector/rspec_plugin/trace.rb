@@ -1,19 +1,21 @@
 # frozen_string_literal: true
 
 module Buildkite::TestCollector::RSpecPlugin
-  class Trace
+  class Trace < Buildkite::TestCollector::Trace
     attr_accessor :example, :failure_reason, :failure_expanded
     attr_reader :history
     attr_reader :tags
+    attr_reader :location_prefix
 
     FILE_PATH_REGEX = /^(.*?\.(rb|feature))/
 
-    def initialize(example, history:, failure_reason: nil, failure_expanded: [], tags: nil)
+    def initialize(example, history:, failure_reason: nil, failure_expanded: [], tags: nil, location_prefix: nil)
       @example = example
       @history = history
       @failure_reason = failure_reason
       @failure_expanded = failure_expanded
       @tags = tags
+      @location_prefix = location_prefix
     end
 
     def result
@@ -24,21 +26,19 @@ module Buildkite::TestCollector::RSpecPlugin
       end
     end
 
-    def as_hash
-      strip_invalid_utf8_chars(
-        scope: example.example_group.metadata[:full_description],
-        name: example.description,
-        location: example.location,
-        file_name: file_name,
-        result: result,
-        failure_reason: failure_reason,
-        failure_expanded: failure_expanded,
-        history: history,
-        tags: tags,
-      ).select { |_, value| !value.nil? }
+    private
+
+    def scope
+      example.example_group.metadata[:full_description]
     end
 
-    private
+    def name
+      example.description
+    end
+
+    def location
+      example.location
+    end
 
     def file_name
       @file_name ||= begin
@@ -68,18 +68,6 @@ module Buildkite::TestCollector::RSpecPlugin
 
     def shared_example_call_location
       example.metadata[:shared_group_inclusion_backtrace].last.inclusion_location
-    end
-
-    def strip_invalid_utf8_chars(object)
-      if object.is_a?(Hash)
-        Hash[object.map { |key, value| [key, strip_invalid_utf8_chars(value)] }]
-      elsif object.is_a?(Array)
-        object.map { |value| strip_invalid_utf8_chars(value) }
-      elsif object.is_a?(String)
-        object.encode('UTF-8', :invalid => :replace, :undef => :replace)
-      else
-        object
-      end
     end
   end
 end

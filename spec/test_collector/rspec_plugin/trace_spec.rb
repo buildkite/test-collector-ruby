@@ -8,10 +8,12 @@ RSpec.describe Buildkite::TestCollector::RSpecPlugin::Trace do
       example,
       history: history,
       tags: tags,
+      location_prefix: location_prefix,
     )
   end
 
   let(:example) { double(id: "test for invalid character '\xC8'").as_null_object }
+  let(:location_prefix) { nil }
 
   let(:history) do
     {
@@ -27,6 +29,29 @@ RSpec.describe Buildkite::TestCollector::RSpecPlugin::Trace do
   let(:tags) { nil }
 
   describe '#as_hash' do
+    describe "file_name" do
+      let(:example) { fake_example(file_path: file_path) }
+      let(:file_path) { "./spec/foo_spec.rb" }
+
+      it "is set from example.file_path" do
+        expect(trace.as_hash).to include(
+          file_name: "./spec/foo_spec.rb",
+          location: "./spec/foo_spec.rb:42",
+        )
+      end
+
+      context "when location_prefix is provided" do
+        let(:location_prefix) { "some/prefix" }
+
+        it "prepends location_prefix to example.file_path" do
+          expect(trace.as_hash).to include(
+            file_name: "some/prefix/spec/foo_spec.rb",
+            location: "some/prefix/spec/foo_spec.rb:42",
+          )
+        end
+      end
+    end
+
     it 'removes invalid UTF-8 characters from nested values' do
       history_json = trace.as_hash[:history].to_json
 

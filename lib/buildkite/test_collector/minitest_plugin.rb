@@ -35,6 +35,7 @@ module Buildkite::TestCollector::MinitestPlugin
         self,
         history: tracer.history,
         tags: tags,
+        location_prefix: Buildkite::TestCollector.location_prefix
       )
 
       Buildkite::TestCollector.uploader.traces[trace.source_location] = trace

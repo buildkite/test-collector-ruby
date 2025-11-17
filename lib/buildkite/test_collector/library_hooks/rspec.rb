@@ -37,6 +37,7 @@ RSpec.configure do |config|
         example,
         history: tracer.history,
         tags: tags,
+        location_prefix: Buildkite::TestCollector.location_prefix
       )
 
       Buildkite::TestCollector.uploader.traces[example.id] = trace
