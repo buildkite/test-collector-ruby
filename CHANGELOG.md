@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## v2.11.0
+
+* Add `location_prefix` option. Allows a file name prefix to be set which will be prepended to `file_name` and `location` in the test results.
+
+**Full Changelog**: https://github.com/buildkite/test-collector-ruby/compare/v2.10.0...v2.11.0
+
 ## v2.10.0
 
 * Add support for Cucumber
