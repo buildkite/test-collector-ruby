@@ -113,17 +113,15 @@ Bug reports and pull requests are welcome on GitHub at https://github.com/buildk
 ## 🚀 Releasing
 
 1. Bump the version in `version.rb` and run `bundle` to update the `Gemfile.lock`.
-1. Update the CHANGELOG.md with your new version and a description of your changes.
+2. Update the CHANGELOG.md with your new version and a description of your changes.
+3. Once your PR is merged to `main` git tag the merge commit and push:
 
-Once your PR is merged to `main`:
-
-1. Git tag the merge commit and push
 ```
 git tag vX.X.X
 git push origin vX.X.X
 ```
-1. Visit the [release pipeline](https://buildkite.com/buildkite/test-collector-ruby-release) to unblock it and confirm the new version is pushed to rubygems.org
-1. Create a [new release in github](https://github.com/buildkite/test-collector-ruby/releases).
+4. Visit the [release pipeline](https://buildkite.com/buildkite/test-collector-ruby-release) to unblock it and confirm the new version is pushed to rubygems.org
+5. Create a [new release in github](https://github.com/buildkite/test-collector-ruby/releases).
 
 ## 📜 MIT License
 
