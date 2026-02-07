@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module IoHelpers
   def reset_io(io)
     io.truncate(0)

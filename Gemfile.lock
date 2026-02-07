@@ -2,6 +2,7 @@ PATH
   remote: .
   specs:
     buildkite-test_collector (2.11.0)
+      concurrent-ruby
 
 GEM
   remote: https://rubygems.org/
@@ -57,8 +58,11 @@ GEM
       concurrent-ruby (~> 1.0)
     logger (1.7.0)
     mini_mime (1.1.5)
-    minitest (5.25.4)
+    minitest (6.0.1)
+      prism (~> 1.5)
     multi_test (1.1.0)
+    ostruct (0.6.3)
+    prism (1.9.0)
     rake (13.2.1)
     rspec (3.13.0)
       rspec-core (~> 3.13.0)
@@ -87,6 +91,7 @@ DEPENDENCIES
   activesupport (>= 4.2)
   buildkite-test_collector!
   cucumber (~> 9.0)
+  ostruct
   rake (~> 13.0)
   rspec (~> 3.0)
   rspec-core (~> 3.10)

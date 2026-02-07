@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require 'ostruct'
+require "ostruct"
 
 RSpec.describe Buildkite::TestCollector::HTTPClient do
   subject do

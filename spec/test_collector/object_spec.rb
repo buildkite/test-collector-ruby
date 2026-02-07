@@ -1,4 +1,5 @@
 # frozen_string_literal: true
+
 require "timeout"
 
 RSpec.describe Buildkite::TestCollector::CI do

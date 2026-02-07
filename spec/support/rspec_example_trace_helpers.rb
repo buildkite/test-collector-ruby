@@ -1,3 +1,7 @@
+# frozen_string_literal: true
+
+require "ostruct"
+
 class FakeExecutionResult
   attr :started_at, :finished_at, :run_time, :status, :exception
   def initialize(status: :passed, skipped: false, pending_fixed: false, exception: nil)
