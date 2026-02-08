@@ -50,15 +50,7 @@ RSpec.describe Buildkite::TestCollector::HTTPClient do
     }.to_json
   end
 
-  let(:compressed_body) do
-    str = StringIO.new
 
-    writer = Zlib::GzipWriter.new(str)
-    writer.write(request_body)
-    writer.close
-
-    str.string
-  end
 
   let(:run_env) { {"key" => "build-123"} }
   let(:tags) { {"language.name" => "ruby"} }
@@ -77,7 +69,12 @@ RSpec.describe Buildkite::TestCollector::HTTPClient do
   describe "#post_upload" do
     it "sends the right data" do
       allow(response).to receive(:is_a?).with(Net::HTTPSuccess).and_return(true)
-      expect(post_double).to receive(:body=).with(compressed_body)
+
+      expect(post_double).to receive(:body=) do |body|
+        decompressed = Zlib::GzipReader.new(StringIO.new(body)).read
+        expect(decompressed).to eq(request_body)
+      end
+
       expect(http_double).to receive(:request).with(post_double).and_return(response)
 
       subject.post_upload(
@@ -91,7 +88,12 @@ RSpec.describe Buildkite::TestCollector::HTTPClient do
       allow(response).to receive(:is_a?).with(Net::HTTPSuccess).and_return(false)
       allow(response).to receive(:code).and_return("500")
       allow(response).to receive(:message).and_return("Internal Server Error")
-      expect(post_double).to receive(:body=).with(compressed_body)
+
+      expect(post_double).to receive(:body=) do |body|
+        decompressed = Zlib::GzipReader.new(StringIO.new(body)).read
+        expect(decompressed).to eq(request_body)
+      end
+
       expect(http_double).to receive(:request).with(post_double).and_return(response)
 
       expect {
