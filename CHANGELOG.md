@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## v2.12.0
+
+* Prevent OOM with bounded thread pool and memory cleanup
+
+**Full Changelog**: https://github.com/buildkite/test-collector-ruby/compare/v2.11.0...v2.12.0
+
 ## v2.11.0
 
 * Add `location_prefix` option. Allows a file name prefix to be set which will be prepended to `file_name` and `location` in the test results.
