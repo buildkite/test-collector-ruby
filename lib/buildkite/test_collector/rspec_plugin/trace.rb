@@ -2,7 +2,8 @@
 
 module Buildkite::TestCollector::RSpecPlugin
   class Trace < Buildkite::TestCollector::Trace
-    attr_accessor :example, :failure_reason, :failure_expanded
+    attr_accessor :failure_reason, :failure_expanded
+    attr_writer :result
     attr_reader :history
     attr_reader :tags
     attr_reader :location_prefix
@@ -10,48 +11,45 @@ module Buildkite::TestCollector::RSpecPlugin
     FILE_PATH_REGEX = /^(.*?\.(rb|feature))/
 
     def initialize(example, history:, failure_reason: nil, failure_expanded: [], tags: nil, location_prefix: nil)
-      @example = example
       @history = history
       @failure_reason = failure_reason
       @failure_expanded = failure_expanded
       @tags = tags
       @location_prefix = location_prefix
+
+      # Extract all data eagerly to allow GC of the test object
+      @scope = example.example_group.metadata[:full_description]
+      @name = example.description
+      @location = example.location
+      @id = strip_invalid_utf8_chars(example.id)
+      @shared_group_inclusion_backtrace = example.metadata[:shared_group_inclusion_backtrace]
     end
 
     def result
-      case example.execution_result.status
-      when :passed; "passed"
-      when :failed; "failed"
-      when :pending; "skipped"
-      end
+      @result
     end
 
     private
 
     def scope
-      example.example_group.metadata[:full_description]
+      @scope
     end
 
     def name
-      example.description
+      @name
     end
 
     def location
-      example.location
+      @location
     end
 
     def file_name
       @file_name ||= begin
-        identifier_file_name = strip_invalid_utf8_chars(example.id)[FILE_PATH_REGEX]
-        location_file_name = example.location[FILE_PATH_REGEX]
+        identifier_file_name = @id[FILE_PATH_REGEX]
+        location_file_name = @location[FILE_PATH_REGEX]
 
         if identifier_file_name != location_file_name
-          # If the identifier and location files are not the same, we assume
-          # that the test was run as part of a shared example. If this isn't the
-          # case, then there's something we haven't accounted for
           if shared_example?
-            # Taking the last frame in this backtrace will give us the original
-            # entry point for the shared example
             shared_example_call_location[FILE_PATH_REGEX]
           else
             "Unknown"
@@ -63,11 +61,11 @@ module Buildkite::TestCollector::RSpecPlugin
     end
 
     def shared_example?
-      !example.metadata[:shared_group_inclusion_backtrace].empty?
+      !@shared_group_inclusion_backtrace.empty?
     end
 
     def shared_example_call_location
-      example.metadata[:shared_group_inclusion_backtrace].last.inclusion_location
+      @shared_group_inclusion_backtrace.last.inclusion_location
     end
   end
 end

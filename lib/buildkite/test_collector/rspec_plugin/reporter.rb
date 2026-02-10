@@ -16,7 +16,11 @@ module Buildkite::TestCollector::RSpecPlugin
       trace = Buildkite::TestCollector.uploader.traces[example.id]
 
       if trace
-        trace.example = example
+        trace.result = case example.execution_result.status
+                       when :passed; "passed"
+                       when :failed; "failed"
+                       when :pending; "skipped"
+                       end
         if example.execution_result.status == :failed
           trace.failure_reason, trace.failure_expanded = failure_info(notification)
         end
