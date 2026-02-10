@@ -1,14 +1,15 @@
 # frozen_string_literal: true
 
+require "concurrent-ruby"
+
 module Buildkite::TestCollector
   class Session
-    UPLOAD_THREAD_TIMEOUT = 60
     UPLOAD_SESSION_TIMEOUT = 60
     UPLOAD_API_MAX_RESULTS = 5000
 
     def initialize
       @send_queue_ids = []
-      @upload_threads = []
+      @upload_futures = []
     end
 
     def add_example_to_send_queue(id)
@@ -24,20 +25,20 @@ module Buildkite::TestCollector
       return if @send_queue_ids.empty?
 
       upload_data(@send_queue_ids)
+      @send_queue_ids.clear
     end
 
     def close
-      # There are two thread joins here, because the inner join will wait up to
-      # UPLOAD_THREAD_TIMEOUT seconds PER thread that is uploading data, i.e.
-      # n_threads x UPLOAD_THREAD_TIMEOUT latency if Buildkite happens to be
-      # down. By wrapping that in an outer thread join with the
-      # UPLOAD_SESSION_TIMEOUT, we ensure that we only wait a max of
-      # UPLOAD_SESSION_TIMEOUT seconds before the session exits.
-      Thread.new do
-        @upload_threads.each { |t| t.join(UPLOAD_THREAD_TIMEOUT) }
-      end.join(UPLOAD_SESSION_TIMEOUT)
+      return if @upload_futures.empty?
 
-      @upload_threads.each { |t| t&.kill }
+      begin
+        Concurrent::Promises.zip(*@upload_futures).value!(UPLOAD_SESSION_TIMEOUT)
+      rescue StandardError
+        # Timeout or other error - futures will continue running in the thread pool
+        # with their own per-upload timeouts, we just stop waiting for them
+      ensure
+        @upload_futures.clear
+      end
     end
 
     private
@@ -45,12 +46,17 @@ module Buildkite::TestCollector
     def upload_data(ids)
       data = Buildkite::TestCollector.uploader.traces.values_at(*ids).compact
 
-      # we do this in batches of UPLOAD_API_MAX_RESULTS in case the number of
-      # results exceeds this due to a bug, or user error in configuring the
-      # batch size
-      data.each_slice(UPLOAD_API_MAX_RESULTS) do |batch|
-        new_thread = Buildkite::TestCollector::Uploader.upload(batch)
-        @upload_threads << new_thread if new_thread
+      begin
+        # We do this in batches of UPLOAD_API_MAX_RESULTS in case the number of
+        # results exceeds this due to a bug, or user error in configuring the
+        # batch size
+        data.each_slice(UPLOAD_API_MAX_RESULTS) do |batch|
+          new_future = Buildkite::TestCollector::Uploader.upload(batch)
+          @upload_futures << new_future if new_future
+        end
+      ensure
+        # Free memory by removing uploaded traces from the in-memory cache
+        ids.each { |id| Buildkite::TestCollector.uploader.traces.delete(id) }
       end
     end
   end

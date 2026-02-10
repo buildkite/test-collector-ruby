@@ -57,20 +57,21 @@ RSpec.describe Buildkite::TestCollector::Session do
   end
 
   describe "#close" do
-    let(:thread) { Thread.new { sleep(1) } }
+    let(:slow_future) { Concurrent::Promises.future { sleep(1) } }
 
-    before do
+    it "does not block waiting for slow uploads beyond session timeout" do
       stub_const("Buildkite::TestCollector::Session::UPLOAD_SESSION_TIMEOUT", 0.1)
-    end
 
-    it "kills threads after timeout has elapsed" do
+      expect(Buildkite::TestCollector::Uploader).to receive(:upload).and_return(slow_future)
+
       subject.add_example_to_send_queue(:"test-1")
-      expect(Buildkite::TestCollector::Uploader).to receive(:upload).and_return(thread)
+
       subject.send_remaining_data
 
+      start_time = Time.now
       subject.close
-      sleep(0.2)
-      expect(thread.alive?).to eq false
+      elapsed_time = Time.now - start_time
+      expect(elapsed_time).to be < 0.2
     end
   end
 end

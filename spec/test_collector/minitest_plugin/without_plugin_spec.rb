@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require "minitest"
 
 RSpec.describe "don’t break minitest when the plugin isn’t loaded" do
