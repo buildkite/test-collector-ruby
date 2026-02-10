@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 module Buildkite::TestCollector::MinitestPlugin
-  class Reporter < Minitest::StatisticsReporter
+  class Reporter < Minitest::Reporter
     def initialize(io, options)
       super
       @io = io

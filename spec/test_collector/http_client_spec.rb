@@ -18,11 +18,16 @@ RSpec.describe Buildkite::TestCollector::HTTPClient do
       description: "mince and cheese",
       id: "12",
       location: "123 Pie St",
-      execution_result: execution_result
+      execution_result: execution_result,
+      metadata: { shared_group_inclusion_backtrace: [] }
     )
   end
 
-  let(:trace) { Buildkite::TestCollector::RSpecPlugin::Trace.new(example, history: "pie lore") }
+  let(:trace) do
+    t = Buildkite::TestCollector::RSpecPlugin::Trace.new(example, history: "pie lore")
+    t.result = "passed"
+    t
+  end
 
   let(:http_double) { double("Net::HTTP_double") }
   let(:post_double) { double("Net::HTTP::Post") }
