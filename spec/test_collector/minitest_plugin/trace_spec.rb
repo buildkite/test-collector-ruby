@@ -114,8 +114,8 @@ RSpec.describe Buildkite::TestCollector::MinitestPlugin::Trace do
 
     it "sets the filename and location" do
       expect(trace.as_hash).to include(
-        file_name: "./spec/test_collector/minitest_plugin/trace_spec.rb",
-        location: "./spec/test_collector/minitest_plugin/trace_spec.rb:#{location_line_number}",
+        file_name: "spec/test_collector/minitest_plugin/trace_spec.rb",
+        location: "spec/test_collector/minitest_plugin/trace_spec.rb:#{location_line_number}",
       )
     end
 
@@ -124,7 +124,7 @@ RSpec.describe Buildkite::TestCollector::MinitestPlugin::Trace do
 
       it "strips Rails.root from the filename" do
         stub_const("Rails", rails)
-        expect(trace.as_hash[:file_name]).to eq("./test_collector/minitest_plugin/trace_spec.rb")
+        expect(trace.as_hash[:file_name]).to eq("test_collector/minitest_plugin/trace_spec.rb")
       end
     end
 

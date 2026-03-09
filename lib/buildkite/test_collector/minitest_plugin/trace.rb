@@ -49,7 +49,7 @@ module Buildkite::TestCollector::MinitestPlugin
     end
 
     def file_name
-      @file_name ||= File.join('./', source_location[0].sub(/\A#{project_dir}/, ""))
+      @file_name ||= source_location[0].sub(/\A#{project_dir}\//, "")
     end
 
     def line_number
