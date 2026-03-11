@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## v2.13.0
+
+* Remove `./` prefix from minitest collector file paths
+
+**Full Changelog**: https://github.com/buildkite/test-collector-ruby/compare/v2.12.0...v2.13.0
+
 ## v2.12.0
 
 * Prevent OOM with bounded thread pool and memory cleanup
