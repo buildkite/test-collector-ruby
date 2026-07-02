@@ -41,6 +41,7 @@ class Buildkite::TestCollector::CI
       "version" => Buildkite::TestCollector::VERSION,
       "collector" => "ruby-#{Buildkite::TestCollector::NAME}",
       "location_prefix" => Buildkite::TestCollector.location_prefix,
+      "test_runner" => Buildkite::TestCollector.test_runner,
       "trace_min_duration" => Buildkite::TestCollector.trace_min_duration&.to_s,
     }.select { |_, value| !value.nil? }
   end
