@@ -22,6 +22,22 @@ RSpec.describe Buildkite::TestCollector::Uploader do
       future.wait if future
     end
 
+    it 'includes location_prefix in run_env' do
+      allow(Buildkite::TestCollector).to receive(:location_prefix).and_return('some-sub-dir')
+
+      expect(http_client_double).to receive(:post_upload).with(
+        data: [{some: 'data'}],
+        run_env: hash_including(
+          "collector" => "ruby-buildkite-test_collector",
+          "location_prefix" => "some-sub-dir",
+        ),
+        tags: {},
+      )
+
+      future = Buildkite::TestCollector::Uploader.upload([{some: 'data'}])
+      future.wait if future
+    end
+
     context 'when there is RuntimeError' do
       before do
         allow(http_client_double).to receive(:post_upload).and_raise(RuntimeError)

@@ -23,6 +23,7 @@ RSpec.describe Buildkite::TestCollector::CI do
       fake_env("BUILDKITE_BUILD_ID", nil)
       fake_env("GITHUB_RUN_NUMBER", nil)
       fake_env("CIRCLE_BUILD_NUM", nil)
+      fake_env("BUILDKITE_ANALYTICS_LOCATION_PREFIX", nil)
 
       Buildkite::TestCollector.configure(hook: :rspec, env: { "test" => test_value })
     end
@@ -31,6 +32,41 @@ RSpec.describe Buildkite::TestCollector::CI do
       result = Buildkite::TestCollector::CI.env
 
       expect(result["test"]).to eq test_value
+    end
+
+    it "omits location_prefix when it is not configured" do
+      result = Buildkite::TestCollector::CI.env
+
+      expect(result).not_to include("location_prefix")
+    end
+
+    context "with configured location_prefix" do
+      before do
+        Buildkite::TestCollector.configure(
+          hook: :rspec,
+          env: { "test" => test_value },
+          location_prefix: "some-sub-dir"
+        )
+      end
+
+      it "includes location_prefix in run_env" do
+        expect(Buildkite::TestCollector::CI.env).to include(
+          "location_prefix" => "some-sub-dir",
+        )
+      end
+    end
+
+    context "with BUILDKITE_ANALYTICS_LOCATION_PREFIX" do
+      before do
+        fake_env("BUILDKITE_ANALYTICS_LOCATION_PREFIX", "some-sub-dir")
+        Buildkite::TestCollector.configure(hook: :rspec, env: { "test" => test_value })
+      end
+
+      it "includes location_prefix in run_env" do
+        expect(Buildkite::TestCollector::CI.env).to include(
+          "location_prefix" => "some-sub-dir",
+        )
+      end
     end
 
     context "when running on Buildkite" do
