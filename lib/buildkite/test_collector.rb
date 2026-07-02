@@ -37,6 +37,7 @@ module Buildkite
       attr_accessor :tracing_enabled
       attr_accessor :artifact_path
       attr_accessor :location_prefix
+      attr_accessor :test_runner
       attr_accessor :env
       attr_accessor :tags
       attr_accessor :batch_size
@@ -54,6 +55,7 @@ module Buildkite
       self.tracing_enabled = tracing_enabled
       self.artifact_path = artifact_path
       self.location_prefix = location_prefix || ENV["BUILDKITE_ANALYTICS_LOCATION_PREFIX"]
+      self.test_runner = hook.to_s
       self.env = env
       self.tags = tags
       self.batch_size = ENV.fetch("BUILDKITE_ANALYTICS_UPLOAD_BATCH_SIZE") { DEFAULT_UPLOAD_BATCH_SIZE }.to_i

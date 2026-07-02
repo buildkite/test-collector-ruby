@@ -40,6 +40,12 @@ RSpec.describe Buildkite::TestCollector::CI do
       expect(result).not_to include("location_prefix")
     end
 
+    it "includes the configured test_runner in run_env" do
+      result = Buildkite::TestCollector::CI.env
+
+      expect(result).to include("test_runner" => "rspec")
+    end
+
     context "with configured location_prefix" do
       before do
         Buildkite::TestCollector.configure(
@@ -105,6 +111,7 @@ RSpec.describe Buildkite::TestCollector::CI do
           "version" => version,
           "collector" => name,
           "test" => test_value,
+          "test_runner" => "rspec",
         })
       end
 
@@ -139,6 +146,7 @@ RSpec.describe Buildkite::TestCollector::CI do
             "version" => version,
             "collector" => name,
             "test" => test_value,
+            "test_runner" => "rspec",
           })
         end
       end
@@ -178,6 +186,7 @@ RSpec.describe Buildkite::TestCollector::CI do
           "version" => version,
           "collector" => name,
           "test" => test_value,
+          "test_runner" => "rspec",
         })
       end
 
@@ -208,6 +217,7 @@ RSpec.describe Buildkite::TestCollector::CI do
             "version" => version,
             "collector" => name,
             "test" => test_value,
+            "test_runner" => "rspec",
           })
         end
       end
@@ -243,6 +253,7 @@ RSpec.describe Buildkite::TestCollector::CI do
           "version" => version,
           "collector" => name,
           "test" => test_value,
+          "test_runner" => "rspec",
         })
       end
 
@@ -273,6 +284,7 @@ RSpec.describe Buildkite::TestCollector::CI do
             "version" => version,
             "collector" => name,
             "test" => test_value,
+            "test_runner" => "rspec",
           })
         end
       end
@@ -309,6 +321,7 @@ RSpec.describe Buildkite::TestCollector::CI do
           "version" => version,
           "collector" => name,
           "test" => test_value,
+          "test_runner" => "rspec",
         })
       end
 
@@ -340,6 +353,7 @@ RSpec.describe Buildkite::TestCollector::CI do
             "version" => version,
             "collector" => name,
             "test" => test_value,
+            "test_runner" => "rspec",
           })
         end
       end
@@ -362,6 +376,7 @@ RSpec.describe Buildkite::TestCollector::CI do
           "version" => version,
           "collector" => name,
           "test" => test_value,
+          "test_runner" => "rspec",
         })
       end
 
@@ -392,6 +407,7 @@ RSpec.describe Buildkite::TestCollector::CI do
             "version" => version,
             "collector" => name,
             "test" => test_value,
+            "test_runner" => "rspec",
           })
         end
       end
@@ -412,6 +428,7 @@ RSpec.describe Buildkite::TestCollector::CI do
           "version" => version,
           "collector" => name,
           "test" => test_value,
+          "test_runner" => "rspec",
         })
       end
 
@@ -442,6 +459,7 @@ RSpec.describe Buildkite::TestCollector::CI do
             "version" => version,
             "collector" => name,
             "test" => test_value,
+            "test_runner" => "rspec",
           })
         end
       end
