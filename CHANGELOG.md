@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## v2.14.0
+
+* Send `location_prefix` in `run_env`
+* Send `test_runner` in `run_env`
+
+**Full Changelog**: https://github.com/buildkite/test-collector-ruby/compare/v2.13.0...v2.14.0
+
 ## v2.13.0
 
 * Remove `./` prefix from minitest collector file paths
