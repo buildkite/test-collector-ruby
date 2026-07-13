@@ -50,6 +50,40 @@ RSpec.describe Buildkite::TestCollector::RSpecPlugin::Trace do
           )
         end
       end
+
+      context "when the path contains a .rb-like segment before the real extension" do
+        let(:file_path) { "spec/archive.rb.d/widget_spec.rb" }
+
+        it "does not truncate the file_name at the first .rb occurrence" do
+          expect(trace.as_hash).to include(
+            file_name: "spec/archive.rb.d/widget_spec.rb",
+            location: "spec/archive.rb.d/widget_spec.rb:42",
+          )
+        end
+      end
+
+      context "when the example is a shared example" do
+        let(:example) do
+          fake_example(
+            file_path: "./spec/foo_spec.rb",
+            id: "./spec/shared_examples/a_widget.rb[1:1]",
+            location: "./spec/foo_spec.rb:12",
+            metadata: {
+              shared_group_inclusion_backtrace: [
+                double(
+                  inclusion_location: "./spec/foo_spec.rb:12:in `block (2 levels) in <top (required)>'"
+                )
+              ]
+            },
+          )
+        end
+
+        it "returns the actual spec file, not the shared-examples library file" do
+          expect(trace.as_hash).to include(
+            file_name: "./spec/foo_spec.rb",
+          )
+        end
+      end
     end
 
     it 'removes invalid UTF-8 characters from nested values' do

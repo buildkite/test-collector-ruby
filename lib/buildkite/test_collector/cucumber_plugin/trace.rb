@@ -5,7 +5,9 @@ module Buildkite::TestCollector::CucumberPlugin
     attr_accessor :scenario, :failure_reason, :failure_expanded
     attr_reader :history, :tags, :location_prefix
 
-    FILE_PATH_REGEX = /^(.*?\.(rb|feature))/
+    # scenario.location looks like "./features/foo.feature:12" - strip the
+    # trailing line number to get the file path.
+    LOCATION_LINE_SUFFIX_REGEX = /:\d+\z/
 
     def initialize(scenario, history:, failure_reason: nil, failure_expanded: [], tags: nil, location_prefix: nil)
       @scenario         = scenario
@@ -49,7 +51,7 @@ module Buildkite::TestCollector::CucumberPlugin
     end
 
     def file_name
-      @file_name ||= location&.to_s[FILE_PATH_REGEX]
+      @file_name ||= location&.to_s&.sub(LOCATION_LINE_SUFFIX_REGEX, "")
     end
   end
 end

@@ -7,7 +7,18 @@ module Buildkite::TestCollector::RSpecPlugin
     attr_reader :tags
     attr_reader :location_prefix
 
-    FILE_PATH_REGEX = /^(.*?\.(rb|feature))/
+    # example.id looks like "./spec/foo_spec.rb[1:2]" - strip the trailing
+    # example index suffix to get the file path.
+    ID_INDEX_SUFFIX_REGEX = /\[[\d:]+\]\z/
+
+    # example.location looks like "./spec/foo_spec.rb:42" - strip the
+    # trailing line number to get the file path.
+    LOCATION_LINE_SUFFIX_REGEX = /:\d+\z/
+
+    # shared_example_call_location is a raw backtrace line, e.g.
+    # "./spec/foo_spec.rb:12:in `block (2 levels) in <top (required)>'" -
+    # strip the trailing line number and frame label to get the file path.
+    BACKTRACE_LINE_SUFFIX_REGEX = /:\d+:in\b.*\z/
 
     def initialize(example, history:, failure_reason: nil, failure_expanded: [], tags: nil, location_prefix: nil)
       @example = example
@@ -42,8 +53,8 @@ module Buildkite::TestCollector::RSpecPlugin
 
     def file_name
       @file_name ||= begin
-        identifier_file_name = strip_invalid_utf8_chars(example.id)[FILE_PATH_REGEX]
-        location_file_name = example.location[FILE_PATH_REGEX]
+        identifier_file_name = strip_invalid_utf8_chars(example.id).sub(ID_INDEX_SUFFIX_REGEX, "")
+        location_file_name = example.location.sub(LOCATION_LINE_SUFFIX_REGEX, "")
 
         if identifier_file_name != location_file_name
           # If the identifier and location files are not the same, we assume
@@ -52,7 +63,7 @@ module Buildkite::TestCollector::RSpecPlugin
           if shared_example?
             # Taking the last frame in this backtrace will give us the original
             # entry point for the shared example
-            shared_example_call_location[FILE_PATH_REGEX]
+            shared_example_call_location.sub(BACKTRACE_LINE_SUFFIX_REGEX, "")
           else
             "Unknown"
           end

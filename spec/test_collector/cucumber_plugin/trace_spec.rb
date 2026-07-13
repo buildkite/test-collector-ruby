@@ -75,6 +75,42 @@ if Gem::Version.new(RUBY_VERSION) >= Gem::Version.new('2.7')
           )
         end
       end
+
+      context "when the location includes a line number" do
+        let(:example) do
+          double(
+            Cucumber::RunningTestCase::TestCase,
+            name: "test_it_passes",
+            location: "spec/support/fixtures/features/a.feature:12",
+            "passed?": false,
+            "failed?": true,
+          )
+        end
+
+        it "strips the line number from the file_name" do
+          expect(trace.as_hash).to include(
+            file_name: "spec/support/fixtures/features/a.feature",
+          )
+        end
+      end
+
+      context "when the path contains a .feature-like segment before the real extension" do
+        let(:example) do
+          double(
+            Cucumber::RunningTestCase::TestCase,
+            name: "test_it_passes",
+            location: "spec/support/fixtures/features/a.feature.d/login.feature:12",
+            "passed?": false,
+            "failed?": true,
+          )
+        end
+
+        it "does not truncate the file_name at the first .feature occurrence" do
+          expect(trace.as_hash).to include(
+            file_name: "spec/support/fixtures/features/a.feature.d/login.feature",
+          )
+        end
+      end
     end
   end
 else

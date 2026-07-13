@@ -16,8 +16,9 @@ RSpec.describe Buildkite::TestCollector::HTTPClient do
     OpenStruct.new(
       example_group: example_group,
       description: "mince and cheese",
-      id: "12",
-      location: "123 Pie St",
+      id: "./spec/pie_spec.rb[1:2]",
+      location: "./spec/pie_spec.rb:5",
+      metadata: { shared_group_inclusion_backtrace: [] },
       execution_result: execution_result
     )
   end
@@ -41,7 +42,8 @@ RSpec.describe Buildkite::TestCollector::HTTPClient do
         {
           "scope": "i love to eat pies",
           "name": "mince and cheese",
-          "location": "123 Pie St",
+          "location": "./spec/pie_spec.rb:5",
+          "file_name": "./spec/pie_spec.rb",
           "result": "passed",
           "failure_expanded": [],
           "history": "pie lore"
