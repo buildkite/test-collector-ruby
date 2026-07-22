@@ -24,6 +24,7 @@ require_relative "test_collector/trace"
 require_relative "test_collector/tracer"
 require_relative "test_collector/session"
 require_relative "test_collector/uuid"
+require_relative "test_collector/otel"
 
 module Buildkite
   module TestCollector
@@ -43,9 +44,10 @@ module Buildkite
       attr_accessor :batch_size
       attr_accessor :trace_min_duration
       attr_accessor :span_filters
+      attr_accessor :otlp_endpoint
     end
 
-    def self.configure(hook:, token: nil, url: nil, tracing_enabled: true, artifact_path: nil, location_prefix: nil, env: {}, tags: {})
+    def self.configure(hook:, token: nil, url: nil, tracing_enabled: true, artifact_path: nil, location_prefix: nil, env: {}, tags: {}, otlp_endpoint: nil)
       if hook.to_sym == :cucumber && Gem::Version.new(RUBY_VERSION) < Gem::Version.new('2.7')
         raise UnsupportedFrameworkError.new("Cucumber is only supported in versions of Ruby >= 2.7")
       end
@@ -55,6 +57,8 @@ module Buildkite
       self.tracing_enabled = tracing_enabled
       self.artifact_path = artifact_path
       self.location_prefix = location_prefix || ENV["BUILDKITE_ANALYTICS_LOCATION_PREFIX"]
+      # TE-6490 PoC: OTLP endpoint spans are exported to. When unset, span export is disabled.
+      self.otlp_endpoint = otlp_endpoint || ENV["BUILDKITE_ANALYTICS_OTLP_ENDPOINT"]
       self.test_runner = hook.to_s
       self.env = env
       self.tags = tags
@@ -103,6 +107,11 @@ module Buildkite
 
       Buildkite::TestCollector::Network.configure
       Buildkite::TestCollector::Object.configure
+
+      # TE-6490 PoC: set up OpenTelemetry span export when an OTLP endpoint is configured.
+      if otlp_endpoint && !otlp_endpoint.to_s.empty?
+        Buildkite::TestCollector::OTel.configure!(endpoint: otlp_endpoint, api_token: api_token)
+      end
 
       return unless defined?(ActiveSupport)
 

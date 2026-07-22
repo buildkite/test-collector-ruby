@@ -24,12 +24,30 @@ RSpec.configure do |config|
     Thread.current[:_buildkite_tracer] = tracer
     Thread.current[:_buildkite_tags] = tags
 
+    # TE-6490 PoC: mint one span_trace_key per test and carry it as an execution tag,
+    # so the OTel span stream can be joined back to this execution on the backend.
+    if Buildkite::TestCollector::OTel.enabled?
+      span_trace_key = Buildkite::TestCollector::UUID.call
+      tags["span_trace_key"] = span_trace_key
+      Buildkite::TestCollector::OTel.current_key = span_trace_key
+    end
+
     # example.run can raise errors (including from other middleware/hooks) so clean up in `ensure`.
     begin
-      example.run
+      Buildkite::TestCollector::OTel.in_test_span(
+        name: "test.execution",
+        attributes: {
+          "test.name" => example.full_description,
+          "test.id" => example.id,
+          "test.file" => example.metadata[:file_path],
+        }
+      ) do
+        example.run
+      end
     ensure
       Thread.current[:_buildkite_tracer] = nil
       Thread.current[:_buildkite_tags] = nil
+      Buildkite::TestCollector::OTel.current_key = nil
 
       tracer.finalize
 
@@ -54,6 +72,13 @@ RSpec.configure do |config|
         gz.close
       end
     end
+  end
+
+  # TE-6490 PoC: flush and shut down the OTel exporter so spans are delivered
+  # before the process exits.
+  config.after(:suite) do
+    Buildkite::TestCollector::OTel.force_flush
+    Buildkite::TestCollector::OTel.shutdown
   end
 end
 
