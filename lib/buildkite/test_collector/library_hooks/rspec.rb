@@ -24,18 +24,21 @@ RSpec.configure do |config|
     Thread.current[:_buildkite_tracer] = tracer
     Thread.current[:_buildkite_tags] = tags
 
-    # TE-6490 PoC: mint one span_trace_key per test and carry it as an execution tag,
-    # so the OTel span stream can be joined back to this execution on the backend.
-    if Buildkite::TestCollector::OTel.enabled?
-      span_trace_key = Buildkite::TestCollector::UUID.call
-      tags["span_trace_key"] = span_trace_key
-      Buildkite::TestCollector::OTel.current_key = span_trace_key
+    # TE-6490 PoC: use one external ID for both the execution upload and its
+    # root span so the independently ingested records can be joined.
+    external_id = Buildkite::TestCollector::UUID.call if Buildkite::TestCollector::OTel.enabled?
+    if external_id
+      # Keep the existing PoC correlation path working until ingestion and the
+      # execution spans query have moved to external_id.
+      tags["span_trace_key"] = external_id
+      Buildkite::TestCollector::OTel.current_key = external_id
     end
 
     # example.run can raise errors (including from other middleware/hooks) so clean up in `ensure`.
     begin
       Buildkite::TestCollector::OTel.in_test_span(
         name: "test.execution",
+        external_id: external_id,
         attributes: {
           "test.name" => example.full_description,
           "test.id" => example.id,
@@ -55,7 +58,8 @@ RSpec.configure do |config|
         example,
         history: tracer.history,
         tags: tags,
-        location_prefix: Buildkite::TestCollector.location_prefix
+        location_prefix: Buildkite::TestCollector.location_prefix,
+        external_id: external_id,
       )
 
       Buildkite::TestCollector.uploader.traces[example.id] = trace

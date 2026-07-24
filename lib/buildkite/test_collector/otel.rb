@@ -6,8 +6,8 @@ module Buildkite::TestCollector
   # When an OTLP endpoint is configured, we set up a global OpenTelemetry tracer
   # provider that exports spans over OTLP/HTTP. One parent span is opened per test
   # (see the RSpec around(:each) hook); OTel auto-instrumentation records whatever
-  # the test touches as child spans. Every span is stamped with a `span_trace_key`
-  # so the backend can join the span stream back to the test execution upload.
+  # the test touches as child spans. The root span carries the same external ID
+  # as the test execution upload so the backend can join the two records.
   #
   # The opentelemetry-* gems are treated as soft dependencies: if they are not
   # installed, span export quietly disables itself and the collector behaves
@@ -29,9 +29,11 @@ module Buildkite::TestCollector
   # the option to avoid: it forces the whole OTel + instrumentation tree onto
   # every user and raises the Ruby floor to 3.0.
   module OTel
+    EXECUTION_EXTERNAL_ID_ATTRIBUTE = "execution.externalId"
     SPAN_TRACE_KEY_ATTRIBUTE = "buildkite.span_trace_key"
 
-    # Fiber-local slot holding the span_trace_key of the currently running test.
+    # Fiber-local slot used by the existing PoC ingestion path to copy the
+    # correlation value onto auto-instrumented descendants.
     CURRENT_KEY = :_buildkite_span_trace_key
 
     class << self
@@ -71,9 +73,9 @@ module Buildkite::TestCollector
 
         OpenTelemetry::SDK.configure do |c|
           c.service_name = "buildkite-test-collector-ruby"
-          # Stamp span_trace_key onto every span as it starts...
+          # Compatibility for the existing PoC ClickHouse materialization and
+          # query, which still correlate every span via span_trace_key.
           c.add_span_processor(SpanTraceKeyProcessor.new)
-          # ...then batch and export over OTLP.
           c.add_span_processor(
             OpenTelemetry::SDK::Trace::Export::BatchSpanProcessor.new(exporter)
           )
@@ -101,10 +103,10 @@ module Buildkite::TestCollector
 
       # Open one parent span for the given test execution. No-op (still yields)
       # when OTel is not enabled.
-      def in_test_span(name:, attributes: {})
+      def in_test_span(name:, external_id: nil, attributes: {})
         return yield unless enabled?
 
-        span_attributes = { SPAN_TRACE_KEY_ATTRIBUTE => current_key }.merge(attributes).compact
+        span_attributes = { EXECUTION_EXTERNAL_ID_ATTRIBUTE => external_id }.merge(attributes).compact
         @tracer.in_span(name, attributes: span_attributes, kind: :internal) do |_span|
           yield
         end
@@ -125,8 +127,6 @@ module Buildkite::TestCollector
       end
     end
 
-    # Copies the current test's span_trace_key onto every span at start time, so
-    # auto-instrumented child spans carry the same key as their parent test span.
     class SpanTraceKeyProcessor
       def on_start(span, _parent_context)
         key = Buildkite::TestCollector::OTel.current_key
