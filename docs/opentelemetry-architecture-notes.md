@@ -96,16 +96,16 @@ infrastructure it owns.
 ### Keep telemetry additive and non-fatal
 
 OTel export is opt-in through `otlp_endpoint:` or
-`BUILDKITE_ANALYTICS_OTLP_ENDPOINT`. Missing OTel gems or configuration failures
-warn and disable span export rather than failing the customer's test suite. The
-existing execution upload continues independently.
+`BUILDKITE_ANALYTICS_OTLP_ENDPOINT`. Configuration failures warn and disable span
+export rather than failing the customer's test suite. The existing execution
+upload continues independently.
 
-### Keep OTel dependencies out of the core gem
+### Make OTel a hard dependency of the core collector
 
-The core collector supports Ruby >= 2.3, while current OTel gems require newer
-Ruby versions and add a substantial dependency tree. The PoC therefore loads
-them as soft dependencies instead of changing compatibility for every collector
-user.
+The collector directly depends on the OTel SDK, OTLP exporter, and instrumentation
+gems so span export works without additional host application setup. Because
+current OTel gems require Ruby 3.3 or newer, this change ships in v3 of the
+collector and raises its minimum Ruby version to 3.3.
 
 ## PoC shortcuts, not product commitments
 
@@ -116,35 +116,12 @@ production implementation.
 | --- | --- | --- |
 | Configure the global tracer provider | It is the shortest path to a working exporter and active context. | It can interfere with a customer's existing provider, and shutdown can affect telemetry the collector does not own. |
 | Call `use_all` | It quickly demonstrates HTTP, SQL, Redis, and other child spans. | It monkeypatches broadly, can duplicate customer instrumentation, and installs more integrations than the collector needs. |
-| Ask the host application to install OTel gems | It avoids changing the core gem's Ruby floor during the experiment. | Setup is manual and behavior depends on the versions selected by the host. |
 | Use the SDK's default batch processor settings | It avoids inventing tuning before measuring representative suites. | A batch may exceed receiver limits, and queue size, timeout, retry, and compression behavior vary by SDK version. |
 | Integrate only with RSpec | It proves the lifecycle and correlation model with one framework. | Minitest and Cucumber do not create execution spans or flush OTel batches. |
 | Flush in `after(:suite)` | It sends the final partial batch after normal RSpec completion. | Crashes, hard exits, and some process lifecycles can still lose buffered spans. |
 | Reuse the existing UUIDv4 helper | It is compatible with the collector's supported Ruby versions and sufficient for equality-based correlation. | It provides no UUIDv7 ordering if that later becomes a requirement. |
 
 ## Rejected or superseded approaches
-
-### Copy `buildkite.span_trace_key` to every span
-
-An earlier version used a custom span processor to stamp a Buildkite-specific
-key onto the execution span and every descendant. It was removed in favor of
-execution-span-only `execution.externalId` plus standard trace relationships.
-
-Keeping both models would create duplicate correlation contracts and make every
-span carry execution-level metadata.
-
-### Store correlation in execution tags
-
-The earlier span trace key also appeared as an execution tag. A first-class
-`external_id` field makes the contract explicit and avoids exposing internal
-correlation metadata as a user tag.
-
-### Make OTel a hard dependency of the core collector
-
-This would provide simpler setup for OTel users, but would force the dependency
-tree and a higher Ruby requirement onto users who do not enable span export. A
-separate integration package is a better production option if dependencies need
-to be supplied by Buildkite.
 
 ### Build collector-specific transport or batching
 
@@ -165,8 +142,6 @@ The experiment does not answer these production questions:
 
 - **Existing OTel ownership:** how to detect and reuse a customer's provider
   without reconfiguring or shutting it down.
-- **Packaging:** whether to ship a companion gem that supplies compatible SDK,
-  exporter, and instrumentation dependencies.
 - **Instrumentation set:** which integrations should be enabled when the host
   does not already provide instrumentation.
 - **Root isolation:** whether `test.execution` must explicitly ignore an active

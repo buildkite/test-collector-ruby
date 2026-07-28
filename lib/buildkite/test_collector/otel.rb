@@ -2,10 +2,6 @@
 
 module Buildkite::TestCollector
   # Experimental OpenTelemetry span emission.
-  #
-  # OpenTelemetry gems are soft dependencies so missing gems disable span export
-  # without affecting test collection. See docs/opentelemetry-architecture-notes.md
-  # for the PoC's architecture and production tradeoffs.
   module OTel
     EXECUTION_EXTERNAL_ID_ATTRIBUTE = "execution.externalId"
 
@@ -42,9 +38,6 @@ module Buildkite::TestCollector
           "buildkite-test-collector", Buildkite::TestCollector::VERSION
         )
         @enabled = true
-      rescue LoadError => e
-        warn "[buildkite-test_collector] OpenTelemetry span export disabled (missing gem): #{e.message}"
-        @enabled = false
       rescue StandardError => e
         warn "[buildkite-test_collector] OpenTelemetry span export disabled: #{e.class}: #{e.message}"
         @enabled = false

@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## v3.0.0
+
+* Add OpenTelemetry SDK, OTLP exporter, and instrumentation as core dependencies
+* Require Ruby 3.3 or newer
+
+**Full Changelog**: https://github.com/buildkite/test-collector-ruby/compare/v2.14.0...v3.0.0
+
 ## v2.14.0
 
 * Send `location_prefix` in `run_env`

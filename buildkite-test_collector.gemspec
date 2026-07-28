@@ -22,9 +22,12 @@ Gem::Specification.new do |spec|
   end
   spec.require_paths = ["lib"]
 
-  spec.required_ruby_version = Gem::Requirement.new(">= 2.3.0")
+  spec.required_ruby_version = Gem::Requirement.new(">= 3.3.0")
 
   spec.add_dependency "concurrent-ruby"
+  spec.add_dependency "opentelemetry-exporter-otlp"
+  spec.add_dependency "opentelemetry-instrumentation-all"
+  spec.add_dependency "opentelemetry-sdk"
 
   spec.add_development_dependency "activesupport", ">= 4.2"
   spec.add_development_dependency "ostruct"
