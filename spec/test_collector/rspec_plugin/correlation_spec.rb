@@ -40,7 +40,7 @@ RSpec.describe "RSpec execution and OpenTelemetry correlation" do
 
         external_id = "019c8d97-f9ad-75a5-8173-dc6c1b54b901"
         $generated_external_ids = 0
-        Buildkite::TestCollector::UUID.define_singleton_method(:call) do
+        Buildkite::TestCollector::UUID.define_singleton_method(:v7) do
           $generated_external_ids += 1
           external_id
         end

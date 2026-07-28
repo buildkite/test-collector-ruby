@@ -47,7 +47,7 @@ OTLP/HTTP transport. The two delivery paths remain independent.
 ## Correlation contract
 
 When OTel export is enabled, the RSpec hook generates one ID with
-`Buildkite::TestCollector::UUID.call` and passes that same value to both outputs:
+`Buildkite::TestCollector::UUID.v7` and passes that same value to both outputs:
 
 ```text
 execution.external_id == test.execution.attributes["execution.externalId"]
@@ -57,7 +57,8 @@ Only `test.execution` carries `execution.externalId`. Child spans are associated
 with it through standard `trace_id` and `parent_span_id` relationships. The
 collector does not add tenant metadata or ingestion identifiers to spans.
 
-The generated value is currently a UUIDv4. Its UUID version is not part of the
+The generated value is currently a UUIDv7, providing time ordering and storage
+locality for persisted execution IDs. Its UUID version is not part of the
 contract; consumers should treat the external ID as opaque.
 
 ## Architectural decisions we expect to keep
@@ -119,7 +120,6 @@ production implementation.
 | Use the SDK's default batch processor settings | It avoids inventing tuning before measuring representative suites. | A batch may exceed receiver limits, and queue size, timeout, retry, and compression behavior vary by SDK version. |
 | Integrate only with RSpec | It proves the lifecycle and correlation model with one framework. | Minitest and Cucumber do not create execution spans or flush OTel batches. |
 | Flush in `after(:suite)` | It sends the final partial batch after normal RSpec completion. | Crashes, hard exits, and some process lifecycles can still lose buffered spans. |
-| Reuse the existing UUIDv4 helper | It is compatible with the collector's supported Ruby versions and sufficient for equality-based correlation. | It provides no UUIDv7 ordering if that later becomes a requirement. |
 
 ## Rejected or superseded approaches
 

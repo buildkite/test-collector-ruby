@@ -24,8 +24,8 @@ RSpec.configure do |config|
     Thread.current[:_buildkite_tracer] = tracer
     Thread.current[:_buildkite_tags] = tags
 
-    # Use one ID for both independently ingested records so they can be joined.
-    external_id = Buildkite::TestCollector::UUID.call if Buildkite::TestCollector::OTel.enabled?
+    # Use one time-sortable ID for both independently ingested records so they can be joined.
+    external_id = Buildkite::TestCollector::UUID.v7 if Buildkite::TestCollector::OTel.enabled?
 
     # example.run can raise errors (including from other middleware/hooks) so clean up in `ensure`.
     begin
