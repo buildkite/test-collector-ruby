@@ -27,12 +27,6 @@ RSpec.configure do |config|
     # TE-6490 PoC: use one external ID for both the execution upload and its
     # root span so the independently ingested records can be joined.
     external_id = Buildkite::TestCollector::UUID.call if Buildkite::TestCollector::OTel.enabled?
-    if external_id
-      # Keep the existing PoC correlation path working until ingestion and the
-      # execution spans query have moved to external_id.
-      tags["span_trace_key"] = external_id
-      Buildkite::TestCollector::OTel.current_key = external_id
-    end
 
     # example.run can raise errors (including from other middleware/hooks) so clean up in `ensure`.
     begin
@@ -50,7 +44,6 @@ RSpec.configure do |config|
     ensure
       Thread.current[:_buildkite_tracer] = nil
       Thread.current[:_buildkite_tags] = nil
-      Buildkite::TestCollector::OTel.current_key = nil
 
       tracer.finalize
 

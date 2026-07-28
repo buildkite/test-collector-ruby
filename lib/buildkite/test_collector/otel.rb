@@ -30,25 +30,12 @@ module Buildkite::TestCollector
   # every user and raises the Ruby floor to 3.0.
   module OTel
     EXECUTION_EXTERNAL_ID_ATTRIBUTE = "execution.externalId"
-    SPAN_TRACE_KEY_ATTRIBUTE = "buildkite.span_trace_key"
-
-    # Fiber-local slot used by the existing PoC ingestion path to copy the
-    # correlation value onto auto-instrumented descendants.
-    CURRENT_KEY = :_buildkite_span_trace_key
 
     class << self
       attr_reader :tracer
 
       def enabled?
         @enabled == true
-      end
-
-      def current_key
-        Thread.current[CURRENT_KEY]
-      end
-
-      def current_key=(value)
-        Thread.current[CURRENT_KEY] = value
       end
 
       # Set up the global tracer provider. Safe to call more than once (no-op
@@ -73,9 +60,6 @@ module Buildkite::TestCollector
 
         OpenTelemetry::SDK.configure do |c|
           c.service_name = "buildkite-test-collector-ruby"
-          # Compatibility for the existing PoC ClickHouse materialization and
-          # query, which still correlate every span via span_trace_key.
-          c.add_span_processor(SpanTraceKeyProcessor.new)
           c.add_span_processor(
             OpenTelemetry::SDK::Trace::Export::BatchSpanProcessor.new(exporter)
           )
@@ -124,23 +108,6 @@ module Buildkite::TestCollector
         OpenTelemetry.tracer_provider.shutdown
       ensure
         @enabled = false
-      end
-    end
-
-    class SpanTraceKeyProcessor
-      def on_start(span, _parent_context)
-        key = Buildkite::TestCollector::OTel.current_key
-        span.set_attribute(SPAN_TRACE_KEY_ATTRIBUTE, key) if key
-      end
-
-      def on_finish(_span); end
-
-      def force_flush(timeout: nil)
-        OpenTelemetry::SDK::Trace::Export::SUCCESS
-      end
-
-      def shutdown(timeout: nil)
-        OpenTelemetry::SDK::Trace::Export::SUCCESS
       end
     end
   end
