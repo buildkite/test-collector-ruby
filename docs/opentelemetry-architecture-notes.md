@@ -128,7 +128,7 @@ production implementation.
 
 An earlier version used a custom span processor to stamp a Buildkite-specific
 key onto the execution span and every descendant. It was removed in favor of
-root-only `execution.externalId` plus standard trace relationships.
+execution-span-only `execution.externalId` plus standard trace relationships.
 
 Keeping both models would create duplicate correlation contracts and make every
 span carry execution-level metadata.

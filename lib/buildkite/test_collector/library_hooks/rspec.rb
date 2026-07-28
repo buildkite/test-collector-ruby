@@ -24,8 +24,7 @@ RSpec.configure do |config|
     Thread.current[:_buildkite_tracer] = tracer
     Thread.current[:_buildkite_tags] = tags
 
-    # TE-6490 PoC: use one external ID for both the execution upload and its
-    # root span so the independently ingested records can be joined.
+    # Use one ID for both independently ingested records so they can be joined.
     external_id = Buildkite::TestCollector::UUID.call if Buildkite::TestCollector::OTel.enabled?
 
     # example.run can raise errors (including from other middleware/hooks) so clean up in `ensure`.
@@ -71,8 +70,6 @@ RSpec.configure do |config|
     end
   end
 
-  # TE-6490 PoC: flush and shut down the OTel exporter so spans are delivered
-  # before the process exits.
   config.after(:suite) do
     Buildkite::TestCollector::OTel.force_flush
     Buildkite::TestCollector::OTel.shutdown

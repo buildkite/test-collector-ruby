@@ -57,7 +57,6 @@ module Buildkite
       self.tracing_enabled = tracing_enabled
       self.artifact_path = artifact_path
       self.location_prefix = location_prefix || ENV["BUILDKITE_ANALYTICS_LOCATION_PREFIX"]
-      # TE-6490 PoC: OTLP endpoint spans are exported to. When unset, span export is disabled.
       self.otlp_endpoint = otlp_endpoint || ENV["BUILDKITE_ANALYTICS_OTLP_ENDPOINT"]
       self.test_runner = hook.to_s
       self.env = env
@@ -108,7 +107,6 @@ module Buildkite
       Buildkite::TestCollector::Network.configure
       Buildkite::TestCollector::Object.configure
 
-      # TE-6490 PoC: set up OpenTelemetry span export when an OTLP endpoint is configured.
       if otlp_endpoint && !otlp_endpoint.to_s.empty?
         Buildkite::TestCollector::OTel.configure!(endpoint: otlp_endpoint, api_token: api_token)
       end

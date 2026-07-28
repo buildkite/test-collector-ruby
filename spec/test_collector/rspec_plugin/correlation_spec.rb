@@ -3,7 +3,7 @@
 require "open3"
 
 RSpec.describe "RSpec execution and OpenTelemetry correlation" do
-  it "uses one external ID for the upload and root span without copying it to children" do
+  it "uses one external ID for the upload and execution span without copying it to children" do
     Dir.mktmpdir do |directory|
       result_path = File.join(directory, "correlation.json")
       fixture_path = File.join(directory, "correlation_spec.rb")
@@ -95,16 +95,14 @@ RSpec.describe "RSpec execution and OpenTelemetry correlation" do
       expect(result.dig("uploads", 0, "external_id")).to eq("019c8d97-f9ad-75a5-8173-dc6c1b54b901")
 
       expect(result.fetch("spans").length).to eq(2)
-      root_span, child_span = result.fetch("spans")
-      expect(root_span.fetch("name")).to eq("test.execution")
-      expect(root_span.fetch("parent_span_id")).to eq("")
-      expect(root_span.dig("attributes", "execution.externalId")).to eq("019c8d97-f9ad-75a5-8173-dc6c1b54b901")
+      execution_span, child_span = result.fetch("spans")
+      expect(execution_span.fetch("name")).to eq("test.execution")
+      expect(execution_span.dig("attributes", "execution.externalId")).to eq("019c8d97-f9ad-75a5-8173-dc6c1b54b901")
 
       expect(child_span.fetch("name")).to eq("http.request")
-      expect(child_span.fetch("parent_span_id")).to eq(root_span.fetch("span_id"))
-      expect(child_span.fetch("trace_id")).to eq(root_span.fetch("trace_id"))
+      expect(child_span.fetch("parent_span_id")).to eq(execution_span.fetch("span_id"))
+      expect(child_span.fetch("trace_id")).to eq(execution_span.fetch("trace_id"))
       expect(child_span.fetch("attributes")).not_to have_key("execution.externalId")
-      expect(result.to_json).not_to include("buildkite.span_trace_key")
     end
   end
 end

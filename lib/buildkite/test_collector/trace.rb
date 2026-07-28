@@ -3,11 +3,9 @@
 module Buildkite
   module TestCollector
     class Trace
-      attr_accessor :external_id
-
       def as_hash
         strip_invalid_utf8_chars(
-          external_id: external_id,
+          external_id: @external_id,
           scope: scope,
           name: name,
           location: prepend_location_prefix(location),
