@@ -57,6 +57,10 @@ module RSpecExampleTraceHelpers
     allow(fake_trace).to receive(:example=)
     allow(fake_trace).to receive(:failure_reason=)
     allow(fake_trace).to receive(:failure_expanded=)
+    allow(fake_trace).to receive(:otel_span)
+    allow(fake_trace).to receive(:result) { a_example.execution_result.status.to_s }
+    allow(fake_trace).to receive(:tags) { {} }
+    allow(fake_trace).to receive(:otel_attributes) { {} }
     fake_trace
   end
 end

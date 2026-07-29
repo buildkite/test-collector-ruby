@@ -52,6 +52,42 @@ RSpec.describe Buildkite::TestCollector::RSpecPlugin::Trace do
           )
         end
       end
+
+      it "uses the same canonical path for OpenTelemetry" do
+        expect(trace.otel_attributes).to include(
+          "code.file.path" => "./spec/foo_spec.rb",
+          "code.line.number" => 42,
+        )
+      end
+
+      context "when location_prefix is provided for OpenTelemetry" do
+        let(:location_prefix) { "some/prefix" }
+
+        it "uses the prefixed execution path" do
+          expect(trace.otel_attributes.fetch("code.file.path")).to eq("some/prefix/spec/foo_spec.rb")
+        end
+      end
+
+      context "when the example comes from a shared example group" do
+        let(:example) do
+          fake_example(
+            id: "./spec/consumer_spec.rb[1:1]",
+            location: "./spec/support/shared_examples.rb:8",
+            metadata: {
+              shared_group_inclusion_backtrace: [
+                OpenStruct.new(inclusion_location: "./spec/consumer_spec.rb:17"),
+              ],
+            },
+          )
+        end
+
+        it "uses the shared example call site for the path and line" do
+          expect(trace.otel_attributes).to include(
+            "code.file.path" => "./spec/consumer_spec.rb",
+            "code.line.number" => 17,
+          )
+        end
+      end
     end
 
     it 'removes invalid UTF-8 characters from nested values' do

@@ -20,7 +20,19 @@ module Buildkite::TestCollector::RSpecPlugin
         if example.execution_result.status == :failed
           trace.failure_reason, trace.failure_expanded = failure_info(notification)
         end
-        Buildkite::TestCollector.session.add_example_to_send_queue(example.id)
+        begin
+          Buildkite::TestCollector::OTel.finish_test_span(
+            trace.otel_span,
+            result: trace.result,
+            tags: trace.tags,
+            attributes: trace.otel_attributes,
+          )
+        rescue StandardError => e
+          warn "[buildkite-test_collector] Could not prepare OpenTelemetry test span: #{e.class}: #{e.message}"
+          Buildkite::TestCollector::OTel.finish_test_span(trace.otel_span, result: nil)
+        ensure
+          Buildkite::TestCollector.session.add_example_to_send_queue(example.id)
+        end
       end
     end
 

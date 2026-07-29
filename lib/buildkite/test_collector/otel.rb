@@ -7,6 +7,72 @@ module Buildkite::TestCollector
   module OTel
     EXECUTION_EXTERNAL_ID_ATTRIBUTE = "execution.externalId"
     EXECUTION_TAG_ATTRIBUTE_PREFIX = "buildkite.test.execution.tag."
+    BUILDKITE_RESULT_STATUS_ATTRIBUTE = "buildkite.test.case.result.status"
+
+    class ResourceMergingExporter
+      def initialize(exporter, resource)
+        @exporter = exporter
+        @resource = resource
+      end
+
+      def export(span_data, timeout: nil)
+        @exporter.export(
+          span_data.map do |data|
+            data.dup.tap { |copy| copy.resource = data.resource.merge(@resource) }
+          end,
+          timeout: timeout,
+        )
+      end
+
+      def force_flush(timeout: nil)
+        @exporter.force_flush(timeout: timeout)
+      end
+
+      def shutdown(timeout: nil)
+        @exporter.shutdown(timeout: timeout)
+      end
+    end
+    private_constant :ResourceMergingExporter
+
+    class OwnedSpanProcessor
+      def initialize(processor)
+        @processor = processor
+        @active = true
+        @mutex = Mutex.new
+      end
+
+      def on_start(span, parent_context)
+        @mutex.synchronize { @processor.on_start(span, parent_context) if @active }
+      end
+
+      def on_finish(span)
+        @mutex.synchronize { @processor.on_finish(span) if @active }
+      end
+
+      def force_flush(timeout: nil)
+        @mutex.synchronize do
+          return success unless @active
+
+          @processor.force_flush(timeout: timeout)
+        end
+      end
+
+      def shutdown(timeout: nil)
+        @mutex.synchronize do
+          return success unless @active
+
+          @active = false
+          @processor.shutdown(timeout: timeout)
+        end
+      end
+
+      private
+
+      def success
+        OpenTelemetry::SDK::Trace::Export::SUCCESS
+      end
+    end
+    private_constant :OwnedSpanProcessor
 
     class << self
       def enabled?
@@ -23,72 +89,111 @@ module Buildkite::TestCollector
         headers = {}
         headers["Authorization"] = "Token token=\"#{api_token}\"" if api_token
 
-        exporter = OpenTelemetry::Exporter::OTLP::Exporter.new(
-          endpoint: endpoint,
-          headers: headers,
+        resource = OpenTelemetry::SDK::Resources::Resource.create(
+          resource_attributes(run_env)
+        )
+        exporter = ResourceMergingExporter.new(
+          OpenTelemetry::Exporter::OTLP::Exporter.new(
+            endpoint: endpoint,
+            headers: headers,
+          ),
+          resource,
+        )
+        @processor = OwnedSpanProcessor.new(
+          OpenTelemetry::SDK::Trace::Export::BatchSpanProcessor.new(exporter)
         )
 
-        OpenTelemetry::SDK.configure do |c|
-          c.resource = OpenTelemetry::SDK::Resources::Resource.create(
-            resource_attributes(run_env)
-          )
-          c.add_span_processor(
-            OpenTelemetry::SDK::Trace::Export::BatchSpanProcessor.new(exporter)
-          )
+        provider = OpenTelemetry.tracer_provider
+        if provider.respond_to?(:add_span_processor)
+          provider.add_span_processor(@processor)
           # PoC shortcut: capture every available instrumentation.
-          c.use_all
+          OpenTelemetry::Instrumentation.registry.install_all
+        elsif provider.is_a?(OpenTelemetry::Internal::ProxyTracerProvider)
+          OpenTelemetry::SDK.configure do |c|
+            c.resource = resource
+            c.add_span_processor(@processor)
+            # PoC shortcut: capture every available instrumentation.
+            c.use_all
+          end
+          provider = OpenTelemetry.tracer_provider
+        else
+          raise "existing OpenTelemetry tracer provider does not support adding a span processor"
         end
 
-        @tracer = OpenTelemetry.tracer_provider.tracer(
+        @tracer = provider.tracer(
           "buildkite-test-collector", Buildkite::TestCollector::VERSION
         )
         @enabled = true
       rescue StandardError => e
         warn "[buildkite-test_collector] OpenTelemetry span export disabled: #{e.class}: #{e.message}"
+        @processor&.shutdown
+        @processor = nil
+        @tracer = nil
         @enabled = false
       end
 
-      def in_test_span(name:, external_id: nil, attributes: {})
-        return yield unless enabled?
+      def start_test_span(name:, external_id: nil)
+        return unless enabled?
 
-        span_attributes = { EXECUTION_EXTERNAL_ID_ATTRIBUTE => external_id }
-          .merge(attributes)
-          .select { |_, value| !value.nil? }
-        OpenTelemetry::Context.with_current(OpenTelemetry::Context.empty) do
-          @tracer.in_span(name, attributes: span_attributes, kind: :internal) do |span|
-            yield span
-          end
-        end
+        @tracer.start_span(
+          name,
+          with_parent: OpenTelemetry::Context.empty,
+          attributes: { EXECUTION_EXTERNAL_ID_ATTRIBUTE => external_id }.compact,
+          kind: :internal,
+        )
       end
 
-      def record_test_result(span, result:, tags: {})
+      def with_test_span(span)
+        return yield unless span
+
+        OpenTelemetry::Trace.with_span(span) { yield }
+      end
+
+      def finish_test_span(span, result:, tags: {}, attributes: {})
         return unless span
 
-        status = case result
-        when "passed" then "pass"
-        when "failed" then "fail"
-        when "skipped" then "skipped"
-        end
+        begin
+          attributes.each do |key, value|
+            span.set_attribute(key, value) unless value.nil?
+          end
 
-        span.set_attribute("test.case.result.status", status) if status
-        tags.each do |key, value|
-          span.set_attribute("#{EXECUTION_TAG_ATTRIBUTE_PREFIX}#{key}", value)
+          case result
+          when "passed"
+            span.set_attribute("test.case.result.status", "pass")
+          when "failed"
+            span.set_attribute("test.case.result.status", "fail")
+          when "skipped"
+            span.set_attribute(BUILDKITE_RESULT_STATUS_ATTRIBUTE, "skipped")
+          end
+          tags.each do |key, value|
+            span.set_attribute("#{EXECUTION_TAG_ATTRIBUTE_PREFIX}#{key}", value)
+          end
+          span.status = OpenTelemetry::Trace::Status.error if result == "failed"
+        rescue StandardError => e
+          warn "[buildkite-test_collector] Could not finalize OpenTelemetry test span: #{e.class}: #{e.message}"
+        ensure
+          begin
+            span.finish
+          rescue StandardError => e
+            warn "[buildkite-test_collector] Could not finish OpenTelemetry test span: #{e.class}: #{e.message}"
+          end
         end
-        span.status = OpenTelemetry::Trace::Status.error if result == "failed"
       end
 
       def force_flush
         return unless enabled?
 
-        OpenTelemetry.tracer_provider.force_flush
+        @processor.force_flush
       end
 
       def shutdown
         return unless enabled?
 
-        OpenTelemetry.tracer_provider.shutdown
+        @processor.shutdown
       ensure
         @enabled = false
+        @processor = nil
+        @tracer = nil
       end
 
       private
@@ -97,10 +202,10 @@ module Buildkite::TestCollector
         attributes = {
           "buildkite.test.run.id" => run_env["key"],
           "cicd.pipeline.run.id" => pipeline_run_id,
-          "cicd.pipeline.run.url.full" => valid_http_url(run_env["url"]),
+          "cicd.pipeline.run.url.full" => pipeline_run_url(run_env),
           "cicd.pipeline.name" => pipeline_name,
           "vcs.ref.head.revision" => run_env["commit_sha"],
-          "vcs.ref.head.name" => run_env["branch"],
+          "vcs.ref.head.name" => vcs_ref_name(run_env),
           "vcs.ref.type" => vcs_ref_type(run_env),
         }
         attributes.select { |_, value| value && !value.to_s.empty? }
@@ -116,6 +221,18 @@ module Buildkite::TestCollector
       def pipeline_name
         return ENV["BUILDKITE_PIPELINE_SLUG"] if ENV["BUILDKITE_BUILD_ID"]
         return ENV["GITHUB_WORKFLOW"] if ENV["GITHUB_RUN_ID"]
+      end
+
+      def pipeline_run_url(run_env)
+        return if run_env["CI"] == "codeship" && !ENV["BUILDKITE_ANALYTICS_URL"]
+
+        valid_http_url(run_env["url"])
+      end
+
+      def vcs_ref_name(run_env)
+        return ENV["BUILDKITE_TAG"] if ENV["BUILDKITE_TAG"] && !ENV["BUILDKITE_TAG"].empty?
+
+        run_env["branch"]
       end
 
       def vcs_ref_type(run_env)

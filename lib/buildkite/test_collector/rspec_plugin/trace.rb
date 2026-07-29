@@ -6,10 +6,11 @@ module Buildkite::TestCollector::RSpecPlugin
     attr_reader :history
     attr_reader :tags
     attr_reader :location_prefix
+    attr_reader :otel_span
 
     FILE_PATH_REGEX = /^(.*?\.(rb|feature))/
 
-    def initialize(example, history:, failure_reason: nil, failure_expanded: [], tags: nil, location_prefix: nil, external_id: nil)
+    def initialize(example, history:, failure_reason: nil, failure_expanded: [], tags: nil, location_prefix: nil, external_id: nil, otel_span: nil)
       @example = example
       @history = history
       @failure_reason = failure_reason
@@ -17,6 +18,7 @@ module Buildkite::TestCollector::RSpecPlugin
       @tags = tags
       @location_prefix = location_prefix
       @external_id = external_id
+      @otel_span = otel_span
     end
 
     def result
@@ -27,7 +29,24 @@ module Buildkite::TestCollector::RSpecPlugin
       end
     end
 
+    def otel_attributes
+      {
+        "test.case.name" => example.full_description,
+        "test.suite.name" => example.example_group.metadata[:full_description],
+        "code.file.path" => serialized_file_name,
+        "code.line.number" => source_line_number,
+        "buildkite.test.case.id" => example.id,
+        "buildkite.test.runner.name" => "rspec",
+        "buildkite.test.runner.version" => RSpec::Core::Version::STRING,
+      }
+    end
+
     private
+
+    def source_line_number
+      source = shared_example? ? shared_example_call_location : example.location
+      source[/:(\d+)\z/, 1]&.to_i
+    end
 
     def scope
       example.example_group.metadata[:full_description]
