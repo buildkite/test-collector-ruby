@@ -217,7 +217,7 @@ naturally apply to the execution span and every descendant.
 | `vcs.ref.head.name` | Collector | Emit the branch or tag name when available. |
 | `vcs.ref.type` | Collector | Emit only when branch versus tag is reliably known. |
 
-The collector currently configures:
+The collector previously configured:
 
 ```ruby
 c.service_name = "buildkite-test-collector-ruby"
@@ -228,10 +228,12 @@ spans emitted by the tested process. Semantically, the tested application is the
 service and the collector is instrumentation. Collector identity is already
 represented by `scope_name` and `scope_version`.
 
-The forced service name should therefore be removed or revisited. A customer's
-`OTEL_SERVICE_NAME` should be preserved when present; otherwise the SDK default
-is acceptable because trusted organization and suite identity come from the
-authenticated ingestion boundary.
+The forced service name has been removed. The collector attaches its processor
+to an existing Ruby SDK tracer provider when present and shuts down only its own
+processor. Buildkite run attributes are merged into the Buildkite export path,
+so the customer's provider, resource, processors, and `service.name` remain
+authoritative and their exporter does not receive Buildkite-only resource
+metadata.
 
 ### Root `test.execution` attributes
 
@@ -246,8 +248,9 @@ standard names should be used now instead of maintaining both indefinitely.
 | `execution.externalId` | string | Existing opaque correlation ID; parentless execution root only. |
 | `test.case.name` | string | Fully qualified human-readable example name. |
 | `test.suite.name` | string | RSpec example-group description when meaningful. |
-| `test.case.result.status` | string | `pass`, `fail`, or a documented custom `skipped` value. |
-| `code.file.path` | string | Normalized repository-relative source path. |
+| `test.case.result.status` | string | Standard `pass` or `fail` value. |
+| `buildkite.test.case.result.status` | string | `skipped` when no standard test-case result value exists. |
+| `code.file.path` | string | The collector's canonical repository-relative execution path, including `location_prefix` and shared-example call-site handling. |
 | `code.line.number` | integer | Source line when reliably available. |
 | `buildkite.test.case.id` | string | RSpec example ID; there is no standard test case ID attribute. |
 | `buildkite.test.runner.name` | string | `rspec`. |
@@ -277,12 +280,13 @@ The root span should be updated after the example finishes:
 | --- | --- | --- |
 | Passed | `pass` | `UNSET` |
 | Failed | `fail` | `ERROR` |
-| Skipped/pending | `skipped` | `UNSET` |
+| Skipped/pending | omitted; `buildkite.test.case.result.status=skipped` | `UNSET` |
 | Wrapper or hook exception before a reliable result | omitted | `ERROR` |
 
-The current OTel wrapper passes attributes before `example.run` and discards the
-span yielded by `in_span`. It must expose that span, or accept an end-of-test
-callback, to set final result and status.
+The execution span remains active around `example.run`, then the RSpec formatter
+adds metadata and ends it after RSpec has finalized the result. This prevents a
+later outer-hook failure from leaving the span marked as passed while the JSON
+execution is marked as failed.
 
 Failure reason, expanded failure output, and stack traces should not be copied
 into span attributes. They already exist on the execution and can contain large
@@ -599,11 +603,10 @@ even when their names follow standard conventions.
 2. Add an ambient-context regression test.
 3. Add cross-repository fixture tests proving root-only external ID promotion,
    child relationships, resource/scope storage, and execution correlation.
-4. Remove or revisit the forced collector `service.name`.
+4. Preserve an existing tracer provider and customer `service.name`.
 
-Provider coexistence, `use_all`, sanitization, and tighter per-attribute limits
-remain production follow-ups rather than blockers for this PoC's attribute
-defaults.
+`use_all`, sanitization, and tighter per-attribute limits remain production
+follow-ups rather than blockers for this PoC's attribute defaults.
 
 ### Phase 1: high-value test context
 
