@@ -8,6 +8,7 @@ module Buildkite::TestCollector
     EXECUTION_EXTERNAL_ID_ATTRIBUTE = "execution.externalId"
     EXECUTION_TAG_ATTRIBUTE_PREFIX = "buildkite.test.execution.tag."
     BUILDKITE_RESULT_STATUS_ATTRIBUTE = "buildkite.test.case.result.status"
+    PROCESSOR_TIMEOUT = 5
 
     class ResourceMergingExporter
       def initialize(exporter, resource)
@@ -126,7 +127,7 @@ module Buildkite::TestCollector
         @enabled = true
       rescue StandardError => e
         warn "[buildkite-test_collector] OpenTelemetry span export disabled: #{e.class}: #{e.message}"
-        @processor&.shutdown
+        shutdown_processor(@processor)
         @processor = nil
         @tracer = nil
         @enabled = false
@@ -183,13 +184,15 @@ module Buildkite::TestCollector
       def force_flush
         return unless enabled?
 
-        @processor.force_flush
+        @processor.force_flush(timeout: PROCESSOR_TIMEOUT)
+      rescue StandardError => e
+        warn "[buildkite-test_collector] Could not flush OpenTelemetry spans: #{e.class}: #{e.message}"
       end
 
       def shutdown
         return unless enabled?
 
-        @processor.shutdown
+        shutdown_processor(@processor)
       ensure
         @enabled = false
         @processor = nil
@@ -197,6 +200,12 @@ module Buildkite::TestCollector
       end
 
       private
+
+      def shutdown_processor(processor)
+        processor&.shutdown(timeout: PROCESSOR_TIMEOUT)
+      rescue StandardError => e
+        warn "[buildkite-test_collector] Could not shut down OpenTelemetry span export: #{e.class}: #{e.message}"
+      end
 
       def resource_attributes(run_env)
         attributes = {

@@ -142,6 +142,65 @@ RSpec.describe "RSpec execution and OpenTelemetry correlation" do
     end
   end
 
+  it "runs and uploads the example when starting its OpenTelemetry span fails" do
+    Dir.mktmpdir do |directory|
+      result_path = File.join(directory, "start-failure.json")
+      fixture_path = File.join(directory, "start_failure_spec.rb")
+      lib_path = File.expand_path("../../../lib", __dir__)
+
+      File.write(fixture_path, <<~RUBY)
+        require "json"
+        require "buildkite/test_collector"
+
+        Buildkite::TestCollector.configure(hook: :rspec, tracing_enabled: false)
+
+        raising_tracer = Object.new
+        raising_tracer.define_singleton_method(:start_span) do |**_options|
+          raise "customer processor failed"
+        end
+        Buildkite::TestCollector::OTel.instance_variable_set(:@enabled, true)
+        Buildkite::TestCollector::OTel.instance_variable_set(:@tracer, raising_tracer)
+        Buildkite::TestCollector::OTel.define_singleton_method(:force_flush) { nil }
+        Buildkite::TestCollector::OTel.define_singleton_method(:shutdown) do
+          instance_variable_set(:@enabled, false)
+        end
+
+        at_exit do
+          File.write(
+            ENV.fetch("START_FAILURE_RESULT_PATH"),
+            JSON.generate(body_ran: $body_ran, uploads: $uploads),
+          )
+        end
+
+        Buildkite::TestCollector::Uploader.define_singleton_method(:upload) do |traces|
+          $uploads = traces.map(&:as_hash)
+          nil
+        end
+
+        RSpec.describe "start failure" do
+          it "still runs" do
+            $body_ran = true
+          end
+        end
+      RUBY
+
+      rspec_path = Gem.bin_path("rspec-core", "rspec")
+      _stdout, stderr, status = Open3.capture3(
+        { "START_FAILURE_RESULT_PATH" => result_path },
+        RbConfig.ruby,
+        "-I#{lib_path}",
+        rspec_path,
+        fixture_path,
+      )
+
+      expect(status).to be_success, stderr
+      result = JSON.parse(File.read(result_path))
+      expect(result.fetch("body_ran")).to be(true)
+      expect(result.fetch("uploads").length).to eq(1)
+      expect(result.dig("uploads", 0)).not_to have_key("external_id")
+    end
+  end
+
   it "starts the execution as a root when another span is active" do
     exporter = OpenTelemetry::SDK::Trace::Export::InMemorySpanExporter.new
     processor = OpenTelemetry::SDK::Trace::Export::SimpleSpanProcessor.new(exporter)
@@ -378,6 +437,21 @@ RSpec.describe "RSpec execution and OpenTelemetry correlation" do
     expect(skipped_span.attributes).not_to have_key("test.case.result.status")
     expect(skipped_span.status).to be_nil
     expect(skipped_span.finished).to be(true)
+  end
+
+  it "does not raise when flushing or shutting down its processor fails" do
+    processor = double("OpenTelemetry processor")
+    allow(processor).to receive(:force_flush).and_raise("flush failed")
+    allow(processor).to receive(:shutdown).and_raise("shutdown failed")
+    Buildkite::TestCollector::OTel.instance_variable_set(:@enabled, true)
+    Buildkite::TestCollector::OTel.instance_variable_set(:@processor, processor)
+
+    expect { Buildkite::TestCollector::OTel.force_flush }.not_to raise_error
+    expect { Buildkite::TestCollector::OTel.shutdown }.not_to raise_error
+    expect(Buildkite::TestCollector::OTel).not_to be_enabled
+  ensure
+    Buildkite::TestCollector::OTel.instance_variable_set(:@enabled, false)
+    Buildkite::TestCollector::OTel.instance_variable_set(:@processor, nil)
   end
 
   it "builds run and VCS resource attributes" do

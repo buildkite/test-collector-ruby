@@ -24,12 +24,21 @@ RSpec.configure do |config|
     Thread.current[:_buildkite_tracer] = tracer
     Thread.current[:_buildkite_tags] = tags
 
-    # Use one time-sortable ID for both independently ingested records so they can be joined.
-    external_id = Buildkite::TestCollector::UUID.v7 if Buildkite::TestCollector::OTel.enabled?
-    otel_span = Buildkite::TestCollector::OTel.start_test_span(
-      name: "test.execution",
-      external_id: external_id,
-    )
+    external_id = nil
+    otel_span = nil
+    if Buildkite::TestCollector::OTel.enabled?
+      begin
+        # Use one time-sortable ID for both independently ingested records so they can be joined.
+        candidate_external_id = Buildkite::TestCollector::UUID.v7
+        otel_span = Buildkite::TestCollector::OTel.start_test_span(
+          name: "test.execution",
+          external_id: candidate_external_id,
+        )
+        external_id = candidate_external_id if otel_span
+      rescue StandardError => e
+        warn "[buildkite-test_collector] Could not start OpenTelemetry test span: #{e.class}: #{e.message}"
+      end
+    end
 
     # example.run can raise errors (including from other middleware/hooks) so clean up in `ensure`.
     begin
