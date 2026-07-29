@@ -45,6 +45,7 @@ module Buildkite
       attr_accessor :trace_min_duration
       attr_accessor :span_filters
       attr_accessor :otlp_endpoint
+      attr_accessor :run_env
     end
 
     def self.configure(hook:, token: nil, url: nil, tracing_enabled: true, artifact_path: nil, location_prefix: nil, env: {}, tags: {}, otlp_endpoint: nil)
@@ -61,6 +62,7 @@ module Buildkite
       self.test_runner = hook.to_s
       self.env = env
       self.tags = tags
+      self.run_env = nil
       self.batch_size = ENV.fetch("BUILDKITE_ANALYTICS_UPLOAD_BATCH_SIZE") { DEFAULT_UPLOAD_BATCH_SIZE }.to_i
 
       trace_min_ms_string = ENV["BUILDKITE_ANALYTICS_TRACE_MIN_MS"]
@@ -108,7 +110,12 @@ module Buildkite
       Buildkite::TestCollector::Object.configure
 
       if otlp_endpoint && !otlp_endpoint.to_s.empty?
-        Buildkite::TestCollector::OTel.configure!(endpoint: otlp_endpoint, api_token: api_token)
+        self.run_env = Buildkite::TestCollector::CI.env
+        Buildkite::TestCollector::OTel.configure!(
+          endpoint: otlp_endpoint,
+          api_token: api_token,
+          run_env: run_env,
+        )
       end
 
       return unless defined?(ActiveSupport)

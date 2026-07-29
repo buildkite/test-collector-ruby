@@ -52,7 +52,7 @@ module Buildkite::TestCollector
           upload_attempts ||= 0
           http.post_upload(
             data: data,
-            run_env: Buildkite::TestCollector::CI.env,
+            run_env: Buildkite::TestCollector.run_env || Buildkite::TestCollector::CI.env,
             tags: Buildkite::TestCollector.tags,
           )
 

@@ -26,6 +26,7 @@ RSpec.configure do |config|
 
     # Use one time-sortable ID for both independently ingested records so they can be joined.
     external_id = Buildkite::TestCollector::UUID.v7 if Buildkite::TestCollector::OTel.enabled?
+    file_path = example.metadata[:file_path]&.sub(%r{\A\./}, "")
 
     # example.run can raise errors (including from other middleware/hooks) so clean up in `ensure`.
     begin
@@ -33,12 +34,32 @@ RSpec.configure do |config|
         name: "test.execution",
         external_id: external_id,
         attributes: {
-          "test.name" => example.full_description,
-          "test.id" => example.id,
-          "test.file" => example.metadata[:file_path],
+          "test.case.name" => example.full_description,
+          "test.suite.name" => example.example_group.metadata[:full_description],
+          "code.file.path" => file_path,
+          "code.line.number" => example.metadata[:line_number],
+          "buildkite.test.case.id" => example.id,
+          "buildkite.test.runner.name" => "rspec",
+          "buildkite.test.runner.version" => RSpec::Core::Version::STRING,
         }
-      ) do
-        example.run
+      ) do |span|
+        begin
+          example.run
+        ensure
+          execution_result = example.execution_result
+          result = if execution_result.pending_message && !execution_result.pending_fixed?
+            "skipped"
+          elsif execution_result.exception
+            "failed"
+          else
+            "passed"
+          end
+          Buildkite::TestCollector::OTel.record_test_result(
+            span,
+            result: result,
+            tags: tags,
+          )
+        end
       end
     ensure
       Thread.current[:_buildkite_tracer] = nil
