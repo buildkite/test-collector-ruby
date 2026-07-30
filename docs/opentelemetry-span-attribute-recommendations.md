@@ -151,12 +151,16 @@ which attributes produce useful test intelligence before permanently discarding
 them. It also avoids a Buildkite-specific schema that prematurely diverges from
 the Ruby OTel ecosystem.
 
-This is not permission to export known-sensitive values unchanged. Apply narrow,
-mandatory sanitization where the value commonly contains secrets, personal data,
-or local filesystem identity. Sanitization affects only the Buildkite export copy;
-a customer's other exporters continue to receive their original telemetry.
-The stored Buildkite span is therefore a privacy-normalized projection of the
-upstream OTel span, not a byte-for-byte archival copy.
+Rely on each Ruby OTel instrumentation's default sensitive-data handling instead
+of reimplementing its statement or command parser in the collector. The bundled
+PG, MySQL, Redis, and MongoDB instrumentations default to obfuscating their query
+or command attributes. If a customer explicitly configures an instrumentation to
+include raw values, preserve that upstream choice rather than silently applying a
+second Buildkite-specific interpretation.
+
+The one collector-owned exception is `process.command`: the Ruby SDK supplies an
+absolute executable path, so the Buildkite export copy reduces it to a basename.
+A customer's other exporters continue to receive their original resource.
 
 The initial behavior is:
 
@@ -164,43 +168,31 @@ The initial behavior is:
 | --- | --- |
 | HTTP and network semantic attributes | Preserve the attributes emitted by Ruby OTel, including method, status, destination, URL components, and connection details. |
 | Database identity and operation attributes | Preserve attributes such as `db.system`, `db.operation`, database identity, and connection details. |
-| SQL/CQL query text | Preserve query shape only after mandatory literal normalization. |
-| Unsupported database query formats | Omit query text until a system-specific sanitizer is available; preserve the remaining operation attributes. |
+| Database query or command text | Preserve the value emitted by the instrumentation, including its default system-specific obfuscation. |
 | `db.query.summary` | Preserve when supplied; it is a useful lower-cardinality grouping key. |
 | `error.type` and protocol/database status attributes | Preserve for failure classification and test diagnosis. |
 | Attributes from other installed instrumentations | Preserve initially, then review using observed sensitivity, utility, cardinality, and storage cost. |
 
-### Database query normalization
+### Database query handling
 
 The installed Ruby instrumentation currently emits the experimental database
 names `db.system`, `db.operation`, and `db.statement`. Keep those names rather
-than rewriting customer telemetry. During the OTel semantic-convention migration,
-also recognize the stable `db.system.name` and `db.query.text` attributes when
-they are present.
+than rewriting customer telemetry. Newer instrumentation may instead emit stable
+names such as `db.system.name`, `db.operation.name`, and `db.query.text`; preserve
+those as emitted as well.
 
-Normalize both `db.statement` and `db.query.text` in the Buildkite export copy,
-even if upstream instrumentation is configured to include raw SQL. String,
-numeric, boolean, UUID, and comment values are replaced with `?` using the
-OpenTelemetry SQL processor and the dialect selected from `db.system` or
-`db.system.name`. For example:
+With its default obfuscation, SQL instrumentation replaces literal values with
+placeholders while retaining query shape. For example:
 
 ```text
 SELECT * FROM users WHERE email = 'person@example.com' AND id = 42
 SELECT * FROM users WHERE email = ? AND id = ?
 ```
 
-Statements that exceed the processor's safety limit produce only its safe
-placeholder message. If normalization fails, omit that query attribute rather
-than exporting the original value. `db.query.summary`, `db.operation`,
-`db.operation.name`, and `error.type` do not contain query literals and pass
-through unchanged when supplied.
-
-`db.statement` and `db.query.text` are generic database attributes and may also
-contain Redis commands, MongoDB documents, or other non-SQL formats. Do not pass
-those values through the SQL processor and assume they are safe. Omit query text
-for an unrecognized database system until a system-specific sanitizer is
-implemented; retain its system, operation, duration, status, and other semantic
-attributes.
+Redis, MongoDB, and other systems use their own serializers and obfuscators. Do
+not run their output through a generic SQL parser. Keeping sanitization in the
+instrumentation preserves its database-specific behavior and keeps the collector
+compatible as Ruby OTel conventions evolve.
 
 ### Suggested evolution after the initial release
 
@@ -210,9 +202,9 @@ policy in reviewable stages:
 
 | Level | Intended use | Attribute policy |
 | --- | --- | --- |
-| **Initial: broad and normalized** | Maximize learning and test intelligence in the first release. | Preserve upstream Ruby OTel semantic attributes. Always normalize known-sensitive values such as SQL literals and absolute process command paths. |
+| **Initial: broad with OTel defaults** | Maximize learning and test intelligence in the first release. | Preserve upstream Ruby OTel semantic attributes and their instrumentation-specific default sanitization. Normalize only the collector-owned `process.command` path. |
 | **Curated** | Future storage-efficient default based on evidence. | Keep attributes used by Test Engine features and investigations; canonicalize or remove fields proven redundant, low-value, or disproportionately high-cardinality. |
-| **Extended/debug** | Explicit troubleshooting when normal instrumentation omits needed detail. | Allow reviewed opt-in attributes on a per-integration basis. Mandatory secret and personal-data sanitization still applies; this level does not provide a bypass. |
+| **Extended/debug** | Explicit troubleshooting when normal instrumentation omits needed detail. | Use the upstream instrumentation's per-integration options and clearly warn when a customer elects to include raw or sensitive values. |
 
 Likely candidates for later redundancy review include legacy/stable semantic
 convention duplicates, default ports, overlapping `server.*` and `net.peer.*`
@@ -269,9 +261,9 @@ integrations and their versions.
 ## Collection boundaries
 
 The current PoC deliberately uses `use_all` to maximize instrumentation coverage
-and preserves the emitted semantic attributes. The exporter enforces
-basename-only `process.command` and normalizes both experimental `db.statement`
-and stable `db.query.text` query attributes.
+and preserves the emitted semantic attributes and upstream sanitization choices.
+The only collector-owned attribute transformation is basename-only
+`process.command` on the Buildkite export copy.
 
 Broad attributes do not require broad trace ownership. Before enabling collection
 by default, export only `test.execution` spans and their descendants. Unrelated

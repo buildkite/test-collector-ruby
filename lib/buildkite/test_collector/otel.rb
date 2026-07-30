@@ -1,6 +1,5 @@
 # frozen_string_literal: true
 
-require "opentelemetry-helpers-sql-processor"
 require "uri"
 
 module Buildkite::TestCollector
@@ -20,10 +19,7 @@ module Buildkite::TestCollector
       def export(span_data, timeout: nil)
         @exporter.export(
           span_data.map do |data|
-            data.dup.tap do |copy|
-              copy.attributes = export_attributes(data.attributes)
-              copy.resource = export_resource(data.resource)
-            end
+            data.dup.tap { |copy| copy.resource = export_resource(data.resource) }
           end,
           timeout: timeout,
         )
@@ -44,47 +40,6 @@ module Buildkite::TestCollector
         command = attributes["process.command"]
         attributes["process.command"] = File.basename(command) if command.is_a?(String)
         OpenTelemetry::SDK::Resources::Resource.create(attributes)
-      end
-
-      def export_attributes(attributes)
-        statement_keys = ["db.statement", "db.query.text"].select do |key|
-          attributes[key].is_a?(String)
-        end
-        return attributes if statement_keys.empty?
-
-        attributes = attributes.dup
-        db_system = attributes["db.system"] || attributes["db.system.name"]
-        statement_keys.each do |key|
-          normalized = normalize_sql(attributes[key], db_system)
-          if normalized
-            attributes[key] = normalized
-          else
-            attributes.delete(key)
-          end
-        end
-        attributes.freeze
-      end
-
-      def normalize_sql(statement, db_system)
-        adapter = sql_adapter(db_system)
-        return unless adapter
-
-        OpenTelemetry::Helpers::SqlProcessor.obfuscate_sql(
-          statement,
-          adapter: adapter,
-        )
-      rescue StandardError
-        nil
-      end
-
-      def sql_adapter(db_system)
-        case db_system
-        when "postgresql" then :postgres
-        when "mysql", "mariadb" then :mysql
-        when "oracle.db" then :oracle
-        when "sqlite", "oracle", "cassandra" then db_system.to_sym
-        when "cockroachdb", "microsoft.sql_server", "other_sql" then :default
-        end
       end
     end
     private_constant :ResourceMergingExporter

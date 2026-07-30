@@ -116,18 +116,19 @@ production implementation.
 | Shortcut | Why it is acceptable for the PoC | Why it should be revisited |
 | --- | --- | --- |
 | Configure the global tracer provider | It is the shortest path to a working exporter and active context. | It can interfere with a customer's existing provider, and shutdown can affect telemetry the collector does not own. |
-| Call `use_all` | It quickly demonstrates HTTP, SQL, Redis, and other child spans. The Buildkite export copy normalizes `process.command` and recognized SQL/CQL query attributes. | It still monkeypatches broadly, can duplicate customer instrumentation, and requires explicit sanitizers before retaining sensitive query formats from additional database systems. |
+| Call `use_all` | It quickly demonstrates HTTP, SQL, Redis, and other child spans while retaining each Ruby instrumentation's default sanitization. | It still monkeypatches broadly, can duplicate customer instrumentation, and installs more integrations than the collector needs. |
 | Use the SDK's default batch processor settings | It avoids inventing tuning before measuring representative suites. | A batch may exceed receiver limits, and queue size, timeout, retry, and compression behavior vary by SDK version. |
 | Integrate only with RSpec | It proves the lifecycle and correlation model with one framework. | Minitest and Cucumber do not create execution spans or flush OTel batches. |
 | Flush in `after(:suite)` | It sends the final partial batch after normal RSpec completion. | Crashes, hard exits, and some process lifecycles can still lose buffered spans. |
 
-The initial attribute policy is broad but normalized: preserve the semantic
-attributes emitted by Ruby OTel to maximize learning, while mandatorily
-sanitizing known-sensitive values such as SQL literals and absolute command
-paths. A future curated level should remove redundant or low-value attributes
-only after measuring utility, cardinality, and storage cost. An extended/debug
-level may add reviewed opt-in detail but must not bypass sensitive-data
-sanitization. These future levels are recommendations rather than implemented
+The initial attribute policy is broad and follows Ruby OTel defaults: preserve
+the semantic attributes and database-specific sanitization emitted by each
+instrumentation to maximize learning. The sole collector-owned transformation is
+reducing `process.command` to its basename in the Buildkite export copy. A future
+curated level should remove redundant or low-value attributes only after measuring
+utility, cardinality, and storage cost. Extended/debug behavior should use
+upstream per-integration options and warn when customers elect to include raw
+values. These future levels are recommendations rather than implemented
 configuration options in the PoC; see
 `docs/opentelemetry-span-attribute-recommendations.md`.
 
