@@ -34,7 +34,7 @@ RSpec.configure do |config|
           name: "test.execution",
           external_id: candidate_external_id,
         )
-        external_id = candidate_external_id if otel_span
+        external_id = candidate_external_id if Buildkite::TestCollector::OTel.sampled?(otel_span)
       rescue StandardError => e
         warn "[buildkite-test_collector] Could not start OpenTelemetry test span: #{e.class}: #{e.message}"
       end

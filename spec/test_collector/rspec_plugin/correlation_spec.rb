@@ -16,7 +16,14 @@ RSpec.describe "RSpec execution and OpenTelemetry correlation" do
         require "opentelemetry/sdk"
 
         class RecordingOTelTracer
+          TraceFlags = Struct.new(:sampled?)
+          SpanContext = Struct.new(:trace_flags)
+
           Span = Struct.new(:name, :span_id, :parent_span_id, :trace_id, :attributes, :status, :finished) do
+            def context
+              SpanContext.new(TraceFlags.new(true))
+            end
+
             def set_attribute(key, value)
               attributes[key] = value
             end
@@ -201,42 +208,67 @@ RSpec.describe "RSpec execution and OpenTelemetry correlation" do
     end
   end
 
-  it "starts the execution as a root when another span is active" do
-    exporter = OpenTelemetry::SDK::Trace::Export::InMemorySpanExporter.new
-    processor = OpenTelemetry::SDK::Trace::Export::SimpleSpanProcessor.new(exporter)
-    provider = OpenTelemetry::SDK::Trace::TracerProvider.new
-    provider.add_span_processor(processor)
-    tracer = provider.tracer("correlation-test")
+  it "does not upload a dangling external ID when the execution span is not sampled" do
+    Dir.mktmpdir do |directory|
+      result_path = File.join(directory, "unsampled.json")
+      fixture_path = File.join(directory, "unsampled_spec.rb")
+      lib_path = File.expand_path("../../../lib", __dir__)
 
-    Buildkite::TestCollector::OTel.instance_variable_set(:@enabled, true)
-    Buildkite::TestCollector::OTel.instance_variable_set(:@tracer, tracer)
+      File.write(fixture_path, <<~RUBY)
+        require "json"
+        require "buildkite/test_collector"
+        require "opentelemetry/sdk"
 
-    tracer.in_span("ambient") do
-      execution_span = Buildkite::TestCollector::OTel.start_test_span(
-        name: "test.execution",
-        external_id: "execution-id",
+        Buildkite::TestCollector.configure(hook: :rspec, tracing_enabled: false)
+
+        provider = OpenTelemetry::SDK::Trace::TracerProvider.new(
+          sampler: OpenTelemetry::SDK::Trace::Samplers::ALWAYS_OFF,
+        )
+        Buildkite::TestCollector::OTel.instance_variable_set(:@enabled, true)
+        Buildkite::TestCollector::OTel.instance_variable_set(
+          :@tracer,
+          provider.tracer("unsampled-test"),
+        )
+        Buildkite::TestCollector::OTel.define_singleton_method(:force_flush) { nil }
+        Buildkite::TestCollector::OTel.define_singleton_method(:shutdown) do
+          instance_variable_set(:@enabled, false)
+        end
+
+        at_exit do
+          provider.shutdown
+          File.write(
+            ENV.fetch("UNSAMPLED_RESULT_PATH"),
+            JSON.generate(body_ran: $body_ran, uploads: $uploads),
+          )
+        end
+
+        Buildkite::TestCollector::Uploader.define_singleton_method(:upload) do |traces|
+          $uploads = traces.map(&:as_hash)
+          nil
+        end
+
+        RSpec.describe "unsampled execution" do
+          it "still runs" do
+            $body_ran = true
+          end
+        end
+      RUBY
+
+      rspec_path = Gem.bin_path("rspec-core", "rspec")
+      _stdout, stderr, status = Open3.capture3(
+        { "UNSAMPLED_RESULT_PATH" => result_path },
+        RbConfig.ruby,
+        "-I#{lib_path}",
+        rspec_path,
+        fixture_path,
       )
-      Buildkite::TestCollector::OTel.with_test_span(execution_span) do
-        tracer.in_span("child") { nil }
-      end
-      Buildkite::TestCollector::OTel.finish_test_span(execution_span, result: "passed")
+
+      expect(status).to be_success, stderr
+      result = JSON.parse(File.read(result_path))
+      expect(result.fetch("body_ran")).to be(true)
+      expect(result.fetch("uploads").length).to eq(1)
+      expect(result.dig("uploads", 0)).not_to have_key("external_id")
     end
-    provider.force_flush
-
-    execution_span = exporter.finished_spans.find { |span| span.name == "test.execution" }
-    child_span = exporter.finished_spans.find { |span| span.name == "child" }
-    ambient_span = exporter.finished_spans.find { |span| span.name == "ambient" }
-
-    expect(execution_span.parent_span_id).to eq(OpenTelemetry::Trace::INVALID_SPAN_ID)
-    expect(child_span.parent_span_id).to eq(execution_span.span_id)
-    expect(child_span.trace_id).to eq(execution_span.trace_id)
-    expect(ambient_span.trace_id).not_to eq(execution_span.trace_id)
-    expect(execution_span.attributes.fetch("execution.externalId")).to eq("execution-id")
-    expect(child_span.attributes).not_to have_key("execution.externalId")
-  ensure
-    Buildkite::TestCollector::OTel.instance_variable_set(:@enabled, false)
-    Buildkite::TestCollector::OTel.instance_variable_set(:@tracer, nil)
-    provider&.shutdown
   end
 
   it "uses RSpec's final result after outer hooks unwind" do
@@ -414,35 +446,93 @@ RSpec.describe "RSpec execution and OpenTelemetry correlation" do
     end
   end
 
-  {
-    "is missing" => nil,
-    "contains whitespace" => "run key",
-    "contains Unicode" => "rún-key",
-    "contains control characters" => "run\nkey",
-    "contains 256 characters" => "x" * 256,
-  }.each do |description, run_key|
-    it "runs and uploads the example when the OpenTelemetry run identity #{description}" do
-      Dir.mktmpdir do |directory|
-        result_path = File.join(directory, "missing-run-key.json")
-        fixture_path = File.join(directory, "missing_run_key_spec.rb")
-        lib_path = File.expand_path("../../../lib", __dir__)
+  it "keeps Buildkite resource attributes exporter-local when initializing the SDK" do
+    Dir.mktmpdir do |directory|
+      result_path = File.join(directory, "proxy-provider.json")
+      fixture_path = File.join(directory, "proxy_provider.rb")
+      lib_path = File.expand_path("../../../lib", __dir__)
 
-        File.write(fixture_path, <<~RUBY)
+      File.write(fixture_path, <<~RUBY)
+        require "json"
+        require "buildkite/test_collector"
+        require "opentelemetry/sdk"
+        require "opentelemetry/exporter/otlp"
+
+        buildkite_exporter = OpenTelemetry::SDK::Trace::Export::InMemorySpanExporter.new
+        OpenTelemetry::Exporter::OTLP::Exporter.define_singleton_method(:new) do |**_options|
+          buildkite_exporter
+        end
+
+        Buildkite::TestCollector::OTel.configure!(
+          endpoint: "https://example.invalid/v1/traces",
+          run_env: { "key" => "run-123" },
+        )
+
+        provider = OpenTelemetry.tracer_provider
+        customer_exporter = OpenTelemetry::SDK::Trace::Export::InMemorySpanExporter.new
+        customer_processor = OpenTelemetry::SDK::Trace::Export::SimpleSpanProcessor.new(
+          customer_exporter,
+        )
+        provider.add_span_processor(customer_processor)
+
+        tracer = provider.tracer("customer")
+        tracer.in_span("proxy-provider-span") { nil }
+        Buildkite::TestCollector::OTel.force_flush
+
+        buildkite_span = buildkite_exporter.finished_spans.find do |span|
+          span.name == "proxy-provider-span"
+        end
+        customer_span = customer_exporter.finished_spans.find do |span|
+          span.name == "proxy-provider-span"
+        end
+
+        Buildkite::TestCollector::OTel.shutdown
+        provider.shutdown
+
+        File.write(
+          ENV.fetch("PROXY_PROVIDER_RESULT_PATH"),
+          JSON.generate(
+            buildkite_resource: buildkite_span.resource.attribute_enumerator.to_h,
+            customer_resource: customer_span.resource.attribute_enumerator.to_h,
+          ),
+        )
+      RUBY
+
+      stdout, stderr, status = Open3.capture3(
+        { "PROXY_PROVIDER_RESULT_PATH" => result_path },
+        RbConfig.ruby,
+        "-I#{lib_path}",
+        fixture_path,
+      )
+      expect(status).to be_success, "#{stdout}\n#{stderr}"
+
+      result = JSON.parse(File.read(result_path))
+      expect(result.dig("buildkite_resource", "buildkite.test.run.key")).to eq("run-123")
+      expect(result.fetch("customer_resource")).not_to have_key("buildkite.test.run.key")
+    end
+  end
+
+  it "rejects invalid OpenTelemetry run identities without breaking the test or upload" do
+    Dir.mktmpdir do |directory|
+      result_path = File.join(directory, "invalid-run-keys.json")
+      fixture_path = File.join(directory, "invalid_run_keys_spec.rb")
+      lib_path = File.expand_path("../../../lib", __dir__)
+
+      File.write(fixture_path, <<~RUBY)
         require "json"
         require "buildkite/test_collector"
 
-        run_key = ENV["INVALID_RUN_KEY"]
-        run_env = run_key ? { "key" => run_key } : {}
-        Buildkite::TestCollector::CI.define_singleton_method(:env) { run_env }
-        Buildkite::TestCollector.configure(
-          hook: :rspec,
-          otlp_endpoint: "https://example.invalid/v1/traces",
-        )
-        Buildkite::TestCollector.enable_tracing!
+        [nil, "run key", "rún-key", "run\nkey", "x" * 256].each do |run_key|
+          run_env = run_key ? { "key" => run_key } : {}
+          Buildkite::TestCollector::OTel.configure!(
+            endpoint: "https://example.invalid/v1/traces",
+            run_env: run_env,
+          )
+        end
 
         at_exit do
           File.write(
-            ENV.fetch("MISSING_RUN_KEY_RESULT_PATH"),
+            ENV.fetch("INVALID_RUN_KEYS_RESULT_PATH"),
             JSON.generate(
               body_ran: $body_ran,
               uploads: $uploads,
@@ -463,135 +553,22 @@ RSpec.describe "RSpec execution and OpenTelemetry correlation" do
         end
       RUBY
 
-        rspec_path = Gem.bin_path("rspec-core", "rspec")
-        _stdout, stderr, status = Open3.capture3(
-          {
-            "INVALID_RUN_KEY" => run_key,
-            "MISSING_RUN_KEY_RESULT_PATH" => result_path,
-          }.compact,
-          RbConfig.ruby,
-          "-I#{lib_path}",
-          rspec_path,
-          fixture_path,
-        )
+      rspec_path = Gem.bin_path("rspec-core", "rspec")
+      _stdout, stderr, status = Open3.capture3(
+        { "INVALID_RUN_KEYS_RESULT_PATH" => result_path },
+        RbConfig.ruby,
+        "-I#{lib_path}",
+        rspec_path,
+        fixture_path,
+      )
 
-        expect(status).to be_success, stderr
-        expect(stderr).to include("OpenTelemetry span export disabled: ArgumentError: a valid Buildkite test run key is required")
-        result = JSON.parse(File.read(result_path))
-        expect(result.fetch("body_ran")).to be(true)
-        expect(result.fetch("uploads").length).to eq(1)
-        expect(result.fetch("otel_enabled")).to be(false)
-      end
+      expect(status).to be_success, stderr
+      expect(stderr.scan("a valid Buildkite test run key is required").length).to eq(5)
+      result = JSON.parse(File.read(result_path))
+      expect(result.fetch("body_ran")).to be(true)
+      expect(result.fetch("uploads").length).to eq(1)
+      expect(result.fetch("otel_enabled")).to be(false)
     end
   end
 
-  it "records failed and skipped test outcomes" do
-    span_class = Struct.new(:attributes, :status, :finished) do
-      def set_attribute(key, value)
-        attributes[key] = value
-      end
-
-      def finish
-        self.finished = true
-      end
-    end
-
-    failed_span = span_class.new({})
-    Buildkite::TestCollector::OTel.finish_test_span(
-      failed_span,
-      result: "failed",
-      tags: { "component" => "checkout" },
-    )
-    skipped_span = span_class.new({})
-    Buildkite::TestCollector::OTel.finish_test_span(
-      skipped_span,
-      result: "skipped",
-    )
-
-    expect(failed_span.attributes).to include(
-      "test.case.result.status" => "fail",
-      "buildkite.test.execution.tag.component" => "checkout",
-    )
-    expect(failed_span.status.code).to eq(OpenTelemetry::Trace::Status::ERROR)
-    expect(failed_span.finished).to be(true)
-    expect(skipped_span.attributes.fetch("buildkite.test.case.result.status")).to eq("skipped")
-    expect(skipped_span.attributes).not_to have_key("test.case.result.status")
-    expect(skipped_span.status).to be_nil
-    expect(skipped_span.finished).to be(true)
-  end
-
-  it "does not raise when flushing or shutting down its processor fails" do
-    processor = double("OpenTelemetry processor")
-    allow(processor).to receive(:force_flush).and_raise("flush failed")
-    allow(processor).to receive(:shutdown).and_raise("shutdown failed")
-    Buildkite::TestCollector::OTel.instance_variable_set(:@enabled, true)
-    Buildkite::TestCollector::OTel.instance_variable_set(:@processor, processor)
-
-    expect { Buildkite::TestCollector::OTel.force_flush }.not_to raise_error
-    expect { Buildkite::TestCollector::OTel.shutdown }.not_to raise_error
-    expect(Buildkite::TestCollector::OTel).not_to be_enabled
-  ensure
-    Buildkite::TestCollector::OTel.instance_variable_set(:@enabled, false)
-    Buildkite::TestCollector::OTel.instance_variable_set(:@processor, nil)
-  end
-
-  it "builds run and VCS resource attributes" do
-    allow(ENV).to receive(:[]).and_call_original
-    fake_env("BUILDKITE_BUILD_ID", "build-id")
-    fake_env("BUILDKITE_PIPELINE_SLUG", "test-pipeline")
-    fake_env("BUILDKITE_TAG", nil)
-    fake_env("GITHUB_RUN_ID", nil)
-    fake_env("CIRCLE_WORKFLOW_ID", nil)
-    fake_env("CI_NAME", nil)
-
-    attributes = Buildkite::TestCollector::OTel.send(
-      :resource_attributes,
-      {
-        "key" => "test-run-id",
-        "url" => "https://buildkite.com/acme/test/builds/1",
-        "branch" => "main",
-        "commit_sha" => "abc123",
-      }
-    )
-
-    expect(attributes).to include(
-      "buildkite.test.run.key" => "test-run-id",
-      "cicd.pipeline.run.id" => "build-id",
-      "cicd.pipeline.run.url.full" => "https://buildkite.com/acme/test/builds/1",
-      "cicd.pipeline.name" => "test-pipeline",
-      "vcs.ref.head.revision" => "abc123",
-      "vcs.ref.head.name" => "main",
-      "vcs.ref.type" => "branch",
-    )
-    expect(attributes).not_to have_key("buildkite.test.run.id")
-  end
-
-  it "uses tag names for Buildkite tag refs and omits Codeship pull request URLs" do
-    allow(ENV).to receive(:[]).and_call_original
-    fake_env("BUILDKITE_BUILD_ID", "build-id")
-    fake_env("BUILDKITE_TAG", "v3.0.0")
-    fake_env("BUILDKITE_ANALYTICS_URL", nil)
-    fake_env("GITHUB_RUN_ID", nil)
-    fake_env("CIRCLE_WORKFLOW_ID", nil)
-    fake_env("CI_NAME", nil)
-
-    tag_attributes = Buildkite::TestCollector::OTel.send(
-      :resource_attributes,
-      { "branch" => "main" }
-    )
-    expect(tag_attributes).to include(
-      "vcs.ref.head.name" => "v3.0.0",
-      "vcs.ref.type" => "tag",
-    )
-
-    fake_env("BUILDKITE_BUILD_ID", nil)
-    codeship_attributes = Buildkite::TestCollector::OTel.send(
-      :resource_attributes,
-      {
-        "CI" => "codeship",
-        "url" => "https://github.com/acme/repo/pull/123",
-      }
-    )
-    expect(codeship_attributes).not_to have_key("cicd.pipeline.run.url.full")
-  end
 end

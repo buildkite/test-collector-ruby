@@ -7,8 +7,9 @@ module Buildkite::TestCollector
   module OTel
     EXECUTION_EXTERNAL_ID_ATTRIBUTE = "execution.externalId"
     EXECUTION_TAG_ATTRIBUTE_PREFIX = "buildkite.test.execution.tag."
+    TEST_RESULT_STATUS_ATTRIBUTE = "test.case.result.status"
     BUILDKITE_RESULT_STATUS_ATTRIBUTE = "buildkite.test.case.result.status"
-    PROCESSOR_TIMEOUT = 5
+    PROCESSOR_TIMEOUT_SECONDS = 5
     RUN_KEY_FORMAT = /\A[!-~]{1,255}\z/
 
     class ResourceMergingExporter
@@ -126,7 +127,6 @@ module Buildkite::TestCollector
           OpenTelemetry::Instrumentation.registry.install_all
         elsif provider.is_a?(OpenTelemetry::Internal::ProxyTracerProvider)
           OpenTelemetry::SDK.configure do |c|
-            c.resource = resource
             c.add_span_processor(@processor)
             # PoC shortcut: capture every available instrumentation.
             c.use_all
@@ -140,7 +140,7 @@ module Buildkite::TestCollector
           "buildkite-test-collector", Buildkite::TestCollector::VERSION
         )
         @enabled = true
-      rescue StandardError => e
+      rescue LoadError, StandardError => e
         warn "[buildkite-test_collector] OpenTelemetry span export disabled: #{e.class}: #{e.message}"
         shutdown_processor(@processor)
         @processor = nil
@@ -159,6 +159,10 @@ module Buildkite::TestCollector
         )
       end
 
+      def sampled?(span)
+        span&.context&.trace_flags&.sampled? == true
+      end
+
       def with_test_span(span)
         return yield unless span
 
@@ -175,9 +179,9 @@ module Buildkite::TestCollector
 
           case result
           when "passed"
-            span.set_attribute("test.case.result.status", "pass")
+            span.set_attribute(TEST_RESULT_STATUS_ATTRIBUTE, "pass")
           when "failed"
-            span.set_attribute("test.case.result.status", "fail")
+            span.set_attribute(TEST_RESULT_STATUS_ATTRIBUTE, "fail")
           when "skipped"
             span.set_attribute(BUILDKITE_RESULT_STATUS_ATTRIBUTE, "skipped")
           end
@@ -199,7 +203,7 @@ module Buildkite::TestCollector
       def force_flush
         return unless enabled?
 
-        @processor.force_flush(timeout: PROCESSOR_TIMEOUT)
+        @processor.force_flush(timeout: PROCESSOR_TIMEOUT_SECONDS)
       rescue StandardError => e
         warn "[buildkite-test_collector] Could not flush OpenTelemetry spans: #{e.class}: #{e.message}"
       end
@@ -217,7 +221,7 @@ module Buildkite::TestCollector
       private
 
       def shutdown_processor(processor)
-        processor&.shutdown(timeout: PROCESSOR_TIMEOUT)
+        processor&.shutdown(timeout: PROCESSOR_TIMEOUT_SECONDS)
       rescue StandardError => e
         warn "[buildkite-test_collector] Could not shut down OpenTelemetry span export: #{e.class}: #{e.message}"
       end

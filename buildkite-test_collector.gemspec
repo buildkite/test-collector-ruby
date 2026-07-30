@@ -25,17 +25,13 @@ Gem::Specification.new do |spec|
   spec.required_ruby_version = Gem::Requirement.new(">= 3.3.0")
 
   spec.add_dependency "concurrent-ruby"
-  spec.add_dependency "opentelemetry-exporter-otlp"
-  spec.add_dependency "opentelemetry-instrumentation-all"
-  spec.add_dependency "opentelemetry-sdk"
+  spec.add_dependency "opentelemetry-exporter-otlp", "~> 0.34.1"
+  spec.add_dependency "opentelemetry-instrumentation-all", "~> 0.94.0"
+  spec.add_dependency "opentelemetry-sdk", "~> 1.13.0"
 
   spec.add_development_dependency "activesupport", ">= 4.2"
+  spec.add_development_dependency "cucumber", "~> 9.0"
   spec.add_development_dependency "ostruct"
   spec.add_development_dependency "rspec-core", '~> 3.10'
   spec.add_development_dependency "rspec-expectations", '~> 3.10'
-
-  # When running the legacy CI builds against versions of Ruby pre 2.7 we cannot include cucumber 9 as it's not supported.
-  if Gem::Version.new(RUBY_VERSION) >= Gem::Version.new('2.7')
-    spec.add_development_dependency "cucumber", '~> 9.0'
-  end
 end
