@@ -320,6 +320,7 @@ RSpec.describe "RSpec execution and OpenTelemetry correlation" do
         customer_processor = OpenTelemetry::SDK::Trace::Export::SimpleSpanProcessor.new(customer_exporter)
         customer_resource = OpenTelemetry::SDK::Resources::Resource.create(
           "service.name" => "customer-service",
+          "process.command" => "/private/customer/bin/rspec",
         )
         provider = OpenTelemetry::SDK::Trace::TracerProvider.new(resource: customer_resource)
         provider.add_span_processor(customer_processor)
@@ -350,7 +351,24 @@ RSpec.describe "RSpec execution and OpenTelemetry correlation" do
         )
 
         tracer = OpenTelemetry.tracer_provider.tracer("customer")
-        tracer.in_span("before-buildkite-shutdown") { nil }
+        statement = "SELECT * FROM users WHERE email = 'private@example.com' AND id = 42"
+        tracer.in_span(
+          "before-buildkite-shutdown",
+          attributes: {
+            "db.system" => "postgresql",
+            "db.statement" => statement,
+            "db.query.text" => statement,
+            "db.query.summary" => "SELECT users",
+            "error.type" => "timeout",
+          },
+        ) { nil }
+        tracer.in_span(
+          "redis",
+          attributes: {
+            "db.system" => "redis",
+            "db.statement" => "GET private-session-key",
+          },
+        ) { nil }
         Buildkite::TestCollector::OTel.force_flush
 
         buildkite_span = buildkite_exporter.finished_spans.find do |span|
@@ -359,6 +377,8 @@ RSpec.describe "RSpec execution and OpenTelemetry correlation" do
         customer_span = customer_exporter.finished_spans.find do |span|
           span.name == "before-buildkite-shutdown"
         end
+        buildkite_redis_span = buildkite_exporter.finished_spans.find { |span| span.name == "redis" }
+        customer_redis_span = customer_exporter.finished_spans.find { |span| span.name == "redis" }
 
         Buildkite::TestCollector::OTel.shutdown
         tracer.in_span("after-buildkite-shutdown") { nil }
@@ -375,7 +395,11 @@ RSpec.describe "RSpec execution and OpenTelemetry correlation" do
           ENV.fetch("PROVIDER_RESULT_PATH"),
           JSON.generate(
             same_provider: OpenTelemetry.tracer_provider.equal?(provider),
+            buildkite_attributes: buildkite_span.attributes,
+            buildkite_redis_attributes: buildkite_redis_span.attributes,
             buildkite_resource: buildkite_span.resource.attribute_enumerator.to_h,
+            customer_attributes: customer_span.attributes,
+            customer_redis_attributes: customer_redis_span.attributes,
             customer_resource: customer_span.resource.attribute_enumerator.to_h,
             customer_continued: customer_continued,
             buildkite_stopped: buildkite_stopped,
@@ -399,7 +423,25 @@ RSpec.describe "RSpec execution and OpenTelemetry correlation" do
       expect(result.fetch("buildkite_shutdown_calls")).to eq(1)
       expect(result.dig("buildkite_resource", "service.name")).to eq("customer-service")
       expect(result.dig("buildkite_resource", "buildkite.test.run.id")).to eq("run-123")
+      expect(result.dig("buildkite_resource", "process.command")).to eq("rspec")
+      expect(result.dig("buildkite_attributes", "db.statement")).to eq(
+        "SELECT * FROM users WHERE email = ? AND id = ?"
+      )
+      expect(result.dig("buildkite_attributes", "db.query.text")).to eq(
+        "SELECT * FROM users WHERE email = ? AND id = ?"
+      )
+      expect(result.dig("buildkite_attributes", "db.query.summary")).to eq("SELECT users")
+      expect(result.dig("buildkite_attributes", "error.type")).to eq("timeout")
+      expect(result.fetch("buildkite_redis_attributes")).not_to have_key("db.statement")
       expect(result.dig("customer_resource", "service.name")).to eq("customer-service")
+      expect(result.dig("customer_resource", "process.command")).to eq("/private/customer/bin/rspec")
+      expect(result.dig("customer_attributes", "db.statement")).to eq(
+        "SELECT * FROM users WHERE email = 'private@example.com' AND id = 42"
+      )
+      expect(result.dig("customer_attributes", "db.query.text")).to eq(
+        "SELECT * FROM users WHERE email = 'private@example.com' AND id = 42"
+      )
+      expect(result.dig("customer_redis_attributes", "db.statement")).to eq("GET private-session-key")
       expect(result.fetch("customer_resource")).not_to have_key("buildkite.test.run.id")
     end
   end

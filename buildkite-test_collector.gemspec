@@ -26,6 +26,7 @@ Gem::Specification.new do |spec|
 
   spec.add_dependency "concurrent-ruby"
   spec.add_dependency "opentelemetry-exporter-otlp"
+  spec.add_dependency "opentelemetry-helpers-sql-processor"
   spec.add_dependency "opentelemetry-instrumentation-all"
   spec.add_dependency "opentelemetry-sdk"
 
