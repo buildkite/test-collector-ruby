@@ -84,7 +84,7 @@ The collector adds the following when available:
 
 | Attribute | Value |
 | --- | --- |
-| `buildkite.test.run.id` | The same collector run key sent as `run_env["key"]`. |
+| `buildkite.test.run.key` | The raw collector run key from `run_env["key"]`, also sent in the `Buildkite-Test-Run-Key` OTLP request header. |
 | `cicd.pipeline.run.id` | Provider-native run ID. |
 | `cicd.pipeline.run.url.full` | Valid HTTP(S) run URL without credentials. |
 | `cicd.pipeline.name` | Provider workflow or pipeline name. |
@@ -102,9 +102,11 @@ Provider-native run IDs are:
 Do not label Codeship's `CI_PULL_REQUEST` as a run URL. For Buildkite tag builds,
 use `BUILDKITE_TAG` as the VCS ref name.
 
-`buildkite.test.run.id` and `cicd.pipeline.run.id` are deliberately separate.
-The first identifies Test Engine's collector run; the second identifies the CI
-provider's pipeline run. They can differ for retries, local runs, and some CI
+`buildkite.test.run.key` is raw correlation metadata, not authorization. The
+authenticated Buildkite receiver combines it with the trusted suite identity to
+derive the canonical Test Engine run UUID. The collector does not derive or emit
+that UUID. `cicd.pipeline.run.id` is also separate: it identifies the CI
+provider's pipeline run and can differ for retries, local runs, and some CI
 providers.
 
 Run IDs are naturally high-cardinality trace identity fields. This is acceptable

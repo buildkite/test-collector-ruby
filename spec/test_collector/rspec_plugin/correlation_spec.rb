@@ -341,7 +341,8 @@ RSpec.describe "RSpec execution and OpenTelemetry correlation" do
         end
 
         buildkite_exporter = CountingExporter.new
-        OpenTelemetry::Exporter::OTLP::Exporter.define_singleton_method(:new) do |**_options|
+        OpenTelemetry::Exporter::OTLP::Exporter.define_singleton_method(:new) do |**options|
+          $buildkite_exporter_options = options
           buildkite_exporter
         end
 
@@ -381,6 +382,7 @@ RSpec.describe "RSpec execution and OpenTelemetry correlation" do
             customer_continued: customer_continued,
             buildkite_stopped: buildkite_stopped,
             buildkite_shutdown_calls: buildkite_exporter.shutdown_calls,
+            buildkite_exporter_headers: $buildkite_exporter_options.fetch(:headers),
           ),
         )
       RUBY
@@ -399,11 +401,87 @@ RSpec.describe "RSpec execution and OpenTelemetry correlation" do
       expect(result.fetch("buildkite_stopped")).to be(true)
       expect(result.fetch("buildkite_shutdown_calls")).to eq(1)
       expect(result.dig("buildkite_resource", "service.name")).to eq("customer-service")
-      expect(result.dig("buildkite_resource", "buildkite.test.run.id")).to eq("run-123")
+      run_key_header = result.dig("buildkite_exporter_headers", "Buildkite-Test-Run-Key")
+      run_key_resource = result.dig("buildkite_resource", "buildkite.test.run.key")
+      expect(run_key_header).to eq("run-123")
+      expect(run_key_resource).to eq(run_key_header)
+      expect(result.fetch("buildkite_resource")).not_to have_key("buildkite.test.run.id")
       expect(result.dig("buildkite_resource", "process.command")).to eq("rspec")
       expect(result.dig("customer_resource", "service.name")).to eq("customer-service")
       expect(result.dig("customer_resource", "process.command")).to eq("/private/customer/bin/rspec")
+      expect(result.fetch("customer_resource")).not_to have_key("buildkite.test.run.key")
       expect(result.fetch("customer_resource")).not_to have_key("buildkite.test.run.id")
+    end
+  end
+
+  {
+    "is missing" => nil,
+    "contains whitespace" => "run key",
+    "contains Unicode" => "rún-key",
+    "contains control characters" => "run\nkey",
+    "contains 256 characters" => "x" * 256,
+  }.each do |description, run_key|
+    it "runs and uploads the example when the OpenTelemetry run identity #{description}" do
+      Dir.mktmpdir do |directory|
+        result_path = File.join(directory, "missing-run-key.json")
+        fixture_path = File.join(directory, "missing_run_key_spec.rb")
+        lib_path = File.expand_path("../../../lib", __dir__)
+
+        File.write(fixture_path, <<~RUBY)
+        require "json"
+        require "buildkite/test_collector"
+
+        run_key = ENV["INVALID_RUN_KEY"]
+        run_env = run_key ? { "key" => run_key } : {}
+        Buildkite::TestCollector::CI.define_singleton_method(:env) { run_env }
+        Buildkite::TestCollector.configure(
+          hook: :rspec,
+          otlp_endpoint: "https://example.invalid/v1/traces",
+        )
+        Buildkite::TestCollector.enable_tracing!
+
+        at_exit do
+          File.write(
+            ENV.fetch("MISSING_RUN_KEY_RESULT_PATH"),
+            JSON.generate(
+              body_ran: $body_ran,
+              uploads: $uploads,
+              otel_enabled: Buildkite::TestCollector::OTel.enabled?,
+            ),
+          )
+        end
+
+        Buildkite::TestCollector::Uploader.define_singleton_method(:upload) do |traces|
+          $uploads = traces.map(&:as_hash)
+          nil
+        end
+
+        RSpec.describe "missing run identity" do
+          it "still runs" do
+            $body_ran = true
+          end
+        end
+      RUBY
+
+        rspec_path = Gem.bin_path("rspec-core", "rspec")
+        _stdout, stderr, status = Open3.capture3(
+          {
+            "INVALID_RUN_KEY" => run_key,
+            "MISSING_RUN_KEY_RESULT_PATH" => result_path,
+          }.compact,
+          RbConfig.ruby,
+          "-I#{lib_path}",
+          rspec_path,
+          fixture_path,
+        )
+
+        expect(status).to be_success, stderr
+        expect(stderr).to include("OpenTelemetry span export disabled: ArgumentError: a valid Buildkite test run key is required")
+        result = JSON.parse(File.read(result_path))
+        expect(result.fetch("body_ran")).to be(true)
+        expect(result.fetch("uploads").length).to eq(1)
+        expect(result.fetch("otel_enabled")).to be(false)
+      end
     end
   end
 
@@ -477,7 +555,7 @@ RSpec.describe "RSpec execution and OpenTelemetry correlation" do
     )
 
     expect(attributes).to include(
-      "buildkite.test.run.id" => "test-run-id",
+      "buildkite.test.run.key" => "test-run-id",
       "cicd.pipeline.run.id" => "build-id",
       "cicd.pipeline.run.url.full" => "https://buildkite.com/acme/test/builds/1",
       "cicd.pipeline.name" => "test-pipeline",
@@ -485,6 +563,7 @@ RSpec.describe "RSpec execution and OpenTelemetry correlation" do
       "vcs.ref.head.name" => "main",
       "vcs.ref.type" => "branch",
     )
+    expect(attributes).not_to have_key("buildkite.test.run.id")
   end
 
   it "uses tag names for Buildkite tag refs and omits Codeship pull request URLs" do

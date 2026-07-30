@@ -9,6 +9,7 @@ module Buildkite::TestCollector
     EXECUTION_TAG_ATTRIBUTE_PREFIX = "buildkite.test.execution.tag."
     BUILDKITE_RESULT_STATUS_ATTRIBUTE = "buildkite.test.case.result.status"
     PROCESSOR_TIMEOUT = 5
+    RUN_KEY_FORMAT = /\A[!-~]{1,255}\z/
 
     class ResourceMergingExporter
       def initialize(exporter, resource)
@@ -92,11 +93,16 @@ module Buildkite::TestCollector
       def configure!(endpoint:, api_token: nil, run_env: {})
         return if @enabled
 
+        run_key = run_env["key"]
+        unless run_key.is_a?(String) && run_key.match?(RUN_KEY_FORMAT)
+          raise ArgumentError, "a valid Buildkite test run key is required"
+        end
+
         require "opentelemetry/sdk"
         require "opentelemetry/exporter/otlp"
         require "opentelemetry/instrumentation/all"
 
-        headers = {}
+        headers = { "Buildkite-Test-Run-Key" => run_key }
         headers["Authorization"] = "Token token=\"#{api_token}\"" if api_token
 
         resource = OpenTelemetry::SDK::Resources::Resource.create(
@@ -218,7 +224,7 @@ module Buildkite::TestCollector
 
       def resource_attributes(run_env)
         attributes = {
-          "buildkite.test.run.id" => run_env["key"],
+          "buildkite.test.run.key" => run_env["key"],
           "cicd.pipeline.run.id" => pipeline_run_id,
           "cicd.pipeline.run.url.full" => pipeline_run_url(run_env),
           "cicd.pipeline.name" => pipeline_name,
