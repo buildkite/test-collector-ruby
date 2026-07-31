@@ -228,14 +228,14 @@ module Buildkite::TestCollector
 
       def request_headers(run_env, api_token)
         headers = { "Buildkite-Test-Run-Key" => run_env["key"] }
-        job_id = buildkite_job_id(run_env)
+        job_id = buildkite_job_id
         headers["Buildkite-Test-Job-ID"] = job_id if job_id
         headers["Authorization"] = "Token token=\"#{api_token}\"" if api_token
         headers
       end
 
       def resource_attributes(run_env)
-        job_id = buildkite_job_id(run_env)
+        job_id = buildkite_job_id
         attributes = {
           "buildkite.test.run.key" => run_env["key"],
           "buildkite.job.id" => job_id,
@@ -250,9 +250,9 @@ module Buildkite::TestCollector
         attributes.select { |_, value| value && !value.to_s.empty? }
       end
 
-      def buildkite_job_id(run_env)
-        job_id = run_env["job_id"]
-        job_id if run_env["CI"] == "buildkite" && job_id.is_a?(String) && job_id.match?(UUID_FORMAT)
+      def buildkite_job_id
+        job_id = ENV["BUILDKITE_JOB_ID"]
+        job_id if ENV["BUILDKITE_BUILD_ID"] && job_id&.match?(UUID_FORMAT)
       end
 
       def agent_link

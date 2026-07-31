@@ -126,10 +126,12 @@ The `test.execution` root carries:
 | `buildkite.test.runner.name` / `.version` | RSpec identity. |
 | `buildkite.test.execution.tag.<name>` | Existing execution tags. |
 
-Job attributes and the job request header are emitted only when `CI` is
-`buildkite` and `job_id` is a canonical UUID. Legacy arbitrary
-`BUILDKITE_ANALYTICS_JOB_ID` values remain available to the execution upload but
-are not promoted into typed OTLP metadata.
+Job attributes and the job request header are derived directly from the real
+Buildkite environment: `BUILDKITE_BUILD_ID` must be present and
+`BUILDKITE_JOB_ID` must be a canonical UUID. Merged `run_env` overrides,
+including `BUILDKITE_ANALYTICS_JOB_ID` and configured collector environment
+values, remain available to the execution upload but are never promoted into
+typed OTLP metadata.
 
 Source paths reuse the execution upload's normalization, including
 `location_prefix` and shared-example call sites. Failure messages and stack

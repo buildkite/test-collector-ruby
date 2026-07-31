@@ -403,12 +403,15 @@ RSpec.describe "RSpec execution and OpenTelemetry correlation" do
           buildkite_exporter
         end
 
+        ENV["BUILDKITE_BUILD_ID"] = "build-id"
+        ENV["BUILDKITE_JOB_ID"] = "019c8d97-f9ad-75a5-8173-dc6c1b54b901"
+
         Buildkite::TestCollector::OTel.configure!(
           endpoint: "https://example.invalid/v1/traces",
           run_env: {
             "CI" => "buildkite",
             "key" => "run-123",
-            "job_id" => "019c8d97-f9ad-75a5-8173-dc6c1b54b901",
+            "job_id" => "019d8d97-f9ad-75a5-8173-dc6c1b54b902",
           },
         )
 

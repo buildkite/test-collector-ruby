@@ -144,17 +144,18 @@ RSpec.describe Buildkite::TestCollector::OTel do
   it "builds job, run, and VCS exporter metadata" do
     allow(ENV).to receive(:[]).and_call_original
     fake_env("BUILDKITE_BUILD_ID", "build-id")
+    job_id = "019c8d97-f9ad-75a5-8173-dc6c1b54b901"
+    fake_env("BUILDKITE_JOB_ID", job_id)
     fake_env("BUILDKITE_PIPELINE_SLUG", "test-pipeline")
     fake_env("BUILDKITE_TAG", nil)
     fake_env("GITHUB_RUN_ID", nil)
     fake_env("CIRCLE_WORKFLOW_ID", nil)
     fake_env("CI_NAME", nil)
 
-    job_id = "019c8d97-f9ad-75a5-8173-dc6c1b54b901"
     run_env = {
       "CI" => "buildkite",
       "key" => "test-run-id",
-      "job_id" => job_id,
+      "job_id" => "legacy-job-override",
       "url" => "https://buildkite.com/acme/test/builds/1",
       "branch" => "main",
       "commit_sha" => "abc123",
@@ -177,22 +178,63 @@ RSpec.describe Buildkite::TestCollector::OTel do
     expect(attributes).not_to have_key("buildkite.test.run.id")
   end
 
-  it "does not promote missing, malformed, or non-Buildkite job IDs" do
-    valid_job_id = "019c8d97-f9ad-75a5-8173-dc6c1b54b901"
-    run_environments = [
-      { "CI" => "buildkite", "key" => "run-key" },
-      { "CI" => "buildkite", "key" => "run-key", "job_id" => "legacy-job-name" },
-      { "CI" => "github_actions", "key" => "run-key", "job_id" => valid_job_id },
-    ]
+  it "does not promote job IDs without a valid Buildkite environment" do
+    allow(ENV).to receive(:[]).and_call_original
+    fake_env("BUILDKITE_BUILD_ID", nil)
+    fake_env("BUILDKITE_JOB_ID", nil)
+    manufactured_job_id = "019c8d97-f9ad-75a5-8173-dc6c1b54b901"
+    original_collector_env = Buildkite::TestCollector.env
+    Buildkite::TestCollector.env = {
+      "CI" => "buildkite",
+      "job_id" => manufactured_job_id,
+    }
+    run_env = Buildkite::TestCollector::CI.env
+    expect(run_env).to include("CI" => "buildkite", "job_id" => manufactured_job_id)
 
-    run_environments.each do |run_env|
-      headers = described_class.send(:request_headers, run_env, nil)
-      attributes = described_class.send(:resource_attributes, run_env)
+    headers = described_class.send(:request_headers, run_env, nil)
+    attributes = described_class.send(:resource_attributes, run_env)
 
-      expect(headers).not_to have_key("Buildkite-Test-Job-ID")
-      expect(attributes).not_to have_key("buildkite.job.id")
-      expect(attributes).not_to have_key("cicd.pipeline.task.run.id")
-    end
+    expect(headers).not_to have_key("Buildkite-Test-Job-ID")
+    expect(attributes).not_to have_key("buildkite.job.id")
+    expect(attributes).not_to have_key("cicd.pipeline.task.run.id")
+  ensure
+    Buildkite::TestCollector.env = original_collector_env
+  end
+
+  it "does not promote malformed Buildkite job IDs" do
+    allow(ENV).to receive(:[]).and_call_original
+    fake_env("BUILDKITE_BUILD_ID", "build-id")
+    fake_env("BUILDKITE_JOB_ID", "legacy-job-name")
+    run_env = { "CI" => "buildkite", "key" => "run-key" }
+
+    headers = described_class.send(:request_headers, run_env, nil)
+    attributes = described_class.send(:resource_attributes, run_env)
+
+    expect(headers).not_to have_key("Buildkite-Test-Job-ID")
+    expect(attributes).not_to have_key("buildkite.job.id")
+    expect(attributes).not_to have_key("cicd.pipeline.task.run.id")
+  end
+
+  it "ignores legacy job ID overrides for typed OTLP metadata" do
+    allow(ENV).to receive(:[]).and_call_original
+    actual_job_id = "019c8d97-f9ad-75a5-8173-dc6c1b54b901"
+    override_job_id = "019d8d97-f9ad-75a5-8173-dc6c1b54b902"
+    fake_env("BUILDKITE_BUILD_ID", "build-id")
+    fake_env("BUILDKITE_JOB_ID", actual_job_id)
+    fake_env("BUILDKITE_ANALYTICS_JOB_ID", override_job_id)
+    original_collector_env = Buildkite::TestCollector.env
+    Buildkite::TestCollector.env = {}
+    run_env = Buildkite::TestCollector::CI.env
+    expect(run_env.fetch("job_id")).to eq(override_job_id)
+
+    headers = described_class.send(:request_headers, run_env, nil)
+    attributes = described_class.send(:resource_attributes, run_env)
+
+    expect(headers.fetch("Buildkite-Test-Job-ID")).to eq(actual_job_id)
+    expect(attributes.fetch("buildkite.job.id")).to eq(actual_job_id)
+    expect(attributes.fetch("cicd.pipeline.task.run.id")).to eq(actual_job_id)
+  ensure
+    Buildkite::TestCollector.env = original_collector_env
   end
 
   it "uses tag names for Buildkite tag refs and omits Codeship pull request URLs" do
