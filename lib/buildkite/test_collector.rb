@@ -75,6 +75,7 @@ module Buildkite
         self.span_filters << MinDurationSpanFilter.new(self.trace_min_duration)
       end
 
+      self.enable_otel!
       self.hook_into(hook)
     end
 
@@ -109,15 +110,6 @@ module Buildkite
       Buildkite::TestCollector::Network.configure
       Buildkite::TestCollector::Object.configure
 
-      if otlp_endpoint && !otlp_endpoint.to_s.empty?
-        self.run_env = Buildkite::TestCollector::CI.env
-        Buildkite::TestCollector::OTel.configure!(
-          endpoint: otlp_endpoint,
-          api_token: api_token,
-          run_env: run_env,
-        )
-      end
-
       return unless defined?(ActiveSupport)
 
       require "active_support/notifications"
@@ -125,6 +117,18 @@ module Buildkite
       ActiveSupport::Notifications.subscribe("sql.active_record") do |name, start, finish, id, payload|
         Buildkite::TestCollector::Uploader.tracer&.backfill(:sql, finish - start, **{ query: payload[:sql] })
       end
+    end
+
+    def self.enable_otel!
+      return unless test_runner == "rspec"
+      return unless otlp_endpoint && !otlp_endpoint.to_s.empty?
+
+      self.run_env = Buildkite::TestCollector::CI.env
+      Buildkite::TestCollector::OTel.configure!(
+        endpoint: otlp_endpoint,
+        api_token: api_token,
+        run_env: run_env,
+      )
     end
 
     class MinDurationSpanFilter

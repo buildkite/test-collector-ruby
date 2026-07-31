@@ -57,7 +57,7 @@ versions with each run.
 
 | Scenario | Evidence to collect | Expected result |
 | --- | --- | --- |
-| Passing, failing, and skipped examples | Execution record and root span | Correct result mapping; one sampled root per execution. |
+| Passing, failing, and runtime-pending examples that enter the RSpec around hook | Execution record and root span | Correct result mapping; one sampled root per execution. Static skips remain outside this PoC. |
 | HTTP, SQL, Redis, and other in-process work | Trace trees and span attributes | Synchronous work is parented correctly; useful semantic attributes survive. |
 | Shared examples and `location_prefix` | Source fields in both paths | File and line identity agree with the execution upload. |
 | Execution tags added inside a test | Root and child attributes | Tags appear on the root only and match the execution record. |
@@ -76,9 +76,11 @@ For each sampled trace, verify the complete contract:
 OTLP header Buildkite-Test-Run-Key
   == resource["buildkite.test.run.key"]
 
+When a valid Buildkite job UUID exists:
 OTLP header Buildkite-Test-Job-ID
   == resource["buildkite.job.id"]
   == resource["cicd.pipeline.task.run.id"]
+Otherwise all three fields are absent.
 
 receiver(suite identity, raw run key)
   == Kafka["Buildkite-Test-Run-ID"]
@@ -88,7 +90,9 @@ execution.external_id
   == root["execution.externalId"]
 
 root.parent_span_id is empty
-root.links[0] == valid Agent TRACEPARENT / TRACESTATE
+When valid Agent context exists:
+  root.links[0] == Agent TRACEPARENT / TRACESTATE
+Otherwise root.links is empty.
 ```
 
 Also confirm that a forged resource key cannot select another suite's run and

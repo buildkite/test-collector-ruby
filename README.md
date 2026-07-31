@@ -29,6 +29,9 @@ group :test do
 end
 ```
 
+Version 3 requires Ruby 3.3 or newer for every supported test framework. Projects
+on older Ruby versions should continue using the latest 2.x release.
+
 ### Step 2
 
 #### RSpec

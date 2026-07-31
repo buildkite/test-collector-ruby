@@ -106,7 +106,7 @@ The collector adds these resource attributes when available:
 | `buildkite.job.id` | Canonical Buildkite job UUID, also sent as `Buildkite-Test-Job-ID`. |
 | `cicd.pipeline.run.id` | CI provider's run or workflow ID. |
 | `cicd.pipeline.task.run.id` | Same canonical Buildkite job UUID. |
-| `cicd.pipeline.run.url.full` | Valid HTTP(S) run URL without credentials. |
+| `cicd.pipeline.run.url.full` | Valid HTTP(S) run URL without URI userinfo. |
 | `cicd.pipeline.name` | Buildkite pipeline slug or GitHub workflow name. |
 | `vcs.ref.head.revision` | Commit SHA or revision. |
 | `vcs.ref.head.name` | Branch or tag name. |
@@ -126,12 +126,13 @@ The `test.execution` root carries:
 | `buildkite.test.runner.name` / `.version` | RSpec identity. |
 | `buildkite.test.execution.tag.<name>` | Existing execution tags. |
 
-Job attributes and the job request header are derived directly from the real
-Buildkite environment: `BUILDKITE_BUILD_ID` must be present and
+Job attributes and the job request header are derived directly from the process
+environment: `BUILDKITE_BUILD_ID` must be present and
 `BUILDKITE_JOB_ID` must be a canonical UUID. Merged `run_env` overrides,
 including `BUILDKITE_ANALYTICS_JOB_ID` and configured collector environment
 values, remain available to the execution upload but are never promoted into
-typed OTLP metadata.
+typed OTLP metadata. This improves correlation provenance; it does not
+authenticate the job ID.
 
 Source paths reuse the execution upload's normalization, including
 `location_prefix` and shared-example call sites. Failure messages and stack
