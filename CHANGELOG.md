@@ -2,11 +2,9 @@
 
 ## v3.0.0
 
-* Add OpenTelemetry SDK, OTLP exporter, and instrumentation as core dependencies
-* Require Ruby 3.3 or newer
-* Use UUIDv7 execution external IDs for OpenTelemetry correlation
-* Add OpenTelemetry test, CI, and VCS attributes plus Buildkite correlation, runner, and execution-tag attributes
-* Link execution spans to Buildkite Agent trace context and add Buildkite job metadata
+* Require Ruby 3.3 or newer and add OpenTelemetry dependencies
+* Export correlated RSpec execution and auto-instrumented child spans over OTLP
+* Add test, Buildkite pipeline, job, VCS, tag, and Agent trace metadata
 
 **Full Changelog**: https://github.com/buildkite/test-collector-ruby/compare/v2.14.0...v3.0.0
 

@@ -88,16 +88,14 @@ Add the `BUILDKITE_ANALYTICS_TOKEN` secret to your CI, push your changes to a br
 
 ### Experimental OpenTelemetry export
 
-Ruby 3.3+ RSpec suites can opt into the experimental OpenTelemetry integration by
-setting an authenticated Buildkite OTLP endpoint:
+RSpec suites can export OpenTelemetry traces to Buildkite by setting an OTLP endpoint:
 
 ```shell
 BUILDKITE_ANALYTICS_OTLP_ENDPOINT=https://example.com/v1/traces rspec
 ```
 
-The integration is additive: exporter failures do not fail tests or interrupt
-the normal Test Engine execution upload. See the
-[architecture](docs/opentelemetry-architecture.md) for its scope and contracts.
+Exporter failures do not affect tests or the normal Test Engine upload. See the
+[architecture](docs/opentelemetry-architecture.md) for integration details.
 
 ## More information
 
