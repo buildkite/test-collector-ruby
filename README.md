@@ -7,7 +7,7 @@ Official [Buildkite Test Engine](https://buildkite.com/platform/test-engine) col
 
 ⚒ **Supported test frameworks:** RSpec, Minitest, Cucumber, and [more coming soon](https://github.com/buildkite/test-collector-ruby/issues?q=is%3Aissue+is%3Aopen+label%3A%22test+frameworks%22).
 
-📦 **Supported CI system:** Buildkite, with manual configuration available through the `BUILDKITE_ANALYTICS_*` environment variables.
+📦 **Supported CI systems:** Buildkite, GitHub Actions, CircleCI, Codeship, and others via the `BUILDKITE_ANALYTICS_*` environment variables.
 
 ## 👉 Installing
 
@@ -88,7 +88,7 @@ Add the `BUILDKITE_ANALYTICS_TOKEN` secret to your CI, push your changes to a br
 
 ### Experimental OpenTelemetry export
 
-Ruby 3.3+ RSpec suites can opt into the OpenTelemetry dogfooding integration by
+Ruby 3.3+ RSpec suites can opt into the experimental OpenTelemetry integration by
 setting an authenticated Buildkite OTLP endpoint:
 
 ```shell
@@ -97,8 +97,7 @@ BUILDKITE_ANALYTICS_OTLP_ENDPOINT=https://example.com/v1/traces rspec
 
 The integration is additive: exporter failures do not fail tests or interrupt
 the normal Test Engine execution upload. See the
-[architecture](docs/opentelemetry-architecture.md) and
-[dogfooding plan](docs/opentelemetry-dogfooding.md) for its scope and contracts.
+[architecture](docs/opentelemetry-architecture.md) for its scope and contracts.
 
 ## More information
 

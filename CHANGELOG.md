@@ -6,7 +6,7 @@
 * Require Ruby 3.3 or newer
 * Use UUIDv7 execution external IDs for OpenTelemetry correlation
 * Add OpenTelemetry test, CI, and VCS attributes plus Buildkite correlation, runner, and execution-tag attributes
-* Link execution spans to Buildkite Agent trace context and add validated Buildkite job metadata
+* Link execution spans to Buildkite Agent trace context and add Buildkite job metadata
 
 **Full Changelog**: https://github.com/buildkite/test-collector-ruby/compare/v2.14.0...v3.0.0
 

@@ -1,7 +1,5 @@
 # frozen_string_literal: true
 
-require "uri"
-
 module Buildkite::TestCollector
   # Experimental OpenTelemetry span emission.
   module OTel
@@ -10,8 +8,6 @@ module Buildkite::TestCollector
     TEST_RESULT_STATUS_ATTRIBUTE = "test.case.result.status"
     BUILDKITE_RESULT_STATUS_ATTRIBUTE = "buildkite.test.case.result.status"
     PROCESSOR_TIMEOUT_SECONDS = 5
-    RUN_KEY_FORMAT = /\A[!-~]{1,255}\z/
-    UUID_FORMAT = /\A[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}\z/
 
     class ResourceMergingExporter
       def initialize(exporter, resource)
@@ -95,11 +91,6 @@ module Buildkite::TestCollector
       def configure!(endpoint:, api_token: nil, run_env: {})
         return if enabled?
 
-        run_key = run_env["key"]
-        unless run_key.is_a?(String) && run_key.match?(RUN_KEY_FORMAT)
-          raise ArgumentError, "a valid Buildkite test run key is required"
-        end
-
         require "opentelemetry/sdk"
         require "opentelemetry/exporter/otlp"
         require "opentelemetry/instrumentation/all"
@@ -146,7 +137,7 @@ module Buildkite::TestCollector
         return [nil, nil] unless enabled?
 
         # Join the independently ingested upload and span without dangling IDs for unsampled spans.
-        external_id = Buildkite::TestCollector::UUID.v7
+        external_id = SecureRandom.uuid_v7
         link = agent_link
         span = @tracer.start_span(
           "test.execution",
@@ -211,31 +202,29 @@ module Buildkite::TestCollector
 
       def request_headers(run_env, api_token)
         headers = { "Buildkite-Test-Run-Key" => run_env["key"] }
-        job_id = buildkite_job_id
+        job_id = ENV["BUILDKITE_JOB_ID"]
         headers["Buildkite-Test-Job-ID"] = job_id if job_id
         headers["Authorization"] = "Token token=\"#{api_token}\"" if api_token
         headers
       end
 
       def resource_attributes(run_env)
-        job_id = buildkite_job_id
+        job_id = ENV["BUILDKITE_JOB_ID"]
+        tag = ENV["BUILDKITE_TAG"]
+        tag = nil if tag&.empty?
+        branch = ENV["BUILDKITE_BRANCH"]
         attributes = {
           "buildkite.test.run.key" => run_env["key"],
           "buildkite.job.id" => job_id,
           "cicd.pipeline.run.id" => ENV["BUILDKITE_BUILD_ID"],
           "cicd.pipeline.task.run.id" => job_id,
-          "cicd.pipeline.run.url.full" => valid_http_url(run_env["url"]),
+          "cicd.pipeline.run.url.full" => ENV["BUILDKITE_BUILD_URL"],
           "cicd.pipeline.name" => ENV["BUILDKITE_PIPELINE_SLUG"],
-          "vcs.ref.head.revision" => run_env["commit_sha"],
-          "vcs.ref.head.name" => vcs_ref_name(run_env),
-          "vcs.ref.type" => vcs_ref_type(run_env),
+          "vcs.ref.head.revision" => ENV["BUILDKITE_COMMIT"],
+          "vcs.ref.head.name" => tag || branch,
+          "vcs.ref.type" => tag ? "tag" : "branch",
         }
         attributes.select { |_, value| value && !value.to_s.empty? }
-      end
-
-      def buildkite_job_id
-        job_id = ENV["BUILDKITE_JOB_ID"]
-        job_id if ENV["BUILDKITE_BUILD_ID"] && job_id&.match?(UUID_FORMAT)
       end
 
       def agent_link
@@ -253,25 +242,6 @@ module Buildkite::TestCollector
         nil
       end
 
-      def vcs_ref_name(run_env)
-        return ENV["BUILDKITE_TAG"] if ENV["BUILDKITE_TAG"] && !ENV["BUILDKITE_TAG"].empty?
-
-        run_env["branch"]
-      end
-
-      def vcs_ref_type(run_env)
-        return "tag" if ENV["BUILDKITE_TAG"] && !ENV["BUILDKITE_TAG"].empty?
-        return "branch" if run_env["branch"] && !run_env["branch"].empty?
-      end
-
-      def valid_http_url(value)
-        return unless value
-
-        uri = URI.parse(value)
-        value if %w[http https].include?(uri.scheme) && uri.host && !uri.userinfo
-      rescue URI::InvalidURIError
-        nil
-      end
     end
   end
 end
