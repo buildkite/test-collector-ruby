@@ -62,6 +62,8 @@ versions with each run.
 | Shared examples and `location_prefix` | Source fields in both paths | File and line identity agree with the execution upload. |
 | Execution tags added inside a test | Root and child attributes | Tags appear on the root only and match the execution record. |
 | Existing customer provider/exporter | Customer and Buildkite exports | Customer resource is unchanged; Buildkite resource attributes exist only in Buildkite's export. |
+| Buildkite job UUID | OTLP headers and resource | Header and both job attributes contain the same canonical UUID; legacy arbitrary IDs are omitted. |
+| Agent `TRACEPARENT` / `TRACESTATE` | Root span links | Exactly one link preserves the Agent context while the execution remains an independent root. |
 | `always_off` and ratio sampling | Execution records and exported roots | Unsampled executions have no dangling `external_id`; sampled traces correlate. |
 | Invalid and missing run keys | Test result, execution upload, collector warning | OTel disables cleanly while normal collection succeeds. |
 | Receiver rejection or unavailable endpoint | Test status, warnings, upload result | Tests and execution uploads are unaffected. |
@@ -74,12 +76,19 @@ For each sampled trace, verify the complete contract:
 OTLP header Buildkite-Test-Run-Key
   == resource["buildkite.test.run.key"]
 
+OTLP header Buildkite-Test-Job-ID
+  == resource["buildkite.job.id"]
+  == resource["cicd.pipeline.task.run.id"]
+
 receiver(suite identity, raw run key)
   == Kafka["Buildkite-Test-Run-ID"]
   == stored span.run_id
 
 execution.external_id
   == root["execution.externalId"]
+
+root.parent_span_id is empty
+root.links[0] == valid Agent TRACEPARENT / TRACESTATE
 ```
 
 Also confirm that a forged resource key cannot select another suite's run and

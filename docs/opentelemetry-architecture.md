@@ -19,6 +19,7 @@ They never fail the test or prevent the normal execution upload.
 │  RSpec example                                                        │
 │    └── test.execution                                                 │
 │          ├── execution.externalId = execution upload external_id      │
+│          ├── link = Agent TRACEPARENT / TRACESTATE (when valid)       │
 │          └── HTTP, SQL, Redis, ... auto-instrumented child spans      │
 │                                                                       │
 │  Execution uploader ───────────────────────▶ Test Engine upload API   │
@@ -26,7 +27,8 @@ They never fail the test or prevent the normal execution upload.
 │  OTel BatchSpanProcessor                                              │
 │    └── Buildkite OTLP exporter                                        │
 │          ├── Buildkite-Test-Run-Key: <raw run key>                    │
-│          └── buildkite.test.run.key = <same raw run key>              │
+│          ├── Buildkite-Test-Job-ID: <Buildkite job UUID, when valid>   │
+│          └── matching run and job resource attributes                 │
 └────────────────────────────────┬──────────────────────────────────────┘
                                  │ OTLP/HTTP
                                  ▼
@@ -65,6 +67,12 @@ are not copied to descendants. The span finishes after RSpec reports the final
 result, including failures raised by outer hooks. The UUID format is an
 implementation detail and consumers should treat the value as opaque.
 
+When `TRACEPARENT` contains a valid Agent span context, the collector adds it as
+one span link at execution-span creation. `TRACESTATE` is preserved by the
+OpenTelemetry W3C propagator. The Agent context is never used as the parent: each
+execution retains its own trace ID and remains a parentless root. Missing or
+malformed context produces no link.
+
 ## Ownership boundaries
 
 The tested application is the service; the collector is instrumentation.
@@ -95,7 +103,9 @@ The collector adds these resource attributes when available:
 | Attribute | Value |
 | --- | --- |
 | `buildkite.test.run.key` | Raw collector run key, also sent as `Buildkite-Test-Run-Key`. |
+| `buildkite.job.id` | Canonical Buildkite job UUID, also sent as `Buildkite-Test-Job-ID`. |
 | `cicd.pipeline.run.id` | CI provider's run or workflow ID. |
+| `cicd.pipeline.task.run.id` | Same canonical Buildkite job UUID. |
 | `cicd.pipeline.run.url.full` | Valid HTTP(S) run URL without credentials. |
 | `cicd.pipeline.name` | Buildkite pipeline slug or GitHub workflow name. |
 | `vcs.ref.head.revision` | Commit SHA or revision. |
@@ -115,6 +125,11 @@ The `test.execution` root carries:
 | `buildkite.test.case.id` | RSpec example ID. |
 | `buildkite.test.runner.name` / `.version` | RSpec identity. |
 | `buildkite.test.execution.tag.<name>` | Existing execution tags. |
+
+Job attributes and the job request header are emitted only when `CI` is
+`buildkite` and `job_id` is a canonical UUID. Legacy arbitrary
+`BUILDKITE_ANALYTICS_JOB_ID` values remain available to the execution upload but
+are not promoted into typed OTLP metadata.
 
 Source paths reuse the execution upload's normalization, including
 `location_prefix` and shared-example call sites. Failure messages and stack

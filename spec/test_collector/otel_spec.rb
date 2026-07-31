@@ -4,6 +4,11 @@ require "opentelemetry/sdk"
 
 RSpec.describe Buildkite::TestCollector::OTel do
   it "starts the execution as a root when another span is active" do
+    agent_trace_id = "4bf92f3577b34da6a3ce929d0e0e4736"
+    agent_span_id = "00f067aa0ba902b7"
+    fake_env("TRACEPARENT", "00-#{agent_trace_id}-#{agent_span_id}-01")
+    fake_env("TRACESTATE", "vendor=value,buildkite=agent")
+
     exporter = OpenTelemetry::SDK::Trace::Export::InMemorySpanExporter.new
     processor = OpenTelemetry::SDK::Trace::Export::SimpleSpanProcessor.new(exporter)
     provider = OpenTelemetry::SDK::Trace::TracerProvider.new
@@ -35,6 +40,39 @@ RSpec.describe Buildkite::TestCollector::OTel do
     expect(ambient_span.trace_id).not_to eq(execution_span.trace_id)
     expect(execution_span.attributes.fetch("execution.externalId")).to eq("execution-id")
     expect(child_span.attributes).not_to have_key("execution.externalId")
+
+    expect(execution_span.links.length).to eq(1)
+    link_context = execution_span.links.first.span_context
+    expect(link_context.trace_id.unpack1("H*")).to eq(agent_trace_id)
+    expect(link_context.span_id.unpack1("H*")).to eq(agent_span_id)
+    expect(link_context.tracestate.to_s).to eq("vendor=value,buildkite=agent")
+    expect(execution_span.trace_id).not_to eq(link_context.trace_id)
+  ensure
+    described_class.instance_variable_set(:@enabled, false)
+    described_class.instance_variable_set(:@tracer, nil)
+    provider&.shutdown
+  end
+
+  it "omits the Agent link when trace context is missing or malformed" do
+    exporter = OpenTelemetry::SDK::Trace::Export::InMemorySpanExporter.new
+    processor = OpenTelemetry::SDK::Trace::Export::SimpleSpanProcessor.new(exporter)
+    provider = OpenTelemetry::SDK::Trace::TracerProvider.new
+    provider.add_span_processor(processor)
+    described_class.instance_variable_set(:@enabled, true)
+    described_class.instance_variable_set(:@tracer, provider.tracer("invalid-link-test"))
+
+    fake_env("TRACEPARENT", nil)
+    fake_env("TRACESTATE", nil)
+    missing_span = described_class.start_test_span(name: "missing-context")
+    described_class.finish_test_span(missing_span, result: "passed")
+
+    fake_env("TRACEPARENT", "not-a-traceparent")
+    fake_env("TRACESTATE", "vendor=value")
+    malformed_span = described_class.start_test_span(name: "malformed-context")
+    described_class.finish_test_span(malformed_span, result: "passed")
+    provider.force_flush
+
+    expect(exporter.finished_spans.map(&:links)).to all(be_empty)
   ensure
     described_class.instance_variable_set(:@enabled, false)
     described_class.instance_variable_set(:@tracer, nil)
@@ -103,7 +141,7 @@ RSpec.describe Buildkite::TestCollector::OTel do
     expect(described_class).not_to be_enabled
   end
 
-  it "builds run and VCS resource attributes" do
+  it "builds job, run, and VCS exporter metadata" do
     allow(ENV).to receive(:[]).and_call_original
     fake_env("BUILDKITE_BUILD_ID", "build-id")
     fake_env("BUILDKITE_PIPELINE_SLUG", "test-pipeline")
@@ -112,19 +150,24 @@ RSpec.describe Buildkite::TestCollector::OTel do
     fake_env("CIRCLE_WORKFLOW_ID", nil)
     fake_env("CI_NAME", nil)
 
-    attributes = described_class.send(
-      :resource_attributes,
-      {
-        "key" => "test-run-id",
-        "url" => "https://buildkite.com/acme/test/builds/1",
-        "branch" => "main",
-        "commit_sha" => "abc123",
-      }
-    )
+    job_id = "019c8d97-f9ad-75a5-8173-dc6c1b54b901"
+    run_env = {
+      "CI" => "buildkite",
+      "key" => "test-run-id",
+      "job_id" => job_id,
+      "url" => "https://buildkite.com/acme/test/builds/1",
+      "branch" => "main",
+      "commit_sha" => "abc123",
+    }
+    headers = described_class.send(:request_headers, run_env, nil)
+    attributes = described_class.send(:resource_attributes, run_env)
 
+    expect(headers.fetch("Buildkite-Test-Job-ID")).to eq(job_id)
     expect(attributes).to include(
       "buildkite.test.run.key" => "test-run-id",
+      "buildkite.job.id" => job_id,
       "cicd.pipeline.run.id" => "build-id",
+      "cicd.pipeline.task.run.id" => job_id,
       "cicd.pipeline.run.url.full" => "https://buildkite.com/acme/test/builds/1",
       "cicd.pipeline.name" => "test-pipeline",
       "vcs.ref.head.revision" => "abc123",
@@ -132,6 +175,24 @@ RSpec.describe Buildkite::TestCollector::OTel do
       "vcs.ref.type" => "branch",
     )
     expect(attributes).not_to have_key("buildkite.test.run.id")
+  end
+
+  it "does not promote missing, malformed, or non-Buildkite job IDs" do
+    valid_job_id = "019c8d97-f9ad-75a5-8173-dc6c1b54b901"
+    run_environments = [
+      { "CI" => "buildkite", "key" => "run-key" },
+      { "CI" => "buildkite", "key" => "run-key", "job_id" => "legacy-job-name" },
+      { "CI" => "github_actions", "key" => "run-key", "job_id" => valid_job_id },
+    ]
+
+    run_environments.each do |run_env|
+      headers = described_class.send(:request_headers, run_env, nil)
+      attributes = described_class.send(:resource_attributes, run_env)
+
+      expect(headers).not_to have_key("Buildkite-Test-Job-ID")
+      expect(attributes).not_to have_key("buildkite.job.id")
+      expect(attributes).not_to have_key("cicd.pipeline.task.run.id")
+    end
   end
 
   it "uses tag names for Buildkite tag refs and omits Codeship pull request URLs" do

@@ -19,7 +19,7 @@ RSpec.describe "RSpec execution and OpenTelemetry correlation" do
           TraceFlags = Struct.new(:sampled?)
           SpanContext = Struct.new(:trace_flags)
 
-          Span = Struct.new(:name, :span_id, :parent_span_id, :trace_id, :attributes, :status, :finished) do
+          Span = Struct.new(:name, :span_id, :parent_span_id, :trace_id, :attributes, :links, :status, :finished) do
             def context
               SpanContext.new(TraceFlags.new(true))
             end
@@ -43,12 +43,12 @@ RSpec.describe "RSpec execution and OpenTelemetry correlation" do
             @spans = []
           end
 
-          def start_span(name, with_parent: nil, attributes: {}, kind: nil)
+          def start_span(name, with_parent: nil, attributes: {}, kind: nil, links: [])
             parent = OpenTelemetry::Trace.current_span(with_parent)
             parent = nil unless parent.respond_to?(:trace_id)
             span_id = format("%016x", @spans.length + 1)
             trace_id = parent ? parent.trace_id : format("%032x", @spans.length + 1)
-            span = Span.new(name, span_id, parent ? parent.span_id : "", trace_id, attributes)
+            span = Span.new(name, span_id, parent ? parent.span_id : "", trace_id, attributes, links)
             @spans << span
             span
           end
@@ -89,6 +89,13 @@ RSpec.describe "RSpec execution and OpenTelemetry correlation" do
                 parent_span_id: span.parent_span_id,
                 trace_id: span.trace_id,
                 attributes: span.attributes,
+                links: span.links.map do |link|
+                  {
+                    trace_id: link.span_context.trace_id.unpack1("H*"),
+                    span_id: link.span_context.span_id.unpack1("H*"),
+                    trace_state: link.span_context.tracestate.to_s,
+                  }
+                end,
                 status: span.status,
                 finished: span.finished,
               }
@@ -106,13 +113,20 @@ RSpec.describe "RSpec execution and OpenTelemetry correlation" do
           it "makes an auto-instrumented span" do
             Buildkite::TestCollector.tag_execution("component", "checkout")
             $recording_otel_tracer.in_span("http.request") { nil }
+            $recording_otel_tracer.in_span("sql.query") { nil }
           end
         end
       RUBY
 
       rspec_path = Gem.bin_path("rspec-core", "rspec")
+      agent_trace_id = "4bf92f3577b34da6a3ce929d0e0e4736"
+      agent_span_id = "00f067aa0ba902b7"
       _stdout, stderr, status = Open3.capture3(
-        { "CORRELATION_RESULT_PATH" => result_path },
+        {
+          "CORRELATION_RESULT_PATH" => result_path,
+          "TRACEPARENT" => "00-#{agent_trace_id}-#{agent_span_id}-01",
+          "TRACESTATE" => "vendor=value,buildkite=agent",
+        },
         RbConfig.ruby,
         "-I#{lib_path}",
         rspec_path,
@@ -126,8 +140,8 @@ RSpec.describe "RSpec execution and OpenTelemetry correlation" do
       expect(result.fetch("uploads").length).to eq(1)
       expect(result.dig("uploads", 0, "external_id")).to eq("019c8d97-f9ad-75a5-8173-dc6c1b54b901")
 
-      expect(result.fetch("spans").length).to eq(2)
-      execution_span, child_span = result.fetch("spans")
+      expect(result.fetch("spans").length).to eq(3)
+      execution_span, *child_spans = result.fetch("spans")
       expect(execution_span.fetch("name")).to eq("test.execution")
       expect(execution_span.dig("attributes", "execution.externalId")).to eq("019c8d97-f9ad-75a5-8173-dc6c1b54b901")
       expect(execution_span.dig("attributes", "test.case.name")).to eq("instrumented example makes an auto-instrumented span")
@@ -140,12 +154,23 @@ RSpec.describe "RSpec execution and OpenTelemetry correlation" do
       expect(execution_span.dig("attributes", "buildkite.test.runner.version")).to eq(RSpec::Core::Version::STRING)
       expect(execution_span.dig("attributes", "buildkite.test.execution.tag.component")).to eq("checkout")
       expect(execution_span.fetch("finished")).to be(true)
+      expect(execution_span.fetch("parent_span_id")).to eq("")
+      expect(execution_span.fetch("trace_id")).not_to eq(agent_trace_id)
+      expect(execution_span.fetch("links")).to contain_exactly(
+        {
+          "trace_id" => agent_trace_id,
+          "span_id" => agent_span_id,
+          "trace_state" => "vendor=value,buildkite=agent",
+        }
+      )
 
-      expect(child_span.fetch("name")).to eq("http.request")
-      expect(child_span.fetch("parent_span_id")).to eq(execution_span.fetch("span_id"))
-      expect(child_span.fetch("trace_id")).to eq(execution_span.fetch("trace_id"))
-      expect(child_span.fetch("attributes")).not_to have_key("execution.externalId")
-      expect(child_span.fetch("attributes")).not_to have_key("buildkite.test.execution.tag.component")
+      expect(child_spans.map { |span| span.fetch("name") }).to contain_exactly("http.request", "sql.query")
+      child_spans.each do |child_span|
+        expect(child_span.fetch("parent_span_id")).to eq(execution_span.fetch("span_id"))
+        expect(child_span.fetch("trace_id")).to eq(execution_span.fetch("trace_id"))
+        expect(child_span.fetch("attributes")).not_to have_key("execution.externalId")
+        expect(child_span.fetch("attributes")).not_to have_key("buildkite.test.execution.tag.component")
+      end
     end
   end
 
@@ -380,7 +405,11 @@ RSpec.describe "RSpec execution and OpenTelemetry correlation" do
 
         Buildkite::TestCollector::OTel.configure!(
           endpoint: "https://example.invalid/v1/traces",
-          run_env: { "key" => "run-123" },
+          run_env: {
+            "CI" => "buildkite",
+            "key" => "run-123",
+            "job_id" => "019c8d97-f9ad-75a5-8173-dc6c1b54b901",
+          },
         )
 
         tracer = OpenTelemetry.tracer_provider.tracer("customer")
@@ -437,11 +466,17 @@ RSpec.describe "RSpec execution and OpenTelemetry correlation" do
       run_key_resource = result.dig("buildkite_resource", "buildkite.test.run.key")
       expect(run_key_header).to eq("run-123")
       expect(run_key_resource).to eq(run_key_header)
+      job_id_header = result.dig("buildkite_exporter_headers", "Buildkite-Test-Job-ID")
+      expect(job_id_header).to eq("019c8d97-f9ad-75a5-8173-dc6c1b54b901")
+      expect(result.dig("buildkite_resource", "buildkite.job.id")).to eq(job_id_header)
+      expect(result.dig("buildkite_resource", "cicd.pipeline.task.run.id")).to eq(job_id_header)
       expect(result.fetch("buildkite_resource")).not_to have_key("buildkite.test.run.id")
       expect(result.dig("buildkite_resource", "process.command")).to eq("rspec")
       expect(result.dig("customer_resource", "service.name")).to eq("customer-service")
       expect(result.dig("customer_resource", "process.command")).to eq("/private/customer/bin/rspec")
       expect(result.fetch("customer_resource")).not_to have_key("buildkite.test.run.key")
+      expect(result.fetch("customer_resource")).not_to have_key("buildkite.job.id")
+      expect(result.fetch("customer_resource")).not_to have_key("cicd.pipeline.task.run.id")
       expect(result.fetch("customer_resource")).not_to have_key("buildkite.test.run.id")
     end
   end

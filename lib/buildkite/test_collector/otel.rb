@@ -11,6 +11,7 @@ module Buildkite::TestCollector
     BUILDKITE_RESULT_STATUS_ATTRIBUTE = "buildkite.test.case.result.status"
     PROCESSOR_TIMEOUT_SECONDS = 5
     RUN_KEY_FORMAT = /\A[!-~]{1,255}\z/
+    UUID_FORMAT = /\A[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}\z/
 
     class ResourceMergingExporter
       def initialize(exporter, resource)
@@ -103,16 +104,13 @@ module Buildkite::TestCollector
         require "opentelemetry/exporter/otlp"
         require "opentelemetry/instrumentation/all"
 
-        headers = { "Buildkite-Test-Run-Key" => run_key }
-        headers["Authorization"] = "Token token=\"#{api_token}\"" if api_token
-
         resource = OpenTelemetry::SDK::Resources::Resource.create(
           resource_attributes(run_env)
         )
         exporter = ResourceMergingExporter.new(
           OpenTelemetry::Exporter::OTLP::Exporter.new(
             endpoint: endpoint,
-            headers: headers,
+            headers: request_headers(run_env, api_token),
           ),
           resource,
         )
@@ -151,11 +149,13 @@ module Buildkite::TestCollector
       def start_test_span(name:, external_id: nil)
         return unless enabled?
 
+        link = agent_link
         @tracer.start_span(
           name,
           with_parent: OpenTelemetry::Context.empty,
           attributes: { EXECUTION_EXTERNAL_ID_ATTRIBUTE => external_id }.compact,
           kind: :internal,
+          links: [link].compact,
         )
       end
 
@@ -226,10 +226,21 @@ module Buildkite::TestCollector
         warn "[buildkite-test_collector] Could not shut down OpenTelemetry span export: #{e.class}: #{e.message}"
       end
 
+      def request_headers(run_env, api_token)
+        headers = { "Buildkite-Test-Run-Key" => run_env["key"] }
+        job_id = buildkite_job_id(run_env)
+        headers["Buildkite-Test-Job-ID"] = job_id if job_id
+        headers["Authorization"] = "Token token=\"#{api_token}\"" if api_token
+        headers
+      end
+
       def resource_attributes(run_env)
+        job_id = buildkite_job_id(run_env)
         attributes = {
           "buildkite.test.run.key" => run_env["key"],
+          "buildkite.job.id" => job_id,
           "cicd.pipeline.run.id" => pipeline_run_id,
+          "cicd.pipeline.task.run.id" => job_id,
           "cicd.pipeline.run.url.full" => pipeline_run_url(run_env),
           "cicd.pipeline.name" => pipeline_name,
           "vcs.ref.head.revision" => run_env["commit_sha"],
@@ -237,6 +248,26 @@ module Buildkite::TestCollector
           "vcs.ref.type" => vcs_ref_type(run_env),
         }
         attributes.select { |_, value| value && !value.to_s.empty? }
+      end
+
+      def buildkite_job_id(run_env)
+        job_id = run_env["job_id"]
+        job_id if run_env["CI"] == "buildkite" && job_id.is_a?(String) && job_id.match?(UUID_FORMAT)
+      end
+
+      def agent_link
+        carrier = {
+          "traceparent" => ENV["TRACEPARENT"],
+          "tracestate" => ENV["TRACESTATE"],
+        }.compact
+        return if carrier.empty?
+
+        propagator = OpenTelemetry::Trace::Propagation::TraceContext::TextMapPropagator.new
+        context = propagator.extract(carrier, context: OpenTelemetry::Context.empty)
+        span_context = OpenTelemetry::Trace.current_span(context).context
+        OpenTelemetry::Trace::Link.new(span_context) if span_context.valid?
+      rescue StandardError
+        nil
       end
 
       def pipeline_run_id
