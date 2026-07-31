@@ -15,10 +15,6 @@ class Buildkite::TestCollector::CI
 
   def ci_env
     return buildkite if ENV["BUILDKITE_BUILD_ID"]
-    return github_actions if ENV["GITHUB_RUN_NUMBER"]
-    return circleci if ENV["CIRCLE_BUILD_NUM"]
-    return codeship if ENV["CI_NAME"] == "codeship"
-    return generic if ENV["CI"]
 
     {
       "CI" => nil,
@@ -46,13 +42,6 @@ class Buildkite::TestCollector::CI
     }.select { |_, value| !value.nil? }
   end
 
-  def generic
-    {
-      "CI" => "generic",
-      "key" => Buildkite::TestCollector::UUID.call,
-    }
-  end
-
   def buildkite
     {
       "CI" => "buildkite",
@@ -63,40 +52,6 @@ class Buildkite::TestCollector::CI
       "number" => ENV["BUILDKITE_BUILD_NUMBER"],
       "job_id" => ENV["BUILDKITE_JOB_ID"],
       "message" => ENV["BUILDKITE_MESSAGE"],
-    }
-  end
-
-  def github_actions
-    {
-      "CI" => "github_actions",
-      "key" => "#{ENV["GITHUB_ACTION"]}-#{ENV["GITHUB_RUN_NUMBER"]}-#{ENV["GITHUB_RUN_ATTEMPT"]}",
-      "url" => File.join("https://github.com", ENV["GITHUB_REPOSITORY"], "actions/runs", ENV["GITHUB_RUN_ID"]),
-      "branch" => ENV["GITHUB_REF_NAME"],
-      "commit_sha" => ENV["GITHUB_SHA"],
-      "number" => ENV["GITHUB_RUN_NUMBER"],
-    }
-  end
-
-  def circleci
-    {
-      "CI" => "circleci",
-      "key" => "#{ENV["CIRCLE_WORKFLOW_ID"]}-#{ENV["CIRCLE_BUILD_NUM"]}",
-      "url" => ENV["CIRCLE_BUILD_URL"],
-      "branch" => ENV["CIRCLE_BRANCH"],
-      "commit_sha" => ENV["CIRCLE_SHA1"],
-      "number" => ENV["CIRCLE_BUILD_NUM"],
-    }
-  end
-
-  def codeship
-    {
-      "CI" => "codeship",
-      "key" => "#{ENV["CI_BUILD_ID"]}",
-      "url" => ENV["CI_PULL_REQUEST"],
-      "branch" => ENV["CI_BRANCH"],
-      "commit_sha" => ENV["CI_COMMIT_ID"],
-      "number" => nil,
-      "message" => ENV["CI_COMMIT_MESSAGE"],
     }
   end
 end

@@ -148,9 +148,6 @@ RSpec.describe Buildkite::TestCollector::OTel do
     fake_env("BUILDKITE_JOB_ID", job_id)
     fake_env("BUILDKITE_PIPELINE_SLUG", "test-pipeline")
     fake_env("BUILDKITE_TAG", nil)
-    fake_env("GITHUB_RUN_ID", nil)
-    fake_env("CIRCLE_WORKFLOW_ID", nil)
-    fake_env("CI_NAME", nil)
 
     run_env = {
       "CI" => "buildkite",
@@ -237,29 +234,14 @@ RSpec.describe Buildkite::TestCollector::OTel do
     Buildkite::TestCollector.env = original_collector_env
   end
 
-  it "uses tag names for Buildkite tag refs and omits Codeship pull request URLs" do
+  it "uses tag names for Buildkite tag refs" do
     allow(ENV).to receive(:[]).and_call_original
-    fake_env("BUILDKITE_BUILD_ID", "build-id")
     fake_env("BUILDKITE_TAG", "v3.0.0")
-    fake_env("BUILDKITE_ANALYTICS_URL", nil)
-    fake_env("GITHUB_RUN_ID", nil)
-    fake_env("CIRCLE_WORKFLOW_ID", nil)
-    fake_env("CI_NAME", nil)
 
     tag_attributes = described_class.send(:resource_attributes, { "branch" => "main" })
     expect(tag_attributes).to include(
       "vcs.ref.head.name" => "v3.0.0",
       "vcs.ref.type" => "tag",
     )
-
-    fake_env("BUILDKITE_BUILD_ID", nil)
-    codeship_attributes = described_class.send(
-      :resource_attributes,
-      {
-        "CI" => "codeship",
-        "url" => "https://github.com/acme/repo/pull/123",
-      }
-    )
-    expect(codeship_attributes).not_to have_key("cicd.pipeline.run.url.full")
   end
 end

@@ -239,10 +239,10 @@ module Buildkite::TestCollector
         attributes = {
           "buildkite.test.run.key" => run_env["key"],
           "buildkite.job.id" => job_id,
-          "cicd.pipeline.run.id" => pipeline_run_id,
+          "cicd.pipeline.run.id" => ENV["BUILDKITE_BUILD_ID"],
           "cicd.pipeline.task.run.id" => job_id,
-          "cicd.pipeline.run.url.full" => pipeline_run_url(run_env),
-          "cicd.pipeline.name" => pipeline_name,
+          "cicd.pipeline.run.url.full" => valid_http_url(run_env["url"]),
+          "cicd.pipeline.name" => ENV["BUILDKITE_PIPELINE_SLUG"],
           "vcs.ref.head.revision" => run_env["commit_sha"],
           "vcs.ref.head.name" => vcs_ref_name(run_env),
           "vcs.ref.type" => vcs_ref_type(run_env),
@@ -270,24 +270,6 @@ module Buildkite::TestCollector
         nil
       end
 
-      def pipeline_run_id
-        return ENV["BUILDKITE_BUILD_ID"] if ENV["BUILDKITE_BUILD_ID"]
-        return ENV["GITHUB_RUN_ID"] if ENV["GITHUB_RUN_ID"]
-        return ENV["CIRCLE_WORKFLOW_ID"] if ENV["CIRCLE_WORKFLOW_ID"]
-        return ENV["CI_BUILD_ID"] if ENV["CI_NAME"] == "codeship"
-      end
-
-      def pipeline_name
-        return ENV["BUILDKITE_PIPELINE_SLUG"] if ENV["BUILDKITE_BUILD_ID"]
-        return ENV["GITHUB_WORKFLOW"] if ENV["GITHUB_RUN_ID"]
-      end
-
-      def pipeline_run_url(run_env)
-        return if run_env["CI"] == "codeship" && !ENV["BUILDKITE_ANALYTICS_URL"]
-
-        valid_http_url(run_env["url"])
-      end
-
       def vcs_ref_name(run_env)
         return ENV["BUILDKITE_TAG"] if ENV["BUILDKITE_TAG"] && !ENV["BUILDKITE_TAG"].empty?
 
@@ -295,7 +277,6 @@ module Buildkite::TestCollector
       end
 
       def vcs_ref_type(run_env)
-        return ENV["GITHUB_REF_TYPE"] if %w[branch tag].include?(ENV["GITHUB_REF_TYPE"])
         return "tag" if ENV["BUILDKITE_TAG"] && !ENV["BUILDKITE_TAG"].empty?
         return "branch" if run_env["branch"] && !run_env["branch"].empty?
       end
