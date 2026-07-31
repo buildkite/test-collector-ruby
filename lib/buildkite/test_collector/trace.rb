@@ -8,22 +8,14 @@ module Buildkite
           external_id: @external_id,
           scope: scope,
           name: name,
-          location: serialized_location,
-          file_name: serialized_file_name,
+          location: prepend_location_prefix(location),
+          file_name: prepend_location_prefix(file_name),
           result: result,
           failure_reason: failure_reason,
           failure_expanded: failure_expanded,
           history: history,
           tags: tags,
         ).select { |_, value| !value.nil? }
-      end
-
-      def serialized_file_name
-        strip_invalid_utf8_chars(prepend_location_prefix(file_name))
-      end
-
-      def serialized_location
-        strip_invalid_utf8_chars(prepend_location_prefix(location))
       end
 
       private

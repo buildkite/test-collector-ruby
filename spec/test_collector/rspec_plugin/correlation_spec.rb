@@ -71,12 +71,7 @@ RSpec.describe "RSpec execution and OpenTelemetry correlation" do
         end
 
         $recording_otel_tracer = RecordingOTelTracer.new
-        Buildkite::TestCollector::OTel.instance_variable_set(:@enabled, true)
         Buildkite::TestCollector::OTel.instance_variable_set(:@tracer, $recording_otel_tracer)
-        Buildkite::TestCollector::OTel.define_singleton_method(:force_flush) { nil }
-        Buildkite::TestCollector::OTel.define_singleton_method(:shutdown) do
-          instance_variable_set(:@enabled, false)
-        end
 
         at_exit do
           result = {
@@ -190,12 +185,7 @@ RSpec.describe "RSpec execution and OpenTelemetry correlation" do
         raising_tracer.define_singleton_method(:start_span) do |**_options|
           raise "customer processor failed"
         end
-        Buildkite::TestCollector::OTel.instance_variable_set(:@enabled, true)
         Buildkite::TestCollector::OTel.instance_variable_set(:@tracer, raising_tracer)
-        Buildkite::TestCollector::OTel.define_singleton_method(:force_flush) { nil }
-        Buildkite::TestCollector::OTel.define_singleton_method(:shutdown) do
-          instance_variable_set(:@enabled, false)
-        end
 
         at_exit do
           File.write(
@@ -249,15 +239,10 @@ RSpec.describe "RSpec execution and OpenTelemetry correlation" do
         provider = OpenTelemetry::SDK::Trace::TracerProvider.new(
           sampler: OpenTelemetry::SDK::Trace::Samplers::ALWAYS_OFF,
         )
-        Buildkite::TestCollector::OTel.instance_variable_set(:@enabled, true)
         Buildkite::TestCollector::OTel.instance_variable_set(
           :@tracer,
           provider.tracer("unsampled-test"),
         )
-        Buildkite::TestCollector::OTel.define_singleton_method(:force_flush) { nil }
-        Buildkite::TestCollector::OTel.define_singleton_method(:shutdown) do
-          instance_variable_set(:@enabled, false)
-        end
 
         at_exit do
           provider.shutdown
@@ -321,12 +306,10 @@ RSpec.describe "RSpec execution and OpenTelemetry correlation" do
         processor = OpenTelemetry::SDK::Trace::Export::SimpleSpanProcessor.new(exporter)
         provider = OpenTelemetry::SDK::Trace::TracerProvider.new
         provider.add_span_processor(processor)
-        Buildkite::TestCollector::OTel.instance_variable_set(:@enabled, true)
         Buildkite::TestCollector::OTel.instance_variable_set(
           :@tracer,
           provider.tracer("final-result-test"),
         )
-        Buildkite::TestCollector::OTel.define_singleton_method(:force_flush) { provider.force_flush }
         Buildkite::TestCollector::OTel.define_singleton_method(:shutdown) do
           provider.force_flush
           span = exporter.finished_spans.find { |item| item.name == "test.execution" }
@@ -337,7 +320,7 @@ RSpec.describe "RSpec execution and OpenTelemetry correlation" do
               status: span.status.code,
             ),
           )
-          instance_variable_set(:@enabled, false)
+          instance_variable_set(:@tracer, nil)
         end
 
         RSpec.describe "outer hook failure" do
@@ -417,7 +400,7 @@ RSpec.describe "RSpec execution and OpenTelemetry correlation" do
 
         tracer = OpenTelemetry.tracer_provider.tracer("customer")
         tracer.in_span("before-buildkite-shutdown") { nil }
-        Buildkite::TestCollector::OTel.force_flush
+        OpenTelemetry.tracer_provider.force_flush
 
         buildkite_span = buildkite_exporter.finished_spans.find do |span|
           span.name == "before-buildkite-shutdown"
@@ -515,7 +498,7 @@ RSpec.describe "RSpec execution and OpenTelemetry correlation" do
 
         tracer = provider.tracer("customer")
         tracer.in_span("proxy-provider-span") { nil }
-        Buildkite::TestCollector::OTel.force_flush
+        provider.force_flush
 
         buildkite_span = buildkite_exporter.finished_spans.find do |span|
           span.name == "proxy-provider-span"

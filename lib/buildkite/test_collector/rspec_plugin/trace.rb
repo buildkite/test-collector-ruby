@@ -33,7 +33,7 @@ module Buildkite::TestCollector::RSpecPlugin
       {
         "test.case.name" => example.full_description,
         "test.suite.name" => example.example_group.metadata[:full_description],
-        "code.file.path" => serialized_file_name,
+        "code.file.path" => strip_invalid_utf8_chars(prepend_location_prefix(file_name)),
         "code.line.number" => source_line_number,
         "buildkite.test.case.id" => example.id,
         "buildkite.test.runner.name" => "rspec",

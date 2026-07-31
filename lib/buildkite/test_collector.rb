@@ -44,7 +44,6 @@ module Buildkite
       attr_accessor :batch_size
       attr_accessor :trace_min_duration
       attr_accessor :span_filters
-      attr_accessor :otlp_endpoint
       attr_accessor :run_env
     end
 
@@ -58,7 +57,6 @@ module Buildkite
       self.tracing_enabled = tracing_enabled
       self.artifact_path = artifact_path
       self.location_prefix = location_prefix || ENV["BUILDKITE_ANALYTICS_LOCATION_PREFIX"]
-      self.otlp_endpoint = otlp_endpoint || ENV["BUILDKITE_ANALYTICS_OTLP_ENDPOINT"]
       self.test_runner = hook.to_s
       self.env = env
       self.tags = tags
@@ -75,7 +73,15 @@ module Buildkite
         self.span_filters << MinDurationSpanFilter.new(self.trace_min_duration)
       end
 
-      self.enable_otel!
+      endpoint = otlp_endpoint || ENV["BUILDKITE_ANALYTICS_OTLP_ENDPOINT"]
+      if test_runner == "rspec" && !endpoint.to_s.empty?
+        self.run_env = Buildkite::TestCollector::CI.env
+        Buildkite::TestCollector::OTel.configure!(
+          endpoint: endpoint,
+          api_token: api_token,
+          run_env: run_env,
+        )
+      end
       self.hook_into(hook)
     end
 
@@ -117,18 +123,6 @@ module Buildkite
       ActiveSupport::Notifications.subscribe("sql.active_record") do |name, start, finish, id, payload|
         Buildkite::TestCollector::Uploader.tracer&.backfill(:sql, finish - start, **{ query: payload[:sql] })
       end
-    end
-
-    def self.enable_otel!
-      return unless test_runner == "rspec"
-      return unless otlp_endpoint && !otlp_endpoint.to_s.empty?
-
-      self.run_env = Buildkite::TestCollector::CI.env
-      Buildkite::TestCollector::OTel.configure!(
-        endpoint: otlp_endpoint,
-        api_token: api_token,
-        run_env: run_env,
-      )
     end
 
     class MinDurationSpanFilter

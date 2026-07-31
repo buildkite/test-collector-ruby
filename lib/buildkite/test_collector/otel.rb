@@ -89,11 +89,11 @@ module Buildkite::TestCollector
 
     class << self
       def enabled?
-        @enabled == true
+        !@tracer.nil?
       end
 
       def configure!(endpoint:, api_token: nil, run_env: {})
-        return if @enabled
+        return if enabled?
 
         run_key = run_env["key"]
         unless run_key.is_a?(String) && run_key.match?(RUN_KEY_FORMAT)
@@ -137,30 +137,28 @@ module Buildkite::TestCollector
         @tracer = provider.tracer(
           "buildkite-test-collector", Buildkite::TestCollector::VERSION
         )
-        @enabled = true
       rescue LoadError, StandardError => e
         warn "[buildkite-test_collector] OpenTelemetry span export disabled: #{e.class}: #{e.message}"
-        shutdown_processor(@processor)
-        @processor = nil
-        @tracer = nil
-        @enabled = false
+        shutdown
       end
 
-      def start_test_span(name:, external_id: nil)
-        return unless enabled?
+      def start_test_span
+        return [nil, nil] unless enabled?
 
+        # Join the independently ingested upload and span without dangling IDs for unsampled spans.
+        external_id = Buildkite::TestCollector::UUID.v7
         link = agent_link
-        @tracer.start_span(
-          name,
+        span = @tracer.start_span(
+          "test.execution",
           with_parent: OpenTelemetry::Context.empty,
-          attributes: { EXECUTION_EXTERNAL_ID_ATTRIBUTE => external_id }.compact,
+          attributes: { EXECUTION_EXTERNAL_ID_ATTRIBUTE => external_id },
           kind: :internal,
           links: [link].compact,
         )
-      end
-
-      def sampled?(span)
-        span&.context&.trace_flags&.sampled? == true
+        [span, span.context.trace_flags.sampled? ? external_id : nil]
+      rescue StandardError => e
+        warn "[buildkite-test_collector] Could not start OpenTelemetry test span: #{e.class}: #{e.message}"
+        [nil, nil]
       end
 
       def with_test_span(span)
@@ -200,31 +198,16 @@ module Buildkite::TestCollector
         end
       end
 
-      def force_flush
-        return unless enabled?
-
-        @processor.force_flush(timeout: PROCESSOR_TIMEOUT_SECONDS)
-      rescue StandardError => e
-        warn "[buildkite-test_collector] Could not flush OpenTelemetry spans: #{e.class}: #{e.message}"
-      end
-
       def shutdown
-        return unless enabled?
-
-        shutdown_processor(@processor)
+        @processor&.shutdown(timeout: PROCESSOR_TIMEOUT_SECONDS)
+      rescue StandardError => e
+        warn "[buildkite-test_collector] Could not shut down OpenTelemetry span export: #{e.class}: #{e.message}"
       ensure
-        @enabled = false
         @processor = nil
         @tracer = nil
       end
 
       private
-
-      def shutdown_processor(processor)
-        processor&.shutdown(timeout: PROCESSOR_TIMEOUT_SECONDS)
-      rescue StandardError => e
-        warn "[buildkite-test_collector] Could not shut down OpenTelemetry span export: #{e.class}: #{e.message}"
-      end
 
       def request_headers(run_env, api_token)
         headers = { "Buildkite-Test-Run-Key" => run_env["key"] }

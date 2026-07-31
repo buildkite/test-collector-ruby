@@ -15,14 +15,12 @@ RSpec.describe Buildkite::TestCollector::OTel do
     provider.add_span_processor(processor)
     tracer = provider.tracer("correlation-test")
 
-    described_class.instance_variable_set(:@enabled, true)
     described_class.instance_variable_set(:@tracer, tracer)
+    allow(Buildkite::TestCollector::UUID).to receive(:v7) { "execution-id" }
 
     tracer.in_span("ambient") do
-      execution_span = described_class.start_test_span(
-        name: "test.execution",
-        external_id: "execution-id",
-      )
+      execution_span, external_id = described_class.start_test_span
+      expect(external_id).to eq("execution-id")
       described_class.with_test_span(execution_span) do
         tracer.in_span("child") { nil }
       end
@@ -48,7 +46,6 @@ RSpec.describe Buildkite::TestCollector::OTel do
     expect(link_context.tracestate.to_s).to eq("vendor=value,buildkite=agent")
     expect(execution_span.trace_id).not_to eq(link_context.trace_id)
   ensure
-    described_class.instance_variable_set(:@enabled, false)
     described_class.instance_variable_set(:@tracer, nil)
     provider&.shutdown
   end
@@ -58,23 +55,21 @@ RSpec.describe Buildkite::TestCollector::OTel do
     processor = OpenTelemetry::SDK::Trace::Export::SimpleSpanProcessor.new(exporter)
     provider = OpenTelemetry::SDK::Trace::TracerProvider.new
     provider.add_span_processor(processor)
-    described_class.instance_variable_set(:@enabled, true)
     described_class.instance_variable_set(:@tracer, provider.tracer("invalid-link-test"))
 
     fake_env("TRACEPARENT", nil)
     fake_env("TRACESTATE", nil)
-    missing_span = described_class.start_test_span(name: "missing-context")
+    missing_span, = described_class.start_test_span
     described_class.finish_test_span(missing_span, result: "passed")
 
     fake_env("TRACEPARENT", "not-a-traceparent")
     fake_env("TRACESTATE", "vendor=value")
-    malformed_span = described_class.start_test_span(name: "malformed-context")
+    malformed_span, = described_class.start_test_span
     described_class.finish_test_span(malformed_span, result: "passed")
     provider.force_flush
 
     expect(exporter.finished_spans.map(&:links)).to all(be_empty)
   ensure
-    described_class.instance_variable_set(:@enabled, false)
     described_class.instance_variable_set(:@tracer, nil)
     provider&.shutdown
   end
@@ -111,19 +106,16 @@ RSpec.describe Buildkite::TestCollector::OTel do
     expect(skipped_span.finished).to be(true)
   end
 
-  it "does not raise when flushing or shutting down its processor fails" do
+  it "does not raise when shutting down its processor fails" do
     processor = double("OpenTelemetry processor")
-    allow(processor).to receive(:force_flush).and_raise("flush failed")
     allow(processor).to receive(:shutdown).and_raise("shutdown failed")
-    described_class.instance_variable_set(:@enabled, true)
     described_class.instance_variable_set(:@processor, processor)
 
-    expect { described_class.force_flush }.not_to raise_error
     expect { described_class.shutdown }.not_to raise_error
     expect(described_class).not_to be_enabled
   ensure
-    described_class.instance_variable_set(:@enabled, false)
     described_class.instance_variable_set(:@processor, nil)
+    described_class.instance_variable_set(:@tracer, nil)
   end
 
   it "fails open when an OpenTelemetry dependency cannot be loaded" do
