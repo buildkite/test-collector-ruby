@@ -9,11 +9,13 @@ RSpec.describe Buildkite::TestCollector::RSpecPlugin::Trace do
       history: history,
       tags: tags,
       location_prefix: location_prefix,
+      external_id: external_id,
     )
   end
 
   let(:example) { double(id: "test for invalid character '\xC8'").as_null_object }
   let(:location_prefix) { nil }
+  let(:external_id) { nil }
 
   let(:history) do
     {
@@ -70,6 +72,14 @@ RSpec.describe Buildkite::TestCollector::RSpecPlugin::Trace do
 
       it "includes the tags" do
         expect(trace.as_hash[:tags]).to eq({ "hello" => "world" })
+      end
+    end
+
+    context "with an external ID" do
+      let(:external_id) { "019c8d97-f9ad-75a5-8173-dc6c1b54b901" }
+
+      it "includes the external ID" do
+        expect(trace.as_hash[:external_id]).to eq(external_id)
       end
     end
   end
