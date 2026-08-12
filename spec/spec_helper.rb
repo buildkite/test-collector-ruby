@@ -19,6 +19,12 @@ Dir["spec/support/**/*.rb"].each { |f| require File.expand_path(f) }
 Buildkite::TestCollector.configure(hook: :rspec)
 
 RSpec.configure do |config|
+  # The OpenTelemetry gems need Ruby 3.3, so their specs are written for it and
+  # older Rubies must not even parse them.
+  unless Gem::Version.new(RUBY_VERSION) >= Gem::Version.new('3.3')
+    config.exclude_pattern = "**/{otel_spec,correlation_spec}.rb"
+  end
+
   # Enable flags like --only-failures and --next-failure
   config.example_status_persistence_file_path = ".rspec_status"
 
