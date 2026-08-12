@@ -237,7 +237,10 @@ RSpec.describe "RSpec execution and OpenTelemetry correlation" do
       RUBY
 
       stdout, stderr, status = Open3.capture3(
-        { "PROVIDER_RESULT_PATH" => result_path },
+        {
+          "PROVIDER_RESULT_PATH" => result_path,
+          "BUILDKITE_ANALYTICS_OTLP_OIDC_TOKEN" => "test-oidc-jwt",
+        },
         RbConfig.ruby,
         "-I#{lib_path}",
         fixture_path,
@@ -311,7 +314,10 @@ RSpec.describe "RSpec execution and OpenTelemetry correlation" do
       RUBY
 
       stdout, stderr, status = Open3.capture3(
-        { "PROXY_PROVIDER_RESULT_PATH" => result_path },
+        {
+          "PROXY_PROVIDER_RESULT_PATH" => result_path,
+          "BUILDKITE_ANALYTICS_OTLP_OIDC_TOKEN" => "test-oidc-jwt",
+        },
         RbConfig.ruby,
         "-I#{lib_path}",
         fixture_path,

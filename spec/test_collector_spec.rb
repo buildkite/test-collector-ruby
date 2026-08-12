@@ -56,7 +56,6 @@ RSpec.describe Buildkite::TestCollector do
 
       expect(Buildkite::TestCollector::OTel).to have_received(:configure!).with(
         endpoint: "https://example.invalid/v1/traces",
-        api_token: nil,
         run_env: run_env,
       )
     end
@@ -70,7 +69,6 @@ RSpec.describe Buildkite::TestCollector do
 
       expect(Buildkite::TestCollector::OTel).to have_received(:configure!).with(
         endpoint: "https://example.invalid/v1/traces",
-        api_token: nil,
         run_env: { "key" => "run-key" },
       )
     end

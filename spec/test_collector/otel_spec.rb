@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "open3"
 require "opentelemetry/sdk"
 
 RSpec.describe Buildkite::TestCollector::OTel do
@@ -170,11 +171,16 @@ RSpec.describe Buildkite::TestCollector::OTel do
     fake_env("BUILDKITE_COMMIT", "abc123")
     fake_env("BUILDKITE_TAG", nil)
 
+    fake_env("BUILDKITE_ANALYTICS_OTLP_OIDC_TOKEN", "oidc-jwt")
+
     run_env = { "key" => "test-run-id" }
-    headers = described_class.send(:request_headers, run_env, nil)
+    headers = described_class.send(:request_headers, run_env)
     attributes = described_class.send(:resource_attributes, run_env)
 
-    expect(headers.fetch("Buildkite-Test-Job-ID")).to eq(job_id)
+    expect(headers).to eq(
+      "Buildkite-Test-Run-Key" => "test-run-id",
+      "Authorization" => "Token oidc-jwt",
+    )
     expect(attributes).to include(
       "buildkite.test.run.key" => "test-run-id",
       "buildkite.job.id" => job_id,
@@ -198,5 +204,33 @@ RSpec.describe Buildkite::TestCollector::OTel do
       "vcs.ref.head.name" => "v3.0.0",
       "vcs.ref.type" => "tag",
     )
+  end
+
+  it "requests an agent OIDC token when only the audience is configured" do
+    allow(ENV).to receive(:[]).and_call_original
+    fake_env("BUILDKITE_ANALYTICS_OTLP_OIDC_TOKEN", nil)
+    fake_env("BUILDKITE_ANALYTICS_OTLP_OIDC_AUDIENCE", "https://buildkite.com/organizations/acme/analytics/suites/rspec")
+
+    status = double("status", success?: true)
+    allow(Open3).to receive(:capture2).and_return(["agent-jwt\n", status])
+
+    headers = described_class.send(:request_headers, { "key" => "run-key" })
+
+    expect(Open3).to have_received(:capture2).with(
+      "buildkite-agent", "oidc", "request-token",
+      "--audience", "https://buildkite.com/organizations/acme/analytics/suites/rspec",
+      "--lifetime", "3600",
+    )
+    expect(headers.fetch("Authorization")).to eq("Token agent-jwt")
+  end
+
+  it "fails when no OIDC token or audience is configured" do
+    allow(ENV).to receive(:[]).and_call_original
+    fake_env("BUILDKITE_ANALYTICS_OTLP_OIDC_TOKEN", nil)
+    fake_env("BUILDKITE_ANALYTICS_OTLP_OIDC_AUDIENCE", nil)
+
+    expect do
+      described_class.send(:request_headers, { "key" => "run-key" })
+    end.to raise_error(/BUILDKITE_ANALYTICS_OTLP_OIDC_TOKEN/)
   end
 end

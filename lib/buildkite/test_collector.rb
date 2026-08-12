@@ -29,6 +29,9 @@ require_relative "test_collector/otel"
 module Buildkite
   module TestCollector
     DEFAULT_URL = "https://analytics-api.buildkite.com/v1/uploads"
+    # OTLP trace ingest lives on a dedicated subdomain so it can move off the
+    # main API fleet without collectors changing endpoints.
+    DEFAULT_OTLP_ENDPOINT = "https://test-otlp.buildkite.com/v1/traces"
     DEFAULT_UPLOAD_BATCH_SIZE = 500
     class << self
       attr_accessor :api_token
@@ -74,16 +77,24 @@ module Buildkite
       end
 
       endpoint = otlp_endpoint || ENV["BUILDKITE_ANALYTICS_OTLP_ENDPOINT"]
+      if endpoint.to_s.empty? && otlp_oidc_configured?
+        endpoint = DEFAULT_OTLP_ENDPOINT
+      end
       if test_runner == "rspec" && !endpoint.to_s.empty?
         self.run_env = Buildkite::TestCollector::CI.env
         Buildkite::TestCollector::OTel.configure!(
           endpoint: endpoint,
-          api_token: api_token,
           run_env: run_env,
         )
       end
       self.hook_into(hook)
     end
+
+    def self.otlp_oidc_configured?
+      !ENV["BUILDKITE_ANALYTICS_OTLP_OIDC_TOKEN"].to_s.empty? ||
+        !ENV["BUILDKITE_ANALYTICS_OTLP_OIDC_AUDIENCE"].to_s.empty?
+    end
+    private_class_method :otlp_oidc_configured?
 
     def self.hook_into(hook)
       file = "test_collector/library_hooks/#{hook}"

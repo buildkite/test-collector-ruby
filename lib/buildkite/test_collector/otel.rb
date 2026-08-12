@@ -8,6 +8,7 @@ module Buildkite::TestCollector
     TEST_RESULT_STATUS_ATTRIBUTE = "test.case.result.status"
     BUILDKITE_RESULT_STATUS_ATTRIBUTE = "buildkite.test.case.result.status"
     PROCESSOR_TIMEOUT_SECONDS = 5
+    OIDC_TOKEN_LIFETIME_SECONDS = 3600
 
     class ResourceMergingExporter
       def initialize(exporter, resource)
@@ -88,7 +89,7 @@ module Buildkite::TestCollector
         !@tracer.nil?
       end
 
-      def configure!(endpoint:, api_token: nil, run_env: {})
+      def configure!(endpoint:, run_env: {})
         return if enabled?
 
         require "opentelemetry/sdk"
@@ -101,7 +102,7 @@ module Buildkite::TestCollector
         exporter = ResourceMergingExporter.new(
           OpenTelemetry::Exporter::OTLP::Exporter.new(
             endpoint: endpoint,
-            headers: request_headers(run_env, api_token),
+            headers: request_headers(run_env),
           ),
           resource,
         )
@@ -200,12 +201,35 @@ module Buildkite::TestCollector
 
       private
 
-      def request_headers(run_env, api_token)
-        headers = { "Buildkite-Test-Run-Key" => run_env["key"] }
-        job_id = ENV["BUILDKITE_JOB_ID"]
-        headers["Buildkite-Test-Job-ID"] = job_id if job_id
-        headers["Authorization"] = "Token token=\"#{api_token}\"" if api_token
-        headers
+      # The /v1/traces endpoint authenticates with an agent OIDC token whose
+      # audience is the suite URL; the job ID is derived server-side from the
+      # token, so it is no longer sent as a header.
+      def request_headers(run_env)
+        {
+          "Buildkite-Test-Run-Key" => run_env["key"],
+          "Authorization" => "Token #{oidc_token!}",
+        }
+      end
+
+      def oidc_token!
+        token = ENV["BUILDKITE_ANALYTICS_OTLP_OIDC_TOKEN"]
+        return token unless token.to_s.empty?
+
+        audience = ENV["BUILDKITE_ANALYTICS_OTLP_OIDC_AUDIENCE"]
+        if audience.to_s.empty?
+          raise "OTLP export requires BUILDKITE_ANALYTICS_OTLP_OIDC_TOKEN or " \
+            "BUILDKITE_ANALYTICS_OTLP_OIDC_AUDIENCE (the suite URL) to authenticate"
+        end
+
+        require "open3"
+        output, status = Open3.capture2(
+          "buildkite-agent", "oidc", "request-token",
+          "--audience", audience,
+          "--lifetime", OIDC_TOKEN_LIFETIME_SECONDS.to_s,
+        )
+        raise "buildkite-agent oidc request-token failed" unless status.success?
+
+        output.strip
       end
 
       def resource_attributes(run_env)
