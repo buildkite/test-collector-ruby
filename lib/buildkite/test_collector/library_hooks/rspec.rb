@@ -34,7 +34,6 @@ RSpec.configure do |config|
       Thread.current[:_buildkite_tags] = nil
 
       tracer.finalize
-      Buildkite::TestCollector::OTel.finish_test_span(otel_span)
 
       trace = Buildkite::TestCollector::RSpecPlugin::Trace.new(
         example,
@@ -44,6 +43,10 @@ RSpec.configure do |config|
         external_id: Buildkite::TestCollector::UUID.v7,
         trace_id: trace_id,
       )
+
+      # Finish the span here rather than from the reporter, so its duration is
+      # the example itself and not the reporting that follows.
+      Buildkite::TestCollector::OTel.finish_test_span(otel_span, test: trace)
 
       Buildkite::TestCollector.uploader.traces[example.id] = trace
     end

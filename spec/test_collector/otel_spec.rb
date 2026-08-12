@@ -64,6 +64,55 @@ if Gem::Version.new(RUBY_VERSION) >= Gem::Version.new("3.3")
       provider&.shutdown
     end
 
+    it "records what the test was and how it went" do
+      span_class = Struct.new(:attributes, :status, :ended) do
+        def set_attribute(key, value)
+          attributes[key] = value
+        end
+
+        def finish
+          self.ended = true
+        end
+      end
+      described = Struct.new(:otel_attributes, :otel_result)
+
+      failed = span_class.new({})
+      described_class.finish_test_span(
+        failed,
+        test: described.new({ "test.case.name" => "adds up", "code.line.number" => nil }, "failed"),
+      )
+      skipped = span_class.new({})
+      described_class.finish_test_span(skipped, test: described.new({}, "skipped"))
+
+      expect(failed.attributes).to eq(
+        "test.case.name" => "adds up",
+        "test.case.result.status" => "fail",
+      )
+      expect(failed.status.code).to eq(OpenTelemetry::Trace::Status::ERROR)
+      expect(failed.ended).to be(true)
+      expect(skipped.attributes.fetch("test.case.result.status")).to eq("skipped")
+      expect(skipped.status).to be_nil
+      expect(skipped.ended).to be(true)
+    end
+
+    it "finishes the span even when the test cannot be described" do
+      span = double("OpenTelemetry span")
+      allow(span).to receive(:finish)
+      test = double("test")
+      allow(test).to receive(:otel_attributes).and_raise("no metadata for you")
+
+      expect { described_class.finish_test_span(span, test: test) }
+        .to output(/Could not describe OpenTelemetry test span/).to_stderr
+      expect(span).to have_received(:finish).once
+    end
+
+    it "asks nothing of the test when there is no span" do
+      # A strict double raises on any message it wasn't told to expect.
+      test = double("test")
+
+      expect { described_class.finish_test_span(nil, test: test) }.not_to raise_error
+    end
+
     it "does not raise when shutting down its processor fails" do
       processor = double("OpenTelemetry processor")
       allow(processor).to receive(:shutdown).and_raise("shutdown failed")

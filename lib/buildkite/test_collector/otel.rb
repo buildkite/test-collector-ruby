@@ -5,6 +5,17 @@ module Buildkite::TestCollector
   module OTel
     DEFAULT_ENDPOINT = "https://test-otlp.buildkite.com/v1/traces"
 
+    RESULT_ATTRIBUTE = "test.case.result.status"
+
+    # OpenTelemetry defines "pass" and "fail", which we have to use where they
+    # apply, and allows a custom value where none does. Hence "skipped", which it
+    # has no word for.
+    RESULT_STATUSES = {
+      "passed" => "pass",
+      "failed" => "fail",
+      "skipped" => "skipped",
+    }.freeze
+
     PROCESSOR_TIMEOUT_SECONDS = 5
 
     # Once you give OpenTelemetry a processor, there's no way to take it back.
@@ -106,13 +117,34 @@ module Buildkite::TestCollector
         OpenTelemetry::Trace.with_span(span) { yield }
       end
 
-      # Marks the span as done. Safe to call even if there's no span.
-      def finish_test_span(span)
+      # Records what the test was and how it went, then marks the span as done.
+      # Safe to call even if there's no span. `test` is asked for its
+      # `otel_attributes` and `otel_result` here rather than by the caller, so
+      # nothing is built when export is off and a bad value can't leave the span
+      # open or fail the test.
+      def finish_test_span(span, test: nil)
         return unless span
 
-        span.finish
-      rescue StandardError => e
-        warn "[buildkite-test_collector] Could not finish OpenTelemetry test span: #{e.class}: #{e.message}"
+        begin
+          if test
+            test.otel_attributes.each do |key, value|
+              span.set_attribute(key, value) unless value.nil?
+            end
+
+            result = test.otel_result
+            status = RESULT_STATUSES[result]
+            span.set_attribute(RESULT_ATTRIBUTE, status) if status
+            span.status = OpenTelemetry::Trace::Status.error if result == "failed"
+          end
+        rescue StandardError => e
+          warn "[buildkite-test_collector] Could not describe OpenTelemetry test span: #{e.class}: #{e.message}"
+        ensure
+          begin
+            span.finish
+          rescue StandardError => e
+            warn "[buildkite-test_collector] Could not finish OpenTelemetry test span: #{e.class}: #{e.message}"
+          end
+        end
       end
 
       # Turns off span export and flushes anything left in the queue. Safe to
