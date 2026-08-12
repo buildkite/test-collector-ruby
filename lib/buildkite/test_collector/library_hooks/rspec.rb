@@ -24,7 +24,7 @@ RSpec.configure do |config|
     Thread.current[:_buildkite_tracer] = tracer
     Thread.current[:_buildkite_tags] = tags
 
-    otel_span, = Buildkite::TestCollector::OTel.start_test_span
+    otel_span, trace_id = Buildkite::TestCollector::OTel.start_test_span
 
     # example.run can raise errors (including from other middleware/hooks) so clean up in `ensure`.
     begin
@@ -42,6 +42,7 @@ RSpec.configure do |config|
         tags: tags,
         location_prefix: Buildkite::TestCollector.location_prefix,
         external_id: Buildkite::TestCollector::UUID.v7,
+        trace_id: trace_id,
       )
 
       Buildkite::TestCollector.uploader.traces[example.id] = trace

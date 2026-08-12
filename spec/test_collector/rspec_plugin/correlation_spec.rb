@@ -1,0 +1,57 @@
+# frozen_string_literal: true
+
+# The OpenTelemetry gems only ship on Ruby 3.3 and newer.
+if Gem::Version.new(RUBY_VERSION) >= Gem::Version.new("3.3")
+  require "opentelemetry/sdk"
+  require "rspec/core/sandbox"
+
+  RSpec.describe "RSpec execution and OpenTelemetry correlation" do
+    # Runs one example through the collector's real around hook. Sandboxed, so
+    # registering that hook doesn't disturb the suite running this test.
+    def run_sandboxed_example
+      RSpec::Core::Sandbox.sandboxed do |config|
+        config.output_stream = StringIO.new
+        load "buildkite/test_collector/library_hooks/rspec.rb"
+
+        group = RSpec.describe("correlated example") { it("passes") { nil } }
+        group.run(RSpec.configuration.reporter)
+        group.examples.first
+      end
+    end
+
+    it "puts the execution span's trace ID on the upload" do
+      exporter = OpenTelemetry::SDK::Trace::Export::InMemorySpanExporter.new
+      provider = OpenTelemetry::SDK::Trace::TracerProvider.new
+      provider.add_span_processor(
+        OpenTelemetry::SDK::Trace::Export::SimpleSpanProcessor.new(exporter)
+      )
+      Buildkite::TestCollector::OTel.instance_variable_set(
+        :@tracer, provider.tracer("correlation-test")
+      )
+
+      example = run_sandboxed_example
+      provider.force_flush
+
+      trace = Buildkite::TestCollector.uploader.traces.fetch(example.id)
+      span = exporter.finished_spans.find { |finished| finished.name == "test.execution" }
+
+      expect(span).not_to be_nil
+      expect(trace.as_hash[:trace_id]).to eq(span.trace_id.unpack1("H*"))
+    ensure
+      Buildkite::TestCollector::OTel.instance_variable_set(:@tracer, nil)
+      Buildkite::TestCollector.uploader.traces.delete(example&.id)
+      provider&.shutdown
+    end
+
+    it "sends no trace ID when OpenTelemetry is off" do
+      expect(Buildkite::TestCollector::OTel).not_to be_enabled
+
+      example = run_sandboxed_example
+
+      trace = Buildkite::TestCollector.uploader.traces.fetch(example.id)
+      expect(trace.as_hash).not_to have_key(:trace_id)
+    ensure
+      Buildkite::TestCollector.uploader.traces.delete(example&.id)
+    end
+  end
+end

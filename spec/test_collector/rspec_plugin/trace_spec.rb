@@ -10,12 +10,14 @@ RSpec.describe Buildkite::TestCollector::RSpecPlugin::Trace do
       tags: tags,
       location_prefix: location_prefix,
       external_id: external_id,
+      trace_id: trace_id,
     )
   end
 
   let(:example) { double(id: "test for invalid character '\xC8'").as_null_object }
   let(:location_prefix) { nil }
   let(:external_id) { nil }
+  let(:trace_id) { nil }
 
   let(:history) do
     {
@@ -81,6 +83,18 @@ RSpec.describe Buildkite::TestCollector::RSpecPlugin::Trace do
       it "includes the external ID" do
         expect(trace.as_hash[:external_id]).to eq(external_id)
       end
+    end
+
+    context "with an OpenTelemetry trace ID" do
+      let(:trace_id) { "4bf92f3577b34da6a3ce929d0e0e4736" }
+
+      it "includes the trace ID" do
+        expect(trace.as_hash[:trace_id]).to eq(trace_id)
+      end
+    end
+
+    it "omits the trace ID when OpenTelemetry is not enabled" do
+      expect(trace.as_hash).not_to have_key(:trace_id)
     end
   end
 end

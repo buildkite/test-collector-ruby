@@ -9,7 +9,7 @@ module Buildkite::TestCollector::RSpecPlugin
 
     FILE_PATH_REGEX = /^(.*?\.(rb|feature))/
 
-    def initialize(example, history:, failure_reason: nil, failure_expanded: [], tags: nil, location_prefix: nil, external_id: nil)
+    def initialize(example, history:, failure_reason: nil, failure_expanded: [], tags: nil, location_prefix: nil, external_id: nil, trace_id: nil)
       @example = example
       @history = history
       @failure_reason = failure_reason
@@ -17,6 +17,7 @@ module Buildkite::TestCollector::RSpecPlugin
       @tags = tags
       @location_prefix = location_prefix
       @external_id = external_id
+      @trace_id = trace_id
     end
 
     def result
