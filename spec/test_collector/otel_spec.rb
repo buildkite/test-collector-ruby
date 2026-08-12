@@ -100,25 +100,59 @@ if Gem::Version.new(RUBY_VERSION) >= Gem::Version.new("3.3")
       )
     end
 
-    it "leaves instrumentation alone when the suite runs its own OpenTelemetry" do
-    original = OpenTelemetry.tracer_provider
-    OpenTelemetry.tracer_provider = OpenTelemetry::SDK::Trace::TracerProvider.new
-    registry = OpenTelemetry::Instrumentation.registry
-    allow(registry).to receive(:install_all)
-    allow(OpenTelemetry::Exporter::OTLP::Exporter).to receive(:new) do
-      OpenTelemetry::SDK::Trace::Export::InMemorySpanExporter.new
+    it "exports through the suite's own provider without taking it over" do
+      original = OpenTelemetry.tracer_provider
+      suite_exporter = OpenTelemetry::SDK::Trace::Export::InMemorySpanExporter.new
+      provider = OpenTelemetry::SDK::Trace::TracerProvider.new
+      provider.add_span_processor(
+        OpenTelemetry::SDK::Trace::Export::SimpleSpanProcessor.new(suite_exporter)
+      )
+      OpenTelemetry.tracer_provider = provider
+
+      buildkite_exporter = OpenTelemetry::SDK::Trace::Export::InMemorySpanExporter.new
+      allow(OpenTelemetry::Exporter::OTLP::Exporter).to receive(:new) { buildkite_exporter }
+      described_class.configure!(endpoint: "https://example.invalid/v1/traces")
+
+      tracer = provider.tracer("suite")
+      tracer.in_span("before-shutdown") { nil }
+      provider.force_flush
+
+      expect(OpenTelemetry.tracer_provider).to equal(provider)
+      expect(buildkite_exporter.finished_spans.map(&:name)).to include("before-shutdown")
+      expect(suite_exporter.finished_spans.map(&:name)).to include("before-shutdown")
+
+      described_class.shutdown
+      tracer.in_span("after-shutdown") { nil }
+      provider.force_flush
+
+      # Our processor goes quiet, the suite's keeps working.
+      expect(buildkite_exporter.finished_spans.map(&:name)).not_to include("after-shutdown")
+      expect(suite_exporter.finished_spans.map(&:name)).to include("after-shutdown")
+    ensure
+      described_class.shutdown
+      provider&.shutdown
+      OpenTelemetry.tracer_provider = original
     end
 
-    described_class.configure!(endpoint: "https://example.invalid/v1/traces")
+    it "leaves instrumentation alone when the suite runs its own OpenTelemetry" do
+      original = OpenTelemetry.tracer_provider
+      OpenTelemetry.tracer_provider = OpenTelemetry::SDK::Trace::TracerProvider.new
+      registry = OpenTelemetry::Instrumentation.registry
+      allow(registry).to receive(:install_all)
+      allow(OpenTelemetry::Exporter::OTLP::Exporter).to receive(:new) do
+        OpenTelemetry::SDK::Trace::Export::InMemorySpanExporter.new
+      end
 
-    expect(described_class).to be_enabled
-    expect(registry).not_to have_received(:install_all)
-  ensure
-    described_class.shutdown
-    OpenTelemetry.tracer_provider = original
-  end
+      described_class.configure!(endpoint: "https://example.invalid/v1/traces")
 
-  it "installs every available instrumentation" do
+      expect(described_class).to be_enabled
+      expect(registry).not_to have_received(:install_all)
+    ensure
+      described_class.shutdown
+      OpenTelemetry.tracer_provider = original
+    end
+
+    it "installs every available instrumentation" do
       registry = OpenTelemetry::Instrumentation.registry
       allow(registry).to receive(:install_all)
       allow(OpenTelemetry::Exporter::OTLP::Exporter).to receive(:new) do
