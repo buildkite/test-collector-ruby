@@ -42,6 +42,45 @@ RSpec.describe Buildkite::TestCollector do
       Buildkite::TestCollector.configure(hook: hook)
       expect(Buildkite::TestCollector.trace_min_duration).to eq(nil)
     end
+
+    it "leaves OpenTelemetry off unless it is opted into" do
+      allow(Buildkite::TestCollector::OTel).to receive(:configure!)
+
+      Buildkite::TestCollector.configure(hook: hook)
+
+      expect(Buildkite::TestCollector::OTel).not_to have_received(:configure!)
+    end
+
+    it "exports to the Buildkite OTLP endpoint, independently of legacy detailed tracing" do
+      run_env = { "key" => "run-key" }
+      allow(Buildkite::TestCollector::CI).to receive(:env) { run_env }
+      allow(Buildkite::TestCollector::OTel).to receive(:configure!)
+      env_overlay["BUILDKITE_ANALYTICS_TOKEN"] = "MyToken"
+
+      Buildkite::TestCollector.configure(
+        hook: hook,
+        tracing_enabled: false,
+        otel_enabled: true,
+      )
+
+      expect(Buildkite::TestCollector::OTel).to have_received(:configure!).with(
+        endpoint: "https://test-otlp.buildkite.com/v1/traces",
+        api_token: "MyToken",
+        run_env: run_env,
+      )
+    end
+
+    it "can override the endpoint for local development" do
+      env_overlay["BUILDKITE_ANALYTICS_OTLP_ENDPOINT"] = "http://test-otlp.buildkite.localhost/v1/traces"
+      allow(Buildkite::TestCollector::CI).to receive(:env) { { "key" => "run-key" } }
+      allow(Buildkite::TestCollector::OTel).to receive(:configure!)
+
+      Buildkite::TestCollector.configure(hook: hook, otel_enabled: true)
+
+      expect(Buildkite::TestCollector::OTel).to have_received(:configure!).with(
+        hash_including(endpoint: "http://test-otlp.buildkite.localhost/v1/traces"),
+      )
+    end
   end
 
   context "Minitest" do
@@ -64,6 +103,17 @@ RSpec.describe Buildkite::TestCollector do
       analytics.configure(hook: hook, env: env)
 
       expect(analytics.env).to match env
+    end
+
+    it "does not enable the RSpec-only OpenTelemetry integration" do
+      allow(Buildkite::TestCollector::OTel).to receive(:configure!)
+
+      Buildkite::TestCollector.configure(
+        hook: hook,
+        otel_enabled: true,
+      )
+
+      expect(Buildkite::TestCollector::OTel).not_to have_received(:configure!)
     end
   end
 
@@ -92,6 +142,17 @@ RSpec.describe Buildkite::TestCollector do
         analytics.configure(hook: hook, env: env)
 
         expect(analytics.env).to match env
+      end
+
+      it "does not enable the RSpec-only OpenTelemetry integration" do
+        allow(Buildkite::TestCollector::OTel).to receive(:configure!)
+
+        Buildkite::TestCollector.configure(
+          hook: hook,
+          otel_enabled: true,
+        )
+
+        expect(Buildkite::TestCollector::OTel).not_to have_received(:configure!)
       end
     else
       it "raises an UnsupportedFrameworkError" do

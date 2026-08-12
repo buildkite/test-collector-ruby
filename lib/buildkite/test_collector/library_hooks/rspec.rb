@@ -24,14 +24,17 @@ RSpec.configure do |config|
     Thread.current[:_buildkite_tracer] = tracer
     Thread.current[:_buildkite_tags] = tags
 
+    otel_span, = Buildkite::TestCollector::OTel.start_test_span
+
     # example.run can raise errors (including from other middleware/hooks) so clean up in `ensure`.
     begin
-      example.run
+      Buildkite::TestCollector::OTel.with_test_span(otel_span) { example.run }
     ensure
       Thread.current[:_buildkite_tracer] = nil
       Thread.current[:_buildkite_tags] = nil
 
       tracer.finalize
+      Buildkite::TestCollector::OTel.finish_test_span(otel_span)
 
       trace = Buildkite::TestCollector::RSpecPlugin::Trace.new(
         example,
@@ -46,6 +49,8 @@ RSpec.configure do |config|
   end
 
   config.after(:suite) do
+    Buildkite::TestCollector::OTel.shutdown
+
     if Buildkite::TestCollector.artifact_path
       filename = File.join(Buildkite::TestCollector.artifact_path, "buildkite-test-collector-rspec-#{Buildkite::TestCollector::UUID.call}.json.gz")
       data_set = { results: Buildkite::TestCollector.uploader.traces.values.map(&:as_hash) }
