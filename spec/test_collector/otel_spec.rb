@@ -2,14 +2,21 @@
 
 require "opentelemetry/sdk"
 require "opentelemetry/exporter/otlp"
+require "opentelemetry/trace/propagation/trace_context"
 
 RSpec.describe Buildkite::TestCollector::OTel do
-  it "starts the execution as a root when another span is active" do
+  it "starts the execution as a root and links it to the Agent job trace" do
     exporter = OpenTelemetry::SDK::Trace::Export::InMemorySpanExporter.new
     processor = OpenTelemetry::SDK::Trace::Export::SimpleSpanProcessor.new(exporter)
     provider = OpenTelemetry::SDK::Trace::TracerProvider.new
     provider.add_span_processor(processor)
     tracer = provider.tracer("correlation-test")
+    job_trace_id = "0af7651916cd43dd8448eb211c80319c"
+    job_span_id = "b7ad6b7169203331"
+    allow(ENV).to receive(:[]).and_call_original
+    allow(ENV).to receive(:[]).with("TRACEPARENT")
+      .and_return("00-#{job_trace_id}-#{job_span_id}-01")
+    allow(ENV).to receive(:[]).with("TRACESTATE").and_return("vendor=value")
 
     described_class.instance_variable_set(:@tracer, tracer)
 
@@ -28,9 +35,37 @@ RSpec.describe Buildkite::TestCollector::OTel do
     ambient_span = exporter.finished_spans.find { |span| span.name == "ambient" }
 
     expect(execution_span.parent_span_id).to eq(OpenTelemetry::Trace::INVALID_SPAN_ID)
+    expect(execution_span.links.length).to eq(1)
+    expect(execution_span.links.first.span_context.hex_trace_id).to eq(job_trace_id)
+    expect(execution_span.links.first.span_context.hex_span_id).to eq(job_span_id)
+    expect(execution_span.links.first.span_context.tracestate.to_s).to eq("vendor=value")
     expect(child_span.parent_span_id).to eq(execution_span.span_id)
     expect(child_span.trace_id).to eq(execution_span.trace_id)
     expect(ambient_span.trace_id).not_to eq(execution_span.trace_id)
+  ensure
+    described_class.instance_variable_set(:@tracer, nil)
+    provider&.shutdown
+  end
+
+  it "skips missing or malformed Agent trace context" do
+    exporter = OpenTelemetry::SDK::Trace::Export::InMemorySpanExporter.new
+    processor = OpenTelemetry::SDK::Trace::Export::SimpleSpanProcessor.new(exporter)
+    provider = OpenTelemetry::SDK::Trace::TracerProvider.new
+    provider.add_span_processor(processor)
+    described_class.instance_variable_set(:@tracer, provider.tracer("invalid-link-test"))
+    allow(ENV).to receive(:[]).and_call_original
+    allow(ENV).to receive(:[]).with("TRACEPARENT").and_return(nil, "not-a-traceparent")
+    allow(ENV).to receive(:[]).with("TRACESTATE").and_return(nil)
+
+    2.times do
+      span, = described_class.start_test_span
+      described_class.finish_test_span(span)
+    end
+    provider.force_flush
+
+    expect(exporter.finished_spans.map(&:links)).to all(be_empty)
+    expect(exporter.finished_spans.map(&:parent_span_id))
+      .to all(eq(OpenTelemetry::Trace::INVALID_SPAN_ID))
   ensure
     described_class.instance_variable_set(:@tracer, nil)
     provider&.shutdown
