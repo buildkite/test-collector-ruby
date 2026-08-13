@@ -70,6 +70,7 @@ module Buildkite::TestCollector
 
         require "opentelemetry/sdk"
         require "opentelemetry/exporter/otlp"
+        require "opentelemetry/trace/propagation/trace_context"
 
         exporter = OpenTelemetry::Exporter::OTLP::Exporter.new(
           endpoint: endpoint,
@@ -99,6 +100,7 @@ module Buildkite::TestCollector
         span = @tracer.start_span(
           "test.execution",
           with_parent: OpenTelemetry::Context.empty,
+          links: job_span_links,
           kind: :internal,
         )
         [span, trace_id(span)]
@@ -197,6 +199,25 @@ module Buildkite::TestCollector
         return unless context.valid?
 
         context.hex_trace_id
+      end
+
+      # The Agent propagates the current job trace context through these
+      # environment variables. Link to it without making it the parent: every
+      # test execution must remain the root of its own trace.
+      def job_span_links
+        carrier = {
+          "traceparent" => ENV["TRACEPARENT"],
+          "tracestate" => ENV["TRACESTATE"],
+        }
+        context = OpenTelemetry::Trace::Propagation::TraceContext
+          .text_map_propagator
+          .extract(carrier, context: OpenTelemetry::Context.empty)
+        span_context = OpenTelemetry::Trace.current_span(context).context
+        return [] unless span_context.valid?
+
+        [OpenTelemetry::Trace::Link.new(span_context)]
+      rescue StandardError
+        []
       end
 
       # Builds the HTTP headers sent with every exported span. The server
