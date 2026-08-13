@@ -25,10 +25,10 @@ A failure also sets the span status to error. OpenTelemetry defines `pass` and
 `fail`, which we use where they apply, and allows a custom value where none does,
 which is where `skipped` comes from. Failure details stay on the execution record.
 
-RSpec settles an example's result after our `around` hook unwinds, so the span is
-finished from the reporter, which is the first place that result exists. The hook
-records when the example ended and the reporter finishes the span with that
-timestamp, so a span's duration is the test rather than the test plus reporting.
+RSpec settles an example's result after our `around` hook unwinds, so the hook
+derives the result from the exception and pending state in the same way RSpec
+does. It finishes the span before returning, so its duration covers the example
+rather than the reporting that follows.
 
 The span's trace ID goes on the execution upload, so the two can be joined once
 both have been ingested:
