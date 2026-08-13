@@ -45,8 +45,15 @@ RSpec.configure do |config|
       )
 
       # Finish the span here rather than from the reporter, so its duration is
-      # the example itself and not the reporting that follows.
-      Buildkite::TestCollector::OTel.finish_test_span(otel_span, test: trace)
+      # the example itself and not the reporting that follows. When there is a
+      # span, report what it timed as the execution's duration too, so the two
+      # never disagree. `end_at` moves with it, so the history still describes
+      # itself and its children still sit inside it.
+      span_duration = Buildkite::TestCollector::OTel.finish_test_span(otel_span, test: trace)
+      if span_duration
+        trace.history[:duration] = span_duration
+        trace.history[:end_at] = trace.history[:start_at] + span_duration
+      end
 
       Buildkite::TestCollector.uploader.traces[example.id] = trace
     end

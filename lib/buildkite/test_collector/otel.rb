@@ -117,11 +117,11 @@ module Buildkite::TestCollector
         OpenTelemetry::Trace.with_span(span) { yield }
       end
 
-      # Records what the test was and how it went, then marks the span as done.
-      # Safe to call even if there's no span. `test` is asked for its
-      # `otel_attributes` and `otel_result` here rather than by the caller, so
-      # nothing is built when export is off and a bad value can't leave the span
-      # open or fail the test.
+      # Records what the test was and how it went, then marks the span as done,
+      # and hands back how long the span says the test took. Safe to call even
+      # if there's no span. `test` is asked for its `otel_attributes` and
+      # `otel_result` here rather than by the caller, so nothing is built when
+      # export is off and a bad value can't leave the span open or fail the test.
       def finish_test_span(span, test: nil)
         return unless span
 
@@ -145,6 +145,8 @@ module Buildkite::TestCollector
             warn "[buildkite-test_collector] Could not finish OpenTelemetry test span: #{e.class}: #{e.message}"
           end
         end
+
+        span_duration(span)
       end
 
       # Turns off span export and flushes anything left in the queue. Safe to
@@ -185,6 +187,23 @@ module Buildkite::TestCollector
         else
           raise "existing OpenTelemetry tracer provider does not support adding a span processor"
         end
+      end
+
+      # How long the finished span says the test took, in seconds. We report this
+      # as the execution's duration too, so the two never disagree. Both are
+      # worked out from the monotonic clock, so neither is thrown off if the
+      # system clock moves mid-run. Anything that isn't a real recorded span
+      # (unsampled, or a stand-in) has nothing to read, and gets nil.
+      def span_duration(span)
+        return unless span.respond_to?(:to_span_data)
+
+        data = span.to_span_data
+        return unless data.start_timestamp && data.end_timestamp
+
+        (data.end_timestamp - data.start_timestamp) / 1_000_000_000.0
+      rescue StandardError => e
+        warn "[buildkite-test_collector] Could not read the OpenTelemetry test span's duration: #{e.class}: #{e.message}"
+        nil
       end
 
       # Reads the trace ID that OpenTelemetry already generated for this span.

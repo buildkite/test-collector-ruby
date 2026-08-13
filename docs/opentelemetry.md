@@ -41,8 +41,8 @@ Two things worth knowing:
 - An example skipped with `skip` produces no span at all. RSpec doesn't run its
   hooks, so there is nothing to time. `skipped` on a span means a `pending`
   example that failed as expected.
-- The span's duration and the execution's duration are measured separately and
-  can differ by a fraction of a millisecond.
+- The execution's duration is whatever the span timed, so the two always agree.
+  With the export off, the collector times the example itself as it always has.
 
 ## Finding a test's trace
 

@@ -93,6 +93,29 @@ RSpec.describe Buildkite::TestCollector::OTel do
     expect(skipped.ended).to be(true)
   end
 
+  it "reports how long the finished span says the test took" do
+    provider = OpenTelemetry::SDK::Trace::TracerProvider.new
+    described_class.instance_variable_set(:@tracer, provider.tracer("duration-test"))
+
+    span, = described_class.start_test_span
+    sleep 0.01
+    duration = described_class.finish_test_span(span)
+
+    data = span.to_span_data
+    expect(duration).to eq((data.end_timestamp - data.start_timestamp) / 1_000_000_000.0)
+    expect(duration).to be > 0.01
+  ensure
+    described_class.instance_variable_set(:@tracer, nil)
+    provider&.shutdown
+  end
+
+  it "reports no duration for a span it cannot read" do
+    span = double("OpenTelemetry span")
+    allow(span).to receive(:finish)
+
+    expect(described_class.finish_test_span(span)).to be_nil
+  end
+
   it "finishes the span even when the test cannot be described" do
     span = double("OpenTelemetry span")
     allow(span).to receive(:finish)

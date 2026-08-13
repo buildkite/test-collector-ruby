@@ -44,6 +44,16 @@ RSpec.describe "RSpec execution and OpenTelemetry correlation" do
     )
     expect(span.attributes.fetch("code.file.path")).to end_with("correlation_spec.rb")
     expect(span.status.code).to eq(OpenTelemetry::Trace::Status::UNSET)
+
+    # The execution reports exactly what the span timed, not a second
+    # measurement, and the history still describes itself.
+    history = trace.as_hash[:history]
+    expect(history[:duration])
+      .to eq((span.end_timestamp - span.start_timestamp) / 1_000_000_000.0)
+    # Within a nanosecond: start_at is seconds since boot, so adding a
+    # sub-millisecond duration to it rounds.
+    expect(history[:end_at] - history[:start_at])
+      .to be_within(0.000000001).of(history[:duration])
   ensure
     Buildkite::TestCollector::OTel.instance_variable_set(:@tracer, nil)
     Buildkite::TestCollector.uploader.traces.delete(example&.id)
@@ -93,6 +103,21 @@ RSpec.describe "RSpec execution and OpenTelemetry correlation" do
     Buildkite::TestCollector::OTel.instance_variable_set(:@tracer, nil)
     Buildkite::TestCollector.uploader.traces.delete(example&.id)
     provider&.shutdown
+  end
+
+  it "times the execution itself when OpenTelemetry is off" do
+    expect(Buildkite::TestCollector::OTel).not_to be_enabled
+
+    example = run_sandboxed_example
+
+    trace = Buildkite::TestCollector.uploader.traces.fetch(example.id)
+    history = trace.as_hash[:history]
+    # Within a nanosecond: start_at is seconds since boot, so adding a
+    # sub-millisecond duration to it rounds.
+    expect(history[:end_at] - history[:start_at])
+      .to be_within(0.000000001).of(history[:duration])
+  ensure
+    Buildkite::TestCollector.uploader.traces.delete(example&.id)
   end
 
   it "sends no trace ID when OpenTelemetry is off" do
