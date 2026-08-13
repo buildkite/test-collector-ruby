@@ -83,6 +83,34 @@ BUILDKITE_ANALYTICS_TOKEN=xyz cucumber
 
 Add the `BUILDKITE_ANALYTICS_TOKEN` secret to your CI, push your changes to a branch, and open a pull request 🎉
 
+### OpenTelemetry export (experimental)
+
+RSpec suites can also send an OpenTelemetry trace per test execution to Buildkite,
+showing what each test did and where it spent its time. Each trace is rooted in a
+`test.execution` span naming the test, its file, and whether it passed.
+
+This is still under development and everything here may change. It is off by
+default, so opt in when you configure the collector:
+
+```ruby
+Buildkite::TestCollector.configure(hook: :rspec, otel_enabled: true)
+```
+
+If your suite already runs OpenTelemetry, we use your existing setup and your
+instrumentation as it is. If it doesn't, we set one up and install the
+instrumentation this gem bundles, so you get spans for the databases, caches,
+HTTP clients, and background jobs your tests actually touch.
+
+Export needs Ruby 3.3 or newer, which is what the OpenTelemetry gems require. On
+older Rubies the option is accepted and does nothing.
+
+Spans need `BUILDKITE_ANALYTICS_TOKEN` to be an agent OIDC token with the
+`write_uploads` scope, from `buildkite-agent oidc request-token`. A suite API
+token still uploads executions, but its spans are rejected.
+
+Export failures never fail a test or block the normal Test Engine upload. See the
+[OpenTelemetry guide](docs/opentelemetry.md) for what you get and how it
+fits around an existing OpenTelemetry setup.
 
 ## More information
 

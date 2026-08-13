@@ -24,6 +24,7 @@ require_relative "test_collector/trace"
 require_relative "test_collector/tracer"
 require_relative "test_collector/session"
 require_relative "test_collector/uuid"
+require_relative "test_collector/otel"
 
 module Buildkite
   module TestCollector
@@ -45,7 +46,7 @@ module Buildkite
       attr_accessor :span_filters
     end
 
-    def self.configure(hook:, token: nil, url: nil, tracing_enabled: true, artifact_path: nil, location_prefix: nil, env: {}, tags: {})
+    def self.configure(hook:, token: nil, url: nil, tracing_enabled: true, artifact_path: nil, location_prefix: nil, env: {}, tags: {}, otel_enabled: false)
       if hook.to_sym == :cucumber && Gem::Version.new(RUBY_VERSION) < Gem::Version.new('2.7')
         raise UnsupportedFrameworkError.new("Cucumber is only supported in versions of Ruby >= 2.7")
       end
@@ -70,6 +71,14 @@ module Buildkite
         self.span_filters << MinDurationSpanFilter.new(self.trace_min_duration)
       end
 
+      if otel_enabled && test_runner == "rspec"
+        Buildkite::TestCollector::OTel.configure!(
+          # Undocumented, for development purposes.
+          endpoint: ENV["BUILDKITE_ANALYTICS_OTLP_ENDPOINT"] || Buildkite::TestCollector::OTel::DEFAULT_ENDPOINT,
+          api_token: api_token,
+          run_env: Buildkite::TestCollector::CI.env,
+        )
+      end
       self.hook_into(hook)
     end
 
