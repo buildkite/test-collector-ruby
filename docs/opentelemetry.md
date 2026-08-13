@@ -21,7 +21,7 @@ test.execution  "Buildkite::Pipeline creates a build"   12.4ms
 ```
 
 One example is one trace. The span is never nested under anything else, so a
-trace always belongs to exactly one test. On Buildkite Agent v3.100 or newer,
+trace always belongs to exactly one test. On Buildkite Agent v3.110 or newer,
 the root span links to the Agent's propagated job trace when tracing is enabled,
 letting you navigate between them without combining every test into one trace.
 
