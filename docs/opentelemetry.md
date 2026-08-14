@@ -2,17 +2,71 @@
 
 > **This is still under development and everything here may change.**
 
-Every RSpec example becomes a small OpenTelemetry trace, so you can see what a
-test actually did: the queries it ran, the HTTP calls it made, and where its time
-went. The traces are sent to Buildkite and shown against the test's execution.
+Every RSpec example becomes a small OpenTelemetry trace. The root span is always
+created by the collector, and optional instrumentation can show the queries,
+HTTP calls, and other work beneath it. The traces are sent to Buildkite and shown
+against the test's execution.
 
 It is off by default. See the [README](../README.md#opentelemetry-export-experimental)
 for how to turn it on.
 
+## Choose what gets instrumented
+
+The safe default is a root `test.execution` span with no automatically installed
+library instrumentation. Instrumentation patches application libraries globally,
+so installing everything can conflict with another APM, profiler, HTTP adapter,
+or monkey patch in the host process.
+
+The collector supports three setups:
+
+1. **Root spans only.** Add `opentelemetry-sdk` and
+   `opentelemetry-exporter-otlp`, then enable export as shown in the README. No
+   instrumentation gem is needed.
+2. **Explicit child spans.** Add and require each instrumentation gem, then pass
+   its canonical OpenTelemetry name in `otel_instrumentations`.
+3. **An existing OpenTelemetry setup.** The collector uses the host's provider
+   and instrumentation unchanged. In this mode `otel_instrumentations` is
+   ignored because the host application owns instrumentation.
+
+For example, to add Net::HTTP child spans:
+
+```ruby
+# Gemfile
+group :test do
+  gem 'buildkite-test_collector'
+  gem 'opentelemetry-exporter-otlp', '~> 0.34'
+  gem 'opentelemetry-instrumentation-net_http'
+  gem 'opentelemetry-sdk', '~> 1.13'
+end
+```
+
+```ruby
+# spec/spec_helper.rb
+require 'opentelemetry-instrumentation-net_http'
+require 'buildkite/test_collector'
+
+Buildkite::TestCollector.configure(
+  hook: :rspec,
+  otel_enabled: true,
+  otel_instrumentations: ['OpenTelemetry::Instrumentation::Net::HTTP'],
+)
+```
+
+Use canonical names from the instrumentation gems, such as
+`OpenTelemetry::Instrumentation::PG` or
+`OpenTelemetry::Instrumentation::Redis`. The collector installs only names in
+the allowlist. An unregistered, unavailable, incompatible, or failed entry emits
+a warning and does not prevent root-span export.
+
+The OpenTelemetry gems require Ruby 3.3 or newer. They are deliberately not
+runtime dependencies of `buildkite-test_collector`, whose supported Ruby range
+starts at 2.3. Keeping them in the host Gemfile also lets the host choose versions
+compatible with its existing observability libraries.
+
 ## What a trace looks like
 
 Each example gets a `test.execution` span of its own, with the instrumented work
-it did underneath:
+it did underneath when child-span instrumentation is selected:
 
 ```text
 test.execution  "Buildkite::Pipeline creates a build"   12.4ms
@@ -68,9 +122,9 @@ We fit in around your setup rather than replacing it:
 - **We stop when the suite does.** After the run, our processor goes quiet and
   yours keeps working.
 
-If you don't have OpenTelemetry set up, we create a tracer provider and install
-the instrumentation this gem bundles, so you get spans for the databases, caches,
-HTTP clients and background jobs your tests touch.
+If you don't have OpenTelemetry set up, we create a tracer provider and export
+the root span. We install only the instrumentation explicitly selected with
+`otel_instrumentations`; the default list is empty.
 
 ## What gets sent
 
@@ -87,6 +141,11 @@ flushed when the suite finishes, so a hard exit can lose the last few.
 Export never fails a test or holds up your results. If the OpenTelemetry gems are
 missing, or setup fails, or spans can't be delivered, the collector warns and
 carries on, and your test results upload as they always have.
+
+Instrumentation selection is also fail-open during setup. Unknown names, missing
+library dependencies, incompatibilities, and installation errors warn and leave
+root-span export running. The collector does not try to detect other APM patches;
+the empty default avoids modifying the host process in the first place.
 
 Export problems are reported through OpenTelemetry's own logger, so look there
 for the reason if spans aren't arriving.

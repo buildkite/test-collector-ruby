@@ -90,27 +90,41 @@ showing what each test did and where it spent its time. Each trace is rooted in 
 `test.execution` span naming the test, its file, and whether it passed.
 
 This is still under development and everything here may change. It is off by
-default, so opt in when you configure the collector:
+default. OpenTelemetry requires Ruby 3.3 or newer and its gems are not runtime
+dependencies of the collector, so add the SDK and exporter to your test bundle:
+
+```ruby
+group :test do
+  gem 'buildkite-test_collector'
+  gem 'opentelemetry-exporter-otlp', '~> 0.34'
+  gem 'opentelemetry-sdk', '~> 1.13'
+end
+```
+
+Then opt in when you configure the collector:
 
 ```ruby
 Buildkite::TestCollector.configure(hook: :rspec, otel_enabled: true)
 ```
 
 If your suite already runs OpenTelemetry, we use your existing setup and your
-instrumentation as it is. If it doesn't, we set one up and install the
-instrumentation this gem bundles, so you get spans for the databases, caches,
-HTTP clients, and background jobs your tests actually touch.
+instrumentation as it is. Otherwise, the safe default exports only the root
+`test.execution` span. The collector never installs every available
+instrumentation automatically because global patches can conflict with APMs and
+other libraries in the host application.
 
-Export needs Ruby 3.3 or newer, which is what the OpenTelemetry gems require. On
-older Rubies the option is accepted and does nothing.
+You can explicitly select child-span instrumentation after adding and requiring
+its gem. For example, see the [OpenTelemetry guide](docs/opentelemetry.md) to opt
+into Net::HTTP spans. Missing or incompatible selections warn without disabling
+the root span.
 
 Spans need `BUILDKITE_ANALYTICS_TOKEN` to be an agent OIDC token with the
 `write_uploads` scope, from `buildkite-agent oidc request-token`. A suite API
 token still uploads executions, but its spans are rejected.
 
 Export failures never fail a test or block the normal Test Engine upload. See the
-[OpenTelemetry guide](docs/opentelemetry.md) for what you get and how it
-fits around an existing OpenTelemetry setup.
+[OpenTelemetry guide](docs/opentelemetry.md) for what you get and how it fits
+around an existing OpenTelemetry setup.
 
 ## More information
 

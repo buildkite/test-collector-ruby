@@ -67,6 +67,23 @@ RSpec.describe Buildkite::TestCollector do
         endpoint: "https://test-otlp.buildkite.com/v1/traces",
         api_token: "MyToken",
         run_env: run_env,
+        instrumentations: [],
+      )
+    end
+
+    it "passes explicitly selected OpenTelemetry instrumentation through" do
+      instrumentations = ["OpenTelemetry::Instrumentation::Net::HTTP"]
+      allow(Buildkite::TestCollector::CI).to receive(:env) { { "key" => "run-key" } }
+      allow(Buildkite::TestCollector::OTel).to receive(:configure!)
+
+      Buildkite::TestCollector.configure(
+        hook: hook,
+        otel_enabled: true,
+        otel_instrumentations: instrumentations,
+      )
+
+      expect(Buildkite::TestCollector::OTel).to have_received(:configure!).with(
+        hash_including(instrumentations: instrumentations),
       )
     end
 

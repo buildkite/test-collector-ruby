@@ -84,12 +84,12 @@ module Buildkite::TestCollector
         !@tracer.nil?
       end
 
-      # Turns on OpenTelemetry span export: loads the OTel libraries, sets up
-      # an exporter that sends spans to Buildkite, and starts instrumenting
-      # everything OpenTelemetry knows how to instrument. If anything goes
-      # wrong (missing gems, bad setup, etc.), we log a warning and leave
-      # OTel turned off rather than crashing the test run.
-      def configure!(endpoint: DEFAULT_ENDPOINT, api_token: nil, run_env: {})
+      # Turns on OpenTelemetry span export: loads the OTel libraries and sets up
+      # an exporter that sends spans to Buildkite. If we create the provider,
+      # only the instrumentation explicitly requested by the suite is installed.
+      # If anything goes wrong (missing gems, bad setup, etc.), we log a warning
+      # and leave OTel turned off rather than crashing the test run.
+      def configure!(endpoint: DEFAULT_ENDPOINT, api_token: nil, run_env: {}, instrumentations: [])
         return if enabled?
 
         require "opentelemetry/sdk"
@@ -104,7 +104,7 @@ module Buildkite::TestCollector
           OpenTelemetry::SDK::Trace::Export::BatchSpanProcessor.new(exporter)
         )
 
-        provider = install_processor(@processor)
+        provider = install_processor(@processor, instrumentations)
 
         @tracer = provider.tracer(
           "buildkite-test-collector", Buildkite::TestCollector::VERSION
@@ -188,11 +188,10 @@ module Buildkite::TestCollector
 
       private
 
-      # We don't set up our own tracer provider. Instead we plug our
-      # processor into whatever provider the test suite is already using
-      # (its own, or OpenTelemetry's default one), and only take
-      # responsibility for shutting down our own processor later.
-      def install_processor(processor)
+      # Plug our processor into the suite's provider when it has one; otherwise,
+      # configure the default SDK provider. In either case, only our processor is
+      # our responsibility to shut down later.
+      def install_processor(processor, instrumentations = [])
         provider = OpenTelemetry.tracer_provider
 
         if provider.respond_to?(:add_span_processor)
@@ -207,14 +206,42 @@ module Buildkite::TestCollector
             c.id_generator = SecureRandomIdGenerator
             c.add_span_processor(processor)
           end
-          # Nobody else is instrumenting, so bring our own. Everything for now:
-          # narrowing this to a hand picked set is a decision for once
-          # dogfooding shows which spans are worth the noise.
-          require "opentelemetry/instrumentation/all"
-          OpenTelemetry::Instrumentation.registry.install_all
+          install_instrumentations(instrumentations)
           OpenTelemetry.tracer_provider
         else
           raise "existing OpenTelemetry tracer provider does not support adding a span processor"
+        end
+      end
+
+      # Instrumentation patches application libraries globally and can conflict
+      # with other APM libraries. Only install entries the suite explicitly
+      # selected, and let a bad entry fail without disabling root-span export.
+      def install_instrumentations(instrumentation_names)
+        instrumentation_names = Array(instrumentation_names)
+        return if instrumentation_names.empty?
+
+        registry = OpenTelemetry::Instrumentation.registry
+
+        instrumentation_names.each do |name|
+          instrumentation = registry.lookup(name)
+          unless instrumentation
+            warn "[buildkite-test_collector] OpenTelemetry instrumentation is not available: #{name.inspect}"
+            next
+          end
+
+          unless instrumentation.present?
+            warn "[buildkite-test_collector] OpenTelemetry instrumentation dependency is not available: #{name.inspect}"
+            next
+          end
+
+          unless instrumentation.compatible?
+            warn "[buildkite-test_collector] OpenTelemetry instrumentation is not compatible: #{name.inspect}"
+            next
+          end
+
+          registry.install([name])
+        rescue StandardError => e
+          warn "[buildkite-test_collector] Could not install OpenTelemetry instrumentation #{name.inspect}: #{e.class}: #{e.message}"
         end
       end
 

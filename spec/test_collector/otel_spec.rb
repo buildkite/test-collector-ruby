@@ -214,7 +214,6 @@ RSpec.describe Buildkite::TestCollector::OTel do
     allow(OpenTelemetry::SDK).to receive(:configure).and_yield(config)
     allow(config).to receive(:id_generator=)
     allow(config).to receive(:add_span_processor)
-    allow(OpenTelemetry::Instrumentation.registry).to receive(:install_all)
 
     described_class.send(:install_processor, processor)
 
@@ -260,31 +259,105 @@ RSpec.describe Buildkite::TestCollector::OTel do
     original = OpenTelemetry.tracer_provider
     OpenTelemetry.tracer_provider = OpenTelemetry::SDK::Trace::TracerProvider.new
     registry = OpenTelemetry::Instrumentation.registry
+    allow(registry).to receive(:lookup)
+    allow(registry).to receive(:install)
     allow(registry).to receive(:install_all)
     allow(OpenTelemetry::Exporter::OTLP::Exporter).to receive(:new) do
       OpenTelemetry::SDK::Trace::Export::InMemorySpanExporter.new
     end
 
-    described_class.configure!(endpoint: "https://example.invalid/v1/traces")
+    described_class.configure!(
+      endpoint: "https://example.invalid/v1/traces",
+      instrumentations: ["OpenTelemetry::Instrumentation::Net::HTTP"],
+    )
 
     expect(described_class).to be_enabled
+    expect(registry).not_to have_received(:lookup)
+    expect(registry).not_to have_received(:install)
     expect(registry).not_to have_received(:install_all)
   ensure
     described_class.shutdown
     OpenTelemetry.tracer_provider = original
   end
 
-  it "installs every available instrumentation" do
+  it "exports root spans without installing instrumentation by default" do
+    original = OpenTelemetry.tracer_provider
+    provider = nil
+    OpenTelemetry.tracer_provider = OpenTelemetry::Internal::ProxyTracerProvider.new
     registry = OpenTelemetry::Instrumentation.registry
-    allow(registry).to receive(:install_all)
-    allow(OpenTelemetry::Exporter::OTLP::Exporter).to receive(:new) do
-      OpenTelemetry::SDK::Trace::Export::InMemorySpanExporter.new
+    host_http_client = Class.new do
+      def request
+        :response
+      end
+
+      private
+
+      def annotate_span_with_response!(_span, _response, _options)
+        nil
+      end
     end
+    conflicting_instrumentation = Module.new do
+      def request
+        response = super
+        annotate_span_with_response!(:span, response)
+        response
+      end
+    end
+    allow(registry).to receive(:install) { host_http_client.prepend(conflicting_instrumentation) }
+    allow(registry).to receive(:install_all) { host_http_client.prepend(conflicting_instrumentation) }
+
+    exporter = OpenTelemetry::SDK::Trace::Export::InMemorySpanExporter.new
+    allow(OpenTelemetry::Exporter::OTLP::Exporter).to receive(:new) { exporter }
 
     described_class.configure!(endpoint: "https://example.invalid/v1/traces")
+    provider = OpenTelemetry.tracer_provider
+    span, = described_class.start_test_span
+    described_class.finish_test_span(span)
+    provider.force_flush
 
-    expect(registry).to have_received(:install_all)
+    expect(exporter.finished_spans.map(&:name)).to include("test.execution")
+    expect(host_http_client.new.request).to eq(:response)
+    expect(registry).not_to have_received(:install)
+    expect(registry).not_to have_received(:install_all)
   ensure
     described_class.shutdown
+    provider&.shutdown
+    OpenTelemetry.tracer_provider = original
+  end
+
+  it "installs only explicitly selected, available instrumentation" do
+    requested = "OpenTelemetry::Instrumentation::Net::HTTP"
+    instrumentation = double("instrumentation", present?: true, compatible?: true)
+    registry = double("OpenTelemetry instrumentation registry")
+    allow(OpenTelemetry::Instrumentation).to receive(:registry).and_return(registry)
+    allow(registry).to receive(:lookup).with(requested).and_return(instrumentation)
+    allow(registry).to receive(:install)
+
+    described_class.send(:install_instrumentations, [requested])
+
+    expect(registry).to have_received(:install).with([requested]).once
+  end
+
+  it "warns and continues past unavailable, incompatible, and failed instrumentation" do
+    names = {
+      "missing" => nil,
+      "unavailable" => double("unavailable instrumentation", present?: false),
+      "incompatible" => double("incompatible instrumentation", present?: true, compatible?: false),
+      "failed" => double("failed instrumentation", present?: true, compatible?: true),
+      "working" => double("working instrumentation", present?: true, compatible?: true),
+    }
+    registry = double("OpenTelemetry instrumentation registry")
+    allow(OpenTelemetry::Instrumentation).to receive(:registry).and_return(registry)
+    allow(registry).to receive(:lookup) { |name| names.fetch(name) }
+    allow(registry).to receive(:install).with(["failed"]).and_raise("install failed")
+    allow(registry).to receive(:install).with(["working"])
+
+    expect do
+      described_class.send(:install_instrumentations, names.keys)
+    end.to output(
+      /not available: "missing".*dependency is not available: "unavailable".*not compatible: "incompatible".*Could not install.*"failed"/m
+    ).to_stderr
+
+    expect(registry).to have_received(:install).with(["working"]).once
   end
 end
