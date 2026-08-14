@@ -41,6 +41,7 @@ RSpec.describe "RSpec execution and OpenTelemetry correlation" do
       "test.case.name" => "Correlated group passes",
       "test.suite.name" => "Correlated group",
       "test.case.result.status" => "pass",
+      "buildkite.test.execution.external_id" => trace.as_hash.fetch(:external_id),
     )
     expect(span.attributes.fetch("code.file.path")).to end_with("correlation_spec.rb")
     expect(span.status.code).to eq(OpenTelemetry::Trace::Status::UNSET)

@@ -44,12 +44,14 @@ module Buildkite::TestCollector::RSpecPlugin
     # What the span says about the test itself. Same file path as the execution
     # upload, so the two agree.
     def otel_attributes
-      {
+      attributes = {
         "test.case.name" => example.full_description,
         "test.suite.name" => scope,
         "code.file.path" => strip_invalid_utf8_chars(prepend_location_prefix(file_name)),
         "code.line.number" => source_line_number,
       }
+      attributes["buildkite.test.execution.external_id"] = external_id if external_id
+      attributes
     end
 
     private

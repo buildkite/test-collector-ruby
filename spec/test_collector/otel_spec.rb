@@ -182,6 +182,23 @@ RSpec.describe Buildkite::TestCollector::OTel do
     )
   end
 
+  it "uses process-safe random IDs for the provider it creates" do
+    provider = OpenTelemetry::Internal::ProxyTracerProvider.new
+    config = double("OpenTelemetry SDK configuration")
+    processor = double("span processor")
+    generator = described_class.const_get(:SecureRandomIdGenerator, false)
+    allow(OpenTelemetry).to receive(:tracer_provider).and_return(provider)
+    allow(OpenTelemetry::SDK).to receive(:configure).and_yield(config)
+    allow(config).to receive(:id_generator=)
+    allow(config).to receive(:add_span_processor)
+    allow(OpenTelemetry::Instrumentation.registry).to receive(:install_all)
+
+    described_class.send(:install_processor, processor)
+
+    expect(config).to have_received(:id_generator=).with(generator)
+    expect(config).to have_received(:add_span_processor).with(processor)
+  end
+
   it "exports through the suite's own provider without taking it over" do
     original = OpenTelemetry.tracer_provider
     suite_exporter = OpenTelemetry::SDK::Trace::Export::InMemorySpanExporter.new
