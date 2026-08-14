@@ -27,9 +27,11 @@ The collector supports three setups:
 2. **Child spans.** Add and require each individual instrumentation gem you want.
    The collector installs every instrumentation registered by those gems. You
    can optionally restrict installation with `otel_instrumentations`.
-3. **An existing OpenTelemetry setup.** The collector uses the host's provider
-   and instrumentation unchanged. In this mode `otel_instrumentations` is
-   ignored because the host application owns instrumentation.
+3. **An existing OpenTelemetry setup.** The collector leaves the host's provider
+   settings and instrumentation unchanged. It creates each execution root with
+   its own provider and forwards the host's instrumented child spans to
+   Buildkite. In this mode `otel_instrumentations` is ignored because the host
+   application owns instrumentation.
 
 For example, to add Net::HTTP child spans:
 
@@ -123,14 +125,24 @@ one trace holds everything the test did.
 
 We fit in around your setup rather than replacing it:
 
-- **Your tracer provider is used as-is.** We add a span processor to it and
-  nothing else. Your resource, exporters, sampler and lifecycle are untouched.
+- **Execution roots are collector-owned.** A private provider creates
+  `test.execution` with IDs from the operating system's random source, so test
+  framework PRNG seeds cannot make separate processes collide. It uses the
+  host provider's resource attributes when available.
+- **Your tracer provider stays in charge of child spans.** We add a forwarding
+  span processor to it and do not change its ID generator, resource, exporters,
+  sampler, or lifecycle. The forwarding processor cannot shut down the
+  collector's exporter, and collector shutdown does not affect your processors.
 - **Your instrumentation is left alone.** Its spans already reach us through the
-  provider we share, so we don't install any of our own. That also means we never
-  add spans you didn't ask for to your own exporters.
-- **Your exporters will see `test.execution` spans.** A provider gives every span
-  to all of its processors, so these spans arrive in your backend too.
-- **Sampling is yours.** We don't sample, we use whatever your provider decides.
+  forwarding processor, so we don't install any of our own. That also means we
+  never add spans you didn't ask for to your own exporters.
+- **Your exporters do not see `test.execution` spans.** Those roots belong only
+  to the collector's private provider. Your exporters still see child spans
+  created by your provider, and those children inherit the root trace and parent
+  IDs through normal OpenTelemetry context propagation.
+- **Sampling stays independent.** The private provider decides whether to sample
+  execution roots, while your sampler decides whether to keep instrumented child
+  spans.
 - **We stop when the suite does.** After the run, our processor goes quiet and
   yours keeps working.
 

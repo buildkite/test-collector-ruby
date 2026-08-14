@@ -43,13 +43,13 @@ module Buildkite::TestCollector
     private_constant :SecureRandomIdGenerator
 
     # Once you give OpenTelemetry a processor, there's no way to take it back.
-    # So after we shut down, we can't remove ourselves and spans would just
-    # pile up with nothing reading them. This wrapper fixes that by quietly
-    # ignoring everything once we're shut down, instead of leaving a real
-    # processor behind that nobody empties.
-    class OwnedSpanProcessor
-      def initialize(processor)
+    # This wrapper can either own the processor's lifecycle or just forward to
+    # it. The latter lets a host provider send us spans without being able to
+    # shut down the collector-owned processor it forwards to.
+    class ManagedSpanProcessor
+      def initialize(processor, owns_lifecycle: true)
         @processor = processor
+        @owns_lifecycle = owns_lifecycle
         @active = true
       end
 
@@ -73,10 +73,12 @@ module Buildkite::TestCollector
         return OpenTelemetry::SDK::Trace::Export::SUCCESS unless @active
 
         @active = false
+        return OpenTelemetry::SDK::Trace::Export::SUCCESS unless @owns_lifecycle
+
         @processor.shutdown(timeout: timeout)
       end
     end
-    private_constant :OwnedSpanProcessor
+    private_constant :ManagedSpanProcessor
 
     class << self
       # True once OpenTelemetry has been turned on and set up successfully.
@@ -101,7 +103,7 @@ module Buildkite::TestCollector
           endpoint: endpoint,
           headers: request_headers(run_env, api_token),
         )
-        @processor = OwnedSpanProcessor.new(
+        @processor = ManagedSpanProcessor.new(
           OpenTelemetry::SDK::Trace::Export::BatchSpanProcessor.new(exporter)
         )
 
@@ -179,29 +181,42 @@ module Buildkite::TestCollector
       # Turns off span export and flushes anything left in the queue. Safe to
       # call even if we were never turned on.
       def shutdown
-        @processor&.shutdown(timeout: PROCESSOR_TIMEOUT_SECONDS)
-      rescue StandardError => e
-        warn "[buildkite-test_collector] Could not shut down OpenTelemetry span export: #{e.class}: #{e.message}"
+        [@host_processor, @processor].compact.each do |processor|
+          begin
+            processor.shutdown(timeout: PROCESSOR_TIMEOUT_SECONDS)
+          rescue StandardError => e
+            warn "[buildkite-test_collector] Could not shut down OpenTelemetry span export: #{e.class}: #{e.message}"
+          end
+        end
       ensure
+        @host_processor = nil
         @processor = nil
         @tracer = nil
       end
 
       private
 
-      # Plug our processor into the suite's provider when it has one; otherwise,
-      # configure the default SDK provider. In either case, only our processor is
-      # our responsibility to shut down later.
+      # Use the suite's provider for its instrumented child spans, but create the
+      # test root with a private provider whose IDs cannot be affected by the
+      # suite seeding Ruby's PRNG. Both providers feed one processor, whose
+      # lifecycle remains exclusively ours. Without a suite provider, configure
+      # the default SDK provider and use it for both roots and children.
       def install_processor(processor, instrumentations = nil)
         provider = OpenTelemetry.tracer_provider
 
         if provider.respond_to?(:add_span_processor)
-          # The suite runs its own OpenTelemetry. Its instrumentation already
-          # feeds this provider, so our processor sees those spans without us
-          # installing anything. Installing our own would also push spans the
-          # suite never asked for into the suite's own exporters.
-          provider.add_span_processor(processor)
-          provider
+          root_provider_options = { id_generator: SecureRandomIdGenerator }
+          if provider.respond_to?(:resource)
+            root_provider_options[:resource] = provider.resource
+          end
+          root_provider = OpenTelemetry::SDK::Trace::TracerProvider.new(**root_provider_options)
+          root_provider.add_span_processor(processor)
+
+          # The host owns this wrapper's lifecycle. Its shutdown only stops
+          # forwarding; it cannot shut down the processor used by root spans.
+          @host_processor = ManagedSpanProcessor.new(processor, owns_lifecycle: false)
+          provider.add_span_processor(@host_processor)
+          root_provider
         elsif provider.is_a?(OpenTelemetry::Internal::ProxyTracerProvider)
           OpenTelemetry::SDK.configure do |c|
             c.id_generator = SecureRandomIdGenerator

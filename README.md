@@ -107,11 +107,13 @@ Then opt in when you configure the collector:
 Buildkite::TestCollector.configure(hook: :rspec, otel_enabled: true)
 ```
 
-If your suite already runs OpenTelemetry, we use your existing setup and your
-instrumentation as it is. Otherwise, the collector installs every individual
-instrumentation gem the suite has already loaded. The collector does not bundle
-or load any instrumentation itself, so a suite with none gets only the root
-`test.execution` span and no global library patches.
+If your suite already runs OpenTelemetry, we leave its provider settings and
+instrumentation as they are. The collector creates `test.execution` roots with
+process-safe IDs and exports the suite's instrumented child spans beneath them.
+Otherwise, the collector installs every individual instrumentation gem the suite
+has already loaded. The collector does not bundle or load any instrumentation
+itself, so a suite with none gets only the root `test.execution` span and no
+global library patches.
 
 Add and require an individual instrumentation gem to opt into its child spans.
 You can optionally restrict installation with `otel_instrumentations`, or pass an

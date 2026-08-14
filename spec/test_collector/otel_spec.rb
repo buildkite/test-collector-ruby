@@ -221,6 +221,68 @@ RSpec.describe Buildkite::TestCollector::OTel do
     expect(config).to have_received(:add_span_processor).with(processor)
   end
 
+  it "owns root ID generation when the suite runs its own OpenTelemetry" do
+    original = OpenTelemetry.tracer_provider
+    suite_exporter = OpenTelemetry::SDK::Trace::Export::InMemorySpanExporter.new
+    host_id_generator = double(
+      "host ID generator",
+      generate_trace_id: "h" * 16,
+      generate_span_id: "h" * 8,
+    )
+    provider = OpenTelemetry::SDK::Trace::TracerProvider.new(id_generator: host_id_generator)
+    provider.add_span_processor(
+      OpenTelemetry::SDK::Trace::Export::SimpleSpanProcessor.new(suite_exporter)
+    )
+    OpenTelemetry.tracer_provider = provider
+
+    buildkite_exporter = OpenTelemetry::SDK::Trace::Export::InMemorySpanExporter.new
+    allow(OpenTelemetry::Exporter::OTLP::Exporter).to receive(:new) { buildkite_exporter }
+    allow(SecureRandom).to receive(:random_bytes) { |length| "s" * length }
+    described_class.configure!(endpoint: "https://example.invalid/v1/traces")
+
+    execution_span, = described_class.start_test_span
+    described_class.with_test_span(execution_span) do
+      provider.tracer("suite").in_span("host-child") { nil }
+    end
+    described_class.finish_test_span(execution_span)
+    provider.force_flush
+
+    exported_execution = buildkite_exporter.finished_spans.find { |span| span.name == "test.execution" }
+    exported_child = buildkite_exporter.finished_spans.find { |span| span.name == "host-child" }
+
+    expect(exported_execution.trace_id).to eq("s" * 16)
+    expect(exported_child.trace_id).to eq(exported_execution.trace_id)
+    expect(exported_child.parent_span_id).to eq(exported_execution.span_id)
+    expect(suite_exporter.finished_spans.map(&:name)).to contain_exactly("host-child")
+    expect(OpenTelemetry.tracer_provider).to equal(provider)
+    expect(provider.id_generator).to equal(host_id_generator)
+  ensure
+    described_class.shutdown
+    provider&.shutdown
+    OpenTelemetry.tracer_provider = original
+  end
+
+  it "keeps root export alive if the suite shuts down its provider" do
+    original = OpenTelemetry.tracer_provider
+    provider = OpenTelemetry::SDK::Trace::TracerProvider.new
+    OpenTelemetry.tracer_provider = provider
+    buildkite_exporter = OpenTelemetry::SDK::Trace::Export::InMemorySpanExporter.new
+    allow(OpenTelemetry::Exporter::OTLP::Exporter).to receive(:new) { buildkite_exporter }
+    described_class.configure!(endpoint: "https://example.invalid/v1/traces")
+
+    provider.shutdown
+    provider = nil
+    execution_span, = described_class.start_test_span
+    described_class.finish_test_span(execution_span)
+    described_class.instance_variable_get(:@processor).force_flush
+
+    expect(buildkite_exporter.finished_spans.map(&:name)).to contain_exactly("test.execution")
+  ensure
+    described_class.shutdown
+    provider&.shutdown
+    OpenTelemetry.tracer_provider = original
+  end
+
   it "exports through the suite's own provider without taking it over" do
     original = OpenTelemetry.tracer_provider
     suite_exporter = OpenTelemetry::SDK::Trace::Export::InMemorySpanExporter.new
