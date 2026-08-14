@@ -67,7 +67,7 @@ RSpec.describe Buildkite::TestCollector do
         endpoint: "https://test-otlp.buildkite.com/v1/traces",
         api_token: "MyToken",
         run_env: run_env,
-        instrumentations: [],
+        instrumentations: nil,
       )
     end
 

@@ -85,11 +85,12 @@ module Buildkite::TestCollector
       end
 
       # Turns on OpenTelemetry span export: loads the OTel libraries and sets up
-      # an exporter that sends spans to Buildkite. If we create the provider,
-      # only the instrumentation explicitly requested by the suite is installed.
-      # If anything goes wrong (missing gems, bad setup, etc.), we log a warning
-      # and leave OTel turned off rather than crashing the test run.
-      def configure!(endpoint: DEFAULT_ENDPOINT, api_token: nil, run_env: {}, instrumentations: [])
+      # an exporter that sends spans to Buildkite. If we create the provider, we
+      # install the instrumentation gems already loaded by the suite, optionally
+      # limited to an explicit list. If anything goes wrong (missing gems, bad
+      # setup, etc.), we log a warning and leave OTel turned off rather than
+      # crashing the test run.
+      def configure!(endpoint: DEFAULT_ENDPOINT, api_token: nil, run_env: {}, instrumentations: nil)
         return if enabled?
 
         require "opentelemetry/sdk"
@@ -191,7 +192,7 @@ module Buildkite::TestCollector
       # Plug our processor into the suite's provider when it has one; otherwise,
       # configure the default SDK provider. In either case, only our processor is
       # our responsibility to shut down later.
-      def install_processor(processor, instrumentations = [])
+      def install_processor(processor, instrumentations = nil)
         provider = OpenTelemetry.tracer_provider
 
         if provider.respond_to?(:add_span_processor)
@@ -214,13 +215,23 @@ module Buildkite::TestCollector
       end
 
       # Instrumentation patches application libraries globally and can conflict
-      # with other APM libraries. Only install entries the suite explicitly
-      # selected, and let a bad entry fail without disabling root-span export.
+      # with other APM libraries. By default, install every registered entry: the
+      # collector loads none itself, so registrations come from instrumentation
+      # gems the suite loaded. An explicit list (including an empty one) narrows it.
       def install_instrumentations(instrumentation_names)
+        registry = OpenTelemetry::Instrumentation.registry
+
+        if instrumentation_names.nil?
+          begin
+            registry.install_all
+          rescue StandardError => e
+            warn "[buildkite-test_collector] Could not install loaded OpenTelemetry instrumentation: #{e.class}: #{e.message}"
+          end
+          return
+        end
+
         instrumentation_names = Array(instrumentation_names)
         return if instrumentation_names.empty?
-
-        registry = OpenTelemetry::Instrumentation.registry
 
         instrumentation_names.each do |name|
           begin

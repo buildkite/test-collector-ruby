@@ -108,15 +108,16 @@ Buildkite::TestCollector.configure(hook: :rspec, otel_enabled: true)
 ```
 
 If your suite already runs OpenTelemetry, we use your existing setup and your
-instrumentation as it is. Otherwise, the safe default exports only the root
-`test.execution` span. The collector never installs every available
-instrumentation automatically because global patches can conflict with APMs and
-other libraries in the host application.
+instrumentation as it is. Otherwise, the collector installs every individual
+instrumentation gem the suite has already loaded. The collector does not bundle
+or load any instrumentation itself, so a suite with none gets only the root
+`test.execution` span and no global library patches.
 
-You can explicitly select child-span instrumentation after adding and requiring
-its gem. For example, see the [OpenTelemetry guide](docs/opentelemetry.md) to opt
-into Net::HTTP spans. Missing or incompatible selections warn without disabling
-the root span.
+Add and require an individual instrumentation gem to opt into its child spans.
+You can optionally restrict installation with `otel_instrumentations`, or pass an
+empty list for root spans only. See the
+[OpenTelemetry guide](docs/opentelemetry.md) for examples. Missing or incompatible
+selections warn without disabling the root span.
 
 Spans need `BUILDKITE_ANALYTICS_TOKEN` to be an agent OIDC token with the
 `write_uploads` scope, from `buildkite-agent oidc request-token`. A suite API

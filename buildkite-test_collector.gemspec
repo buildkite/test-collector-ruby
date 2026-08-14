@@ -29,7 +29,8 @@ Gem::Specification.new do |spec|
   # OpenTelemetry stays consumer-managed while export is opt-in and this gem
   # supports Ruby 2.3. When export becomes the default in the next major release,
   # raise the Ruby floor to 3.3 and add the SDK and OTLP exporter here as runtime
-  # dependencies. Instrumentation should remain an explicit allowlist.
+  # dependencies. Instrumentation gems should remain consumer-managed, and the
+  # collector should never bundle opentelemetry-instrumentation-all.
 
   spec.add_development_dependency "activesupport", ">= 4.2"
   spec.add_development_dependency "ostruct"

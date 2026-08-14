@@ -280,31 +280,13 @@ RSpec.describe Buildkite::TestCollector::OTel do
     OpenTelemetry.tracer_provider = original
   end
 
-  it "exports root spans without installing instrumentation by default" do
+  it "exports root spans and installs all loaded instrumentation by default" do
     original = OpenTelemetry.tracer_provider
     provider = nil
     OpenTelemetry.tracer_provider = OpenTelemetry::Internal::ProxyTracerProvider.new
     registry = OpenTelemetry::Instrumentation.registry
-    host_http_client = Class.new do
-      def request
-        :response
-      end
-
-      private
-
-      def annotate_span_with_response!(_span, _response, _options)
-        nil
-      end
-    end
-    conflicting_instrumentation = Module.new do
-      def request
-        response = super
-        annotate_span_with_response!(:span, response)
-        response
-      end
-    end
-    allow(registry).to receive(:install) { host_http_client.prepend(conflicting_instrumentation) }
-    allow(registry).to receive(:install_all) { host_http_client.prepend(conflicting_instrumentation) }
+    allow(registry).to receive(:install)
+    allow(registry).to receive(:install_all)
 
     exporter = OpenTelemetry::SDK::Trace::Export::InMemorySpanExporter.new
     allow(OpenTelemetry::Exporter::OTLP::Exporter).to receive(:new) { exporter }
@@ -316,13 +298,23 @@ RSpec.describe Buildkite::TestCollector::OTel do
     provider.force_flush
 
     expect(exporter.finished_spans.map(&:name)).to include("test.execution")
-    expect(host_http_client.new.request).to eq(:response)
     expect(registry).not_to have_received(:install)
-    expect(registry).not_to have_received(:install_all)
+    expect(registry).to have_received(:install_all).once
   ensure
     described_class.shutdown
     provider&.shutdown
     OpenTelemetry.tracer_provider = original
+  end
+
+  it "installs no instrumentation when explicitly given an empty list" do
+    registry = OpenTelemetry::Instrumentation.registry
+    allow(registry).to receive(:install)
+    allow(registry).to receive(:install_all)
+
+    described_class.send(:install_instrumentations, [])
+
+    expect(registry).not_to have_received(:install)
+    expect(registry).not_to have_received(:install_all)
   end
 
   it "installs only explicitly selected, available instrumentation" do
@@ -359,5 +351,14 @@ RSpec.describe Buildkite::TestCollector::OTel do
     ).to_stderr
 
     expect(registry).to have_received(:install).with(["working"]).once
+  end
+
+  it "warns when installing all loaded instrumentation fails" do
+    registry = OpenTelemetry::Instrumentation.registry
+    allow(registry).to receive(:install_all).and_raise("install failed")
+
+    expect do
+      described_class.send(:install_instrumentations, nil)
+    end.to output(/Could not install loaded OpenTelemetry instrumentation/).to_stderr
   end
 end
