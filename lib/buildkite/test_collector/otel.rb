@@ -223,25 +223,27 @@ module Buildkite::TestCollector
         registry = OpenTelemetry::Instrumentation.registry
 
         instrumentation_names.each do |name|
-          instrumentation = registry.lookup(name)
-          unless instrumentation
-            warn "[buildkite-test_collector] OpenTelemetry instrumentation is not available: #{name.inspect}"
-            next
-          end
+          begin
+            instrumentation = registry.lookup(name)
+            unless instrumentation
+              warn "[buildkite-test_collector] OpenTelemetry instrumentation is not available: #{name.inspect}"
+              next
+            end
 
-          unless instrumentation.present?
-            warn "[buildkite-test_collector] OpenTelemetry instrumentation dependency is not available: #{name.inspect}"
-            next
-          end
+            unless instrumentation.present?
+              warn "[buildkite-test_collector] OpenTelemetry instrumentation dependency is not available: #{name.inspect}"
+              next
+            end
 
-          unless instrumentation.compatible?
-            warn "[buildkite-test_collector] OpenTelemetry instrumentation is not compatible: #{name.inspect}"
-            next
-          end
+            unless instrumentation.compatible?
+              warn "[buildkite-test_collector] OpenTelemetry instrumentation is not compatible: #{name.inspect}"
+              next
+            end
 
-          registry.install([name])
-        rescue StandardError => e
-          warn "[buildkite-test_collector] Could not install OpenTelemetry instrumentation #{name.inspect}: #{e.class}: #{e.message}"
+            registry.install([name])
+          rescue StandardError => e
+            warn "[buildkite-test_collector] Could not install OpenTelemetry instrumentation #{name.inspect}: #{e.class}: #{e.message}"
+          end
         end
       end
 
