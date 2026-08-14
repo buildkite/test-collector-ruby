@@ -10,19 +10,18 @@ against the test's execution.
 It is off by default. See the [README](../README.md#opentelemetry-export-experimental)
 for how to turn it on.
 
-## Configure OpenTelemetry
+## Set up OpenTelemetry
 
-The collector supports two modes, depending on whether the host application
-configures the global OpenTelemetry provider before the collector starts. In
-both modes the collector owns the `test.execution` root and its export to
-Buildkite.
+Choose the setup that matches your test suite: either keep using an existing
+OpenTelemetry setup, or let the collector set one up for you. Both options send
+one trace per test execution to Buildkite.
 
 Instrumentation patches application libraries globally and can conflict with
 another APM, profiler, HTTP adapter, or monkey patch in the host process. The
-collector therefore does not bundle or require instrumentation gems. Consumers
-choose which ones to add and load.
+collector therefore does not bundle or require instrumentation gems. You choose
+which ones to add and load.
 
-For example, both modes use these dependencies to add Net::HTTP child spans:
+The examples below use these dependencies to add Net::HTTP child spans:
 
 ```ruby
 # Gemfile
@@ -34,10 +33,9 @@ group :test do
 end
 ```
 
-### Host-configured OpenTelemetry
+### If your suite already uses OpenTelemetry
 
-Use this mode when the application already configures OpenTelemetry. Configure
-the SDK and its instrumentation before configuring the collector:
+Keep your existing SDK and instrumentation setup, then configure the collector:
 
 ```ruby
 # spec/spec_helper.rb
@@ -57,23 +55,20 @@ Buildkite::TestCollector.configure(
 )
 ```
 
-- The collector creates `test.execution` with a private provider and IDs from
-  the operating system's random source. Host PRNG seeds cannot cause root trace
-  ID collisions.
-- Activating that root as the current context makes host-instrumented spans its
-  children, even though the host provider creates them.
-- The collector forwards those child spans to Buildkite without changing the
-  host provider's ID generator, resource, sampler, exporters, instrumentation,
-  or lifecycle.
-- The collector exporter receives `test.execution` and the child spans. Host
-  exporters receive only spans created by the host provider, not
-  `test.execution`.
-- `otel_instrumentations` is ignored because the host owns instrumentation.
+- The collector leaves your OpenTelemetry settings and instrumentation alone.
+- Work already instrumented by your suite appears beneath `test.execution` in
+  Buildkite.
+- The collector generates test trace IDs independently of the test framework's
+  random seed, preventing deterministic collisions between processes.
+- Your existing exporter continues to receive spans created by your suite. It
+  does not receive the collector's `test.execution` span, which is sent only to
+  Buildkite.
+- `otel_instrumentations` has no effect because your suite owns instrumentation.
 
-### Collector-configured OpenTelemetry
+### If your suite does not use OpenTelemetry
 
-Use this mode when the application does not configure OpenTelemetry. Load the
-instrumentation gems you want, but do not call `OpenTelemetry::SDK.configure`:
+Load the instrumentation gems you want and let the collector handle the rest.
+Do not call `OpenTelemetry::SDK.configure` yourself:
 
 ```ruby
 # spec/spec_helper.rb
@@ -86,8 +81,8 @@ Buildkite::TestCollector.configure(
 )
 ```
 
-The collector configures the global provider, installs the loaded Net::HTTP
-instrumentation, and exports `test.execution` and its child spans.
+The collector installs the loaded Net::HTTP instrumentation and sends
+`test.execution` and its child spans to Buildkite.
 
 Choose how much to instrument:
 
@@ -175,12 +170,12 @@ Export never fails a test or holds up your results. If the OpenTelemetry gems ar
 missing, or setup fails, or spans can't be delivered, the collector warns and
 carries on, and your test results upload as they always have.
 
-In collector-configured mode, instrumentation installation is also fail-open.
-Unknown names, missing library dependencies, incompatibilities, and installation
-errors warn and leave root-span export running. The collector does not try to
-detect other APM patches, so consumers should load only instrumentation that is
-safe for their host process or use `otel_instrumentations` to restrict the
-registered set.
+When the collector handles setup, instrumentation installation is also
+fail-open. Unknown names, missing library dependencies, incompatibilities, and
+installation errors warn and leave root-span export running. The collector does
+not try to detect other APM patches, so load only instrumentation that is safe
+for your test process or use `otel_instrumentations` to restrict the registered
+set.
 
 Export problems are reported through OpenTelemetry's own logger, so look there
 for the reason if spans aren't arriving.
