@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "securerandom"
+
 module Buildkite::TestCollector
   # Opt-in OpenTelemetry span emission.
   module OTel
@@ -17,6 +19,28 @@ module Buildkite::TestCollector
     }.freeze
 
     PROCESSOR_TIMEOUT_SECONDS = 5
+
+    # OpenTelemetry's default ID generator uses Ruby's global PRNG. Test suites
+    # can seed that PRNG, making separate processes generate the same trace IDs.
+    # Use the operating system's random source for the provider we create instead.
+    module SecureRandomIdGenerator
+      module_function
+
+      def generate_trace_id
+        generate(16)
+      end
+
+      def generate_span_id
+        generate(8)
+      end
+
+      def generate(length)
+        id = SecureRandom.random_bytes(length) until id && id != "\0" * length
+        id
+      end
+      private_class_method :generate
+    end
+    private_constant :SecureRandomIdGenerator
 
     # Once you give OpenTelemetry a processor, there's no way to take it back.
     # So after we shut down, we can't remove ourselves and spans would just
@@ -179,7 +203,10 @@ module Buildkite::TestCollector
           provider.add_span_processor(processor)
           provider
         elsif provider.is_a?(OpenTelemetry::Internal::ProxyTracerProvider)
-          OpenTelemetry::SDK.configure { |c| c.add_span_processor(processor) }
+          OpenTelemetry::SDK.configure do |c|
+            c.id_generator = SecureRandomIdGenerator
+            c.add_span_processor(processor)
+          end
           # Nobody else is instrumenting, so bring our own. Everything for now:
           # narrowing this to a hand picked set is a decision for once
           # dogfooding shows which spans are worth the noise.

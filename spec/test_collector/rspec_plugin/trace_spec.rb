@@ -110,6 +110,15 @@ RSpec.describe Buildkite::TestCollector::RSpecPlugin::Trace do
       )
     end
 
+    context "with an external ID" do
+      let(:external_id) { "019c8d97-f9ad-75a5-8173-dc6c1b54b901" }
+
+      it "identifies the matching Test Engine execution" do
+        expect(trace.otel_attributes.fetch("buildkite.test.execution.external_id"))
+          .to eq(external_id)
+      end
+    end
+
     context "when location_prefix is provided" do
       let(:location_prefix) { "some/prefix" }
 

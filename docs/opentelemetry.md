@@ -34,6 +34,7 @@ letting you navigate between them without combining every test into one trace.
 | `code.file.path` | the file the test is in |
 | `code.line.number` | the line, or the call site for a shared example |
 | `test.case.result.status` | `pass`, `fail` or `skipped` |
+| `buildkite.test.execution.external_id` | the ID of the matching Test Engine execution |
 
 A failed test also sets the span's status to error. Why it failed stays on the
 test's execution in Test Engine rather than on the span.
