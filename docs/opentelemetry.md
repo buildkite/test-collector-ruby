@@ -35,10 +35,11 @@ end
 
 ### If your suite already uses OpenTelemetry
 
-Keep your existing SDK and instrumentation setup, then configure the collector:
+Your suite already has SDK and instrumentation setup like this. Keep it as-is:
 
 ```ruby
 # spec/spec_helper.rb
+# Existing OpenTelemetry setup
 require 'opentelemetry/sdk'
 require 'opentelemetry/exporter/otlp'
 require 'opentelemetry/instrumentation/net_http'
@@ -46,7 +47,13 @@ require 'opentelemetry/instrumentation/net_http'
 OpenTelemetry::SDK.configure do |config|
   config.use 'OpenTelemetry::Instrumentation::Net::HTTP'
 end
+```
 
+Add the collector configuration after that existing setup:
+
+```ruby
+# spec/spec_helper.rb
+# New Buildkite Test Engine setup
 require 'buildkite/test_collector'
 
 Buildkite::TestCollector.configure(
