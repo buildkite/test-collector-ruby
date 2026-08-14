@@ -18,20 +18,26 @@ collector therefore does not bundle or require any instrumentation gems. By
 default it installs all individual instrumentation gems the suite has already
 loaded, treating each explicit `require` as the consumer's choice to enable it.
 
-The collector supports three setups:
+The collector supports two provider setups:
 
-1. **Root spans only.** Add `opentelemetry-sdk` and
-   `opentelemetry-exporter-otlp`, then enable export as shown in the README. Do
-   not load an instrumentation gem, or pass `otel_instrumentations: []` to
-   suppress instrumentation already loaded elsewhere.
-2. **Child spans.** Add and require each individual instrumentation gem you want.
-   The collector installs every instrumentation registered by those gems. You
-   can optionally restrict installation with `otel_instrumentations`.
-3. **An existing OpenTelemetry setup.** The collector leaves the host's provider
-   settings and instrumentation unchanged. It creates each execution root with
-   its own provider and forwards the host's instrumented child spans to
-   Buildkite. In this mode `otel_instrumentations` is ignored because the host
+1. **The host already has OpenTelemetry configured.** The collector leaves the
+   host's provider settings and instrumentation unchanged. It creates each
+   execution root with its own provider and forwards the host's instrumented
+   child spans to Buildkite. `otel_instrumentations` is ignored because the host
    application owns instrumentation.
+2. **The host does not have OpenTelemetry configured.** The collector configures
+   the global provider and installs instrumentation from gems the suite has
+   loaded.
+
+In the second setup, choose how much to instrument:
+
+- **Root spans only.** Add `opentelemetry-sdk` and
+  `opentelemetry-exporter-otlp`, then enable export as shown in the README. Do
+  not load an instrumentation gem, or pass `otel_instrumentations: []` to
+  suppress instrumentation already loaded elsewhere.
+- **Child spans.** Add and require each individual instrumentation gem you want.
+  The collector installs every instrumentation registered by those gems. You
+  can optionally restrict installation with `otel_instrumentations`.
 
 For example, to add Net::HTTP child spans:
 
