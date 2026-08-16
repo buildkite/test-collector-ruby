@@ -221,7 +221,7 @@ RSpec.describe Buildkite::TestCollector::OTel do
     expect(config).to have_received(:add_span_processor).with(processor)
   end
 
-  it "owns root ID generation when the suite runs its own OpenTelemetry" do
+  it "owns root ID generation and export when the suite runs its own OpenTelemetry" do
     original = OpenTelemetry.tracer_provider
     suite_exporter = OpenTelemetry::SDK::Trace::Export::InMemorySpanExporter.new
     host_id_generator = double(
@@ -235,8 +235,11 @@ RSpec.describe Buildkite::TestCollector::OTel do
     )
     OpenTelemetry.tracer_provider = provider
 
-    buildkite_exporter = OpenTelemetry::SDK::Trace::Export::InMemorySpanExporter.new
-    allow(OpenTelemetry::Exporter::OTLP::Exporter).to receive(:new) { buildkite_exporter }
+    root_exporter = OpenTelemetry::SDK::Trace::Export::InMemorySpanExporter.new
+    child_exporter = OpenTelemetry::SDK::Trace::Export::InMemorySpanExporter.new
+    allow(OpenTelemetry::Exporter::OTLP::Exporter)
+      .to receive(:new)
+      .and_return(root_exporter, child_exporter)
     allow(SecureRandom).to receive(:random_bytes) { |length| "s" * length }
     described_class.configure!(endpoint: "https://example.invalid/v1/traces")
 
@@ -246,13 +249,16 @@ RSpec.describe Buildkite::TestCollector::OTel do
     end
     described_class.finish_test_span(execution_span)
     provider.force_flush
+    described_class.instance_variable_get(:@processor).force_flush
 
-    exported_execution = buildkite_exporter.finished_spans.find { |span| span.name == "test.execution" }
-    exported_child = buildkite_exporter.finished_spans.find { |span| span.name == "host-child" }
+    exported_execution = root_exporter.finished_spans.find { |span| span.name == "test.execution" }
+    exported_child = child_exporter.finished_spans.find { |span| span.name == "host-child" }
 
     expect(exported_execution.trace_id).to eq("s" * 16)
     expect(exported_child.trace_id).to eq(exported_execution.trace_id)
     expect(exported_child.parent_span_id).to eq(exported_execution.span_id)
+    expect(root_exporter.finished_spans.map(&:name)).to contain_exactly("test.execution")
+    expect(child_exporter.finished_spans.map(&:name)).to contain_exactly("host-child")
     expect(suite_exporter.finished_spans.map(&:name)).to contain_exactly("host-child")
     expect(OpenTelemetry.tracer_provider).to equal(provider)
     expect(provider.id_generator).to equal(host_id_generator)
@@ -266,8 +272,11 @@ RSpec.describe Buildkite::TestCollector::OTel do
     original = OpenTelemetry.tracer_provider
     provider = OpenTelemetry::SDK::Trace::TracerProvider.new
     OpenTelemetry.tracer_provider = provider
-    buildkite_exporter = OpenTelemetry::SDK::Trace::Export::InMemorySpanExporter.new
-    allow(OpenTelemetry::Exporter::OTLP::Exporter).to receive(:new) { buildkite_exporter }
+    root_exporter = OpenTelemetry::SDK::Trace::Export::InMemorySpanExporter.new
+    child_exporter = OpenTelemetry::SDK::Trace::Export::InMemorySpanExporter.new
+    allow(OpenTelemetry::Exporter::OTLP::Exporter)
+      .to receive(:new)
+      .and_return(root_exporter, child_exporter)
     described_class.configure!(endpoint: "https://example.invalid/v1/traces")
 
     provider.shutdown
@@ -276,7 +285,8 @@ RSpec.describe Buildkite::TestCollector::OTel do
     described_class.finish_test_span(execution_span)
     described_class.instance_variable_get(:@processor).force_flush
 
-    expect(buildkite_exporter.finished_spans.map(&:name)).to contain_exactly("test.execution")
+    expect(root_exporter.finished_spans.map(&:name)).to contain_exactly("test.execution")
+    expect(child_exporter.finished_spans).to be_empty
   ensure
     described_class.shutdown
     provider&.shutdown
@@ -292,8 +302,11 @@ RSpec.describe Buildkite::TestCollector::OTel do
     )
     OpenTelemetry.tracer_provider = provider
 
-    buildkite_exporter = OpenTelemetry::SDK::Trace::Export::InMemorySpanExporter.new
-    allow(OpenTelemetry::Exporter::OTLP::Exporter).to receive(:new) { buildkite_exporter }
+    root_exporter = OpenTelemetry::SDK::Trace::Export::InMemorySpanExporter.new
+    child_exporter = OpenTelemetry::SDK::Trace::Export::InMemorySpanExporter.new
+    allow(OpenTelemetry::Exporter::OTLP::Exporter)
+      .to receive(:new)
+      .and_return(root_exporter, child_exporter)
     described_class.configure!(endpoint: "https://example.invalid/v1/traces")
 
     tracer = provider.tracer("suite")
@@ -301,7 +314,8 @@ RSpec.describe Buildkite::TestCollector::OTel do
     provider.force_flush
 
     expect(OpenTelemetry.tracer_provider).to equal(provider)
-    expect(buildkite_exporter.finished_spans.map(&:name)).to include("before-shutdown")
+    expect(root_exporter.finished_spans).to be_empty
+    expect(child_exporter.finished_spans.map(&:name)).to include("before-shutdown")
     expect(suite_exporter.finished_spans.map(&:name)).to include("before-shutdown")
 
     described_class.shutdown
@@ -309,7 +323,7 @@ RSpec.describe Buildkite::TestCollector::OTel do
     provider.force_flush
 
     # Our processor goes quiet, the suite's keeps working.
-    expect(buildkite_exporter.finished_spans.map(&:name)).not_to include("after-shutdown")
+    expect(child_exporter.finished_spans.map(&:name)).not_to include("after-shutdown")
     expect(suite_exporter.finished_spans.map(&:name)).to include("after-shutdown")
   ensure
     described_class.shutdown

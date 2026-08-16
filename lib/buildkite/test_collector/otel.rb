@@ -99,15 +99,21 @@ module Buildkite::TestCollector
         require "opentelemetry/exporter/otlp"
         require "opentelemetry/trace/propagation/trace_context"
 
-        exporter = OpenTelemetry::Exporter::OTLP::Exporter.new(
-          endpoint: endpoint,
-          headers: request_headers(run_env, api_token),
-        )
-        @processor = ManagedSpanProcessor.new(
-          OpenTelemetry::SDK::Trace::Export::BatchSpanProcessor.new(exporter)
-        )
+        headers = request_headers(run_env, api_token)
+        @processor = build_processor(endpoint, headers)
+        provider = OpenTelemetry.tracer_provider
+        if provider.respond_to?(:add_span_processor)
+          # Host instrumentation can produce enough spans to fill the SDK's
+          # bounded batch queue. Keep roots in their own queue so that child
+          # span backpressure cannot evict them before export.
+          @child_processor = build_processor(endpoint, headers)
+        end
 
-        provider = install_processor(@processor, instrumentations)
+        provider = install_processor(
+          @processor,
+          instrumentations,
+          child_processor: @child_processor,
+        )
 
         @tracer = provider.tracer(
           "buildkite-test-collector", Buildkite::TestCollector::VERSION
@@ -181,7 +187,7 @@ module Buildkite::TestCollector
       # Turns off span export and flushes anything left in the queue. Safe to
       # call even if we were never turned on.
       def shutdown
-        [@host_processor, @processor].compact.each do |processor|
+        [@host_processor, @processor, @child_processor].compact.each do |processor|
           begin
             processor.shutdown(timeout: PROCESSOR_TIMEOUT_SECONDS)
           rescue StandardError => e
@@ -191,17 +197,29 @@ module Buildkite::TestCollector
       ensure
         @host_processor = nil
         @processor = nil
+        @child_processor = nil
         @tracer = nil
       end
 
       private
 
+      def build_processor(endpoint, headers)
+        exporter = OpenTelemetry::Exporter::OTLP::Exporter.new(
+          endpoint: endpoint,
+          headers: headers,
+        )
+        ManagedSpanProcessor.new(
+          OpenTelemetry::SDK::Trace::Export::BatchSpanProcessor.new(exporter)
+        )
+      end
+
       # Use the suite's provider for its instrumented child spans, but create the
       # test root with a private provider whose IDs cannot be affected by the
-      # suite seeding Ruby's PRNG. Both providers feed one processor, whose
-      # lifecycle remains exclusively ours. Without a suite provider, configure
-      # the default SDK provider and use it for both roots and children.
-      def install_processor(processor, instrumentations = nil)
+      # suite seeding Ruby's PRNG. Each provider has its own processor so heavy
+      # child-span traffic cannot evict roots from the bounded batch queue.
+      # Without a suite provider, configure the default SDK provider and use one
+      # processor for both roots and children.
+      def install_processor(processor, instrumentations = nil, child_processor: nil)
         provider = OpenTelemetry.tracer_provider
 
         if provider.respond_to?(:add_span_processor)
@@ -213,8 +231,8 @@ module Buildkite::TestCollector
           root_provider.add_span_processor(processor)
 
           # The host owns this wrapper's lifecycle. Its shutdown only stops
-          # forwarding; it cannot shut down the processor used by root spans.
-          @host_processor = ManagedSpanProcessor.new(processor, owns_lifecycle: false)
+          # forwarding; it cannot shut down the collector-owned child processor.
+          @host_processor = ManagedSpanProcessor.new(child_processor, owns_lifecycle: false)
           provider.add_span_processor(@host_processor)
           root_provider
         elsif provider.is_a?(OpenTelemetry::Internal::ProxyTracerProvider)
