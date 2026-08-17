@@ -100,13 +100,23 @@ module Buildkite::TestCollector
         require "opentelemetry/trace/propagation/trace_context"
 
         headers = request_headers(run_env, api_token)
-        @processor = build_processor(endpoint, headers)
         provider = OpenTelemetry.tracer_provider
         if provider.respond_to?(:add_span_processor)
+          # Root spans are the correlation anchor for every execution. Keep them
+          # queued until the suite shuts down rather than periodically exporting
+          # them from a second worker alongside the host's child-span worker.
+          # BatchSpanProcessor discards a batch after an export failure; retaining
+          # roots for the shutdown flush prevents an in-test failure from making
+          # otherwise accepted child traces permanently rootless.
+          @processor = build_processor(endpoint, headers, start_thread_on_boot: false)
+
           # Host instrumentation can produce enough spans to fill the SDK's
           # bounded batch queue. Keep roots in their own queue so that child
           # span backpressure cannot evict them before export.
           @child_processor = build_processor(endpoint, headers)
+        else
+          # When the collector owns setup, roots and children share this worker.
+          @processor = build_processor(endpoint, headers)
         end
 
         provider = install_processor(
@@ -203,13 +213,16 @@ module Buildkite::TestCollector
 
       private
 
-      def build_processor(endpoint, headers)
+      def build_processor(endpoint, headers, start_thread_on_boot: true)
         exporter = OpenTelemetry::Exporter::OTLP::Exporter.new(
           endpoint: endpoint,
           headers: headers,
         )
         ManagedSpanProcessor.new(
-          OpenTelemetry::SDK::Trace::Export::BatchSpanProcessor.new(exporter)
+          OpenTelemetry::SDK::Trace::Export::BatchSpanProcessor.new(
+            exporter,
+            start_thread_on_boot: start_thread_on_boot,
+          )
         )
       end
 

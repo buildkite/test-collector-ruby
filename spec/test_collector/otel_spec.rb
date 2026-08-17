@@ -237,11 +237,15 @@ RSpec.describe Buildkite::TestCollector::OTel do
 
     root_exporter = OpenTelemetry::SDK::Trace::Export::InMemorySpanExporter.new
     child_exporter = OpenTelemetry::SDK::Trace::Export::InMemorySpanExporter.new
+    allow(root_exporter).to receive(:shutdown).and_return(OpenTelemetry::SDK::Trace::Export::SUCCESS)
+    allow(child_exporter).to receive(:shutdown).and_return(OpenTelemetry::SDK::Trace::Export::SUCCESS)
     allow(OpenTelemetry::Exporter::OTLP::Exporter)
       .to receive(:new)
       .and_return(root_exporter, child_exporter)
     allow(SecureRandom).to receive(:random_bytes) { |length| "s" * length }
     described_class.configure!(endpoint: "https://example.invalid/v1/traces")
+    root_processor = described_class.instance_variable_get(:@processor)
+    root_batch_processor = root_processor.instance_variable_get(:@processor)
 
     execution_span, = described_class.start_test_span
     described_class.with_test_span(execution_span) do
@@ -249,7 +253,11 @@ RSpec.describe Buildkite::TestCollector::OTel do
     end
     described_class.finish_test_span(execution_span)
     provider.force_flush
-    described_class.instance_variable_get(:@processor).force_flush
+
+    expect(root_batch_processor.instance_variable_get(:@thread)).to be_nil
+    expect(root_exporter.finished_spans).to be_empty
+
+    described_class.shutdown
 
     exported_execution = root_exporter.finished_spans.find { |span| span.name == "test.execution" }
     exported_child = child_exporter.finished_spans.find { |span| span.name == "host-child" }
