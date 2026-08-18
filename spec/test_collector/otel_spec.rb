@@ -200,7 +200,7 @@ RSpec.describe Buildkite::TestCollector::OTel do
     headers = described_class.send(:request_headers, { "key" => "test-run-id" }, "suite-token")
 
     expect(headers).to eq(
-      "Buildkite-Test-Run-Key" => "test-run-id",
+      "Buildkite-Tests-Run-Key" => "test-run-id",
       "Authorization" => %(Token token="suite-token"),
     )
   end
