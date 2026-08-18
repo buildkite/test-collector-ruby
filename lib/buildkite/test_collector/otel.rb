@@ -271,7 +271,7 @@ module Buildkite::TestCollector
       # figures out which job sent it from the auth token, so we don't need
       # to send that separately.
       def request_headers(run_env, api_token)
-        headers = { "Buildkite-Test-Run-Key" => run_env["key"] }
+        headers = { "Buildkite-Tests-Run-Key" => run_env["key"] }
         headers["Authorization"] = "Token token=\"#{api_token}\"" if api_token
         headers
       end
