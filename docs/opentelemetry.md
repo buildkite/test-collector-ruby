@@ -2,6 +2,16 @@
 
 > **This is still under development and everything here may change.**
 
+This page describes `otel_enabled`, where spans are exported *alongside* the
+normal JSON upload and linked to it by trace ID. There is also an OTLP-only
+mode (`otel_only`) where the span *is* the submission: it carries the full
+execution details (`execution.via=otlp`, result, failure reason and backtrace,
+tags) and Buildkite synthesizes the execution from it server-side, with nothing
+sent to `/v1/uploads`. In that mode the run's details (run key, branch, commit,
+and any `tags:` you configure) travel as OpenTelemetry resource attributes on
+the spans the collector exports. See the
+[README](../README.md#otlp-only-submission-experimental) for how to turn it on.
+
 Every RSpec example gets an OpenTelemetry `test.execution` root. When the suite
 already uses OpenTelemetry, its sampled child spans show what the test did and
 where its time went. The traces are sent to Buildkite and shown against the

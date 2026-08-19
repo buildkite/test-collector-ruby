@@ -55,7 +55,14 @@ module Buildkite::TestCollector
         !@tracer.nil?
       end
 
-      def configure!(endpoint: DEFAULT_ENDPOINT, api_token: nil, run_env: {}, instrumentations: nil)
+      # True when OTLP is the only upload method: the spans carry everything
+      # the server needs to synthesize test executions, with no JSON upload
+      # alongside.
+      def otel_only?
+        @otel_only == true
+      end
+
+      def configure!(endpoint: DEFAULT_ENDPOINT, api_token: nil, run_env: {}, instrumentations: nil, otel_only: false, resource_attributes: {})
         return if enabled?
 
         # Non-empty selections are reserved for future :all and preset support.
@@ -70,9 +77,16 @@ module Buildkite::TestCollector
         require "opentelemetry/trace/propagation/trace_context"
 
         headers = request_headers(run_env, api_token)
-        @execution_provider = build_execution_provider(endpoint, headers)
+
+        # In OTLP-only mode the run-level detail (run key, branch, commit,
+        # user tags) travels as the resource of the providers we create, so
+        # every exported span carries it without repeating it per span.
+        resource = otel_only ? run_resource(run_env, resource_attributes) : execution_resource
+        @otel_only = true if otel_only
+
+        @execution_provider = build_execution_provider(endpoint, headers, resource)
         @tracer = @execution_provider.tracer(TRACER_NAME, Buildkite::TestCollector::VERSION)
-        configure_child_export(endpoint, headers, instrumentations)
+        configure_child_export(endpoint, headers, instrumentations, resource: otel_only ? resource : nil)
       rescue LoadError, StandardError => e
         warn "[buildkite-test_collector] OpenTelemetry span export disabled: #{e.class}: #{e.message}"
         shutdown
@@ -114,6 +128,10 @@ module Buildkite::TestCollector
             status = RESULT_STATUSES[result]
             span.set_attribute(RESULT_ATTRIBUTE, status) if status
             span.status = OpenTelemetry::Trace::Status.error if result == "failed"
+
+            if test.respond_to?(:otel_exception) && (exception = test.otel_exception)
+              span.record_exception(exception)
+            end
           end
         rescue StandardError => e
           warn "[buildkite-test_collector] Could not describe OpenTelemetry test span: #{e.class}: #{e.message}"
@@ -122,6 +140,29 @@ module Buildkite::TestCollector
         end
 
         span_duration(span)
+      end
+
+      # Records a point-in-time annotation as an event on whichever span is
+      # current, which during a test is the test's own trace. Safe to call
+      # when export is off or nothing is recording: it just does nothing.
+      def annotate(content)
+        return unless enabled?
+
+        span = OpenTelemetry::Trace.current_span
+        return unless span.recording?
+
+        span.add_event("test.annotation", attributes: { "buildkite.annotation" => content.to_s })
+      rescue StandardError => e
+        warn "[buildkite-test_collector] Could not annotate OpenTelemetry test span: #{e.class}: #{e.message}"
+      end
+
+      # Pushes any finished spans out now without stopping export. Used at the
+      # end of a suite when the process (and maybe another suite run) lives on.
+      def force_flush
+        @execution_provider&.force_flush(timeout: PROCESSOR_TIMEOUT_SECONDS)
+        @execution_child_processor&.force_flush(timeout: PROCESSOR_TIMEOUT_SECONDS)
+      rescue StandardError => e
+        warn "[buildkite-test_collector] Could not flush OpenTelemetry spans: #{e.class}: #{e.message}"
       end
 
       def shutdown
@@ -136,11 +177,12 @@ module Buildkite::TestCollector
         @execution_child_processor = nil
         @execution_child_forwarder = nil
         @tracer = nil
+        @otel_only = nil
       end
 
       private
 
-      def build_execution_provider(endpoint, headers)
+      def build_execution_provider(endpoint, headers, resource)
         execution_processor = batch_processor(
           endpoint,
           headers,
@@ -152,7 +194,7 @@ module Buildkite::TestCollector
         execution_provider = OpenTelemetry::SDK::Trace::TracerProvider.new(
           sampler: OpenTelemetry::SDK::Trace::Samplers::ALWAYS_ON,
           id_generator: SecureRandomIdGenerator,
-          resource: execution_resource,
+          resource: resource,
         )
         execution_provider.add_span_processor(execution_processor)
         execution_provider
@@ -169,7 +211,11 @@ module Buildkite::TestCollector
         OpenTelemetry::SDK::Trace::Export::BatchSpanProcessor.new(exporter, **options)
       end
 
-      def configure_child_export(endpoint, headers, instrumentations)
+      # In OTLP-only mode the collector-managed child provider carries the
+      # same run resource as the execution provider, so instrumentation spans
+      # and any spans the suite starts through the global tracer carry the
+      # run's identity too. A suite-owned provider keeps its own resource.
+      def configure_child_export(endpoint, headers, instrumentations, resource: nil)
         provider = OpenTelemetry.tracer_provider
         collector_managed = provider.is_a?(OpenTelemetry::Internal::ProxyTracerProvider)
         unless collector_managed || provider.respond_to?(:add_span_processor)
@@ -184,6 +230,7 @@ module Buildkite::TestCollector
 
         if collector_managed
           OpenTelemetry::SDK.configure do |config|
+            config.resource = resource if resource
             config.id_generator = SecureRandomIdGenerator
             config.add_span_processor(child_forwarder)
             config.use_all if instrumentations.nil?
@@ -216,6 +263,40 @@ module Buildkite::TestCollector
         return provider.resource if provider.respond_to?(:resource)
 
         OpenTelemetry::SDK::Resources::Resource.default
+      end
+
+      # Describes the whole run once, on the resource, so every span carries it
+      # without repeating it: which run this is, where it came from, and any
+      # tags the user gave to configure.
+      def run_resource(run_env, resource_attributes)
+        attributes = {
+          "service.name" => ENV["BUILDKITE_TEST_ENGINE_SUITE_SLUG"] || "buildkite-test-collector",
+          "service.namespace" => ENV["BUILDKITE_ORGANIZATION_SLUG"],
+          "service.instance.id" => run_env["job_id"],
+          "buildkite.test.run.key" => run_env["key"],
+          "buildkite.test.run.url" => run_env["url"],
+          "buildkite.test.run.branch" => run_env["branch"],
+          "buildkite.test.run.commit_sha" => run_env["commit_sha"],
+          "buildkite.test.run.number" => run_env["number"],
+          "buildkite.test.run.job_id" => run_env["job_id"],
+          "buildkite.test.run.message" => run_env["message"],
+          "buildkite.test.run.build_id" => ENV["BUILDKITE_BUILD_ID"],
+          "buildkite.test.run.step_id" => ENV["BUILDKITE_STEP_ID"],
+          "buildkite.test.collector.name" => run_env["collector"],
+          "buildkite.test.collector.version" => run_env["version"],
+          "test.framework.name" => Buildkite::TestCollector.test_runner,
+        }
+        if defined?(RSpec::Core::Version::STRING)
+          attributes["test.framework.version"] = RSpec::Core::Version::STRING
+        end
+
+        user_attributes = (resource_attributes || {}).map { |key, value| [key.to_s, value.to_s] }.to_h
+
+        OpenTelemetry::SDK::Resources::Resource.default.merge(
+          OpenTelemetry::SDK::Resources::Resource.create(
+            attributes.reject { |_, value| value.nil? }.merge(user_attributes)
+          )
+        )
       end
 
       def shutdown_exports(timeout)

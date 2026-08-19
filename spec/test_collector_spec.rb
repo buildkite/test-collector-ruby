@@ -91,6 +91,46 @@ RSpec.describe Buildkite::TestCollector do
         ),
       )
     end
+
+    it "submits results only via OTLP when otel_only is set, with tags as resource attributes" do
+      run_env = { "key" => "run-key" }
+      allow(Buildkite::TestCollector::CI).to receive(:env) { run_env }
+      allow(Buildkite::TestCollector::OTel).to receive(:configure!)
+      env_overlay["BUILDKITE_ANALYTICS_TOKEN"] = "MyToken"
+
+      Buildkite::TestCollector.configure(
+        hook: hook,
+        otel_only: true,
+        tags: { "team" => "platform" },
+      )
+
+      expect(Buildkite::TestCollector.otel_only?).to eq true
+      expect(Buildkite::TestCollector::OTel).not_to have_received(:configure!)
+
+      Buildkite::TestCollector.start_otel
+
+      expect(Buildkite::TestCollector::OTel).to have_received(:configure!).with(
+        endpoint: "https://tests-otlp.buildkite.com/v1/traces",
+        api_token: "MyToken",
+        run_env: run_env,
+        otel_only: true,
+        instrumentations: nil,
+        resource_attributes: { "team" => "platform" },
+      )
+    ensure
+      Buildkite::TestCollector.otel_only = false
+    end
+
+    it "routes annotations to OpenTelemetry in OTLP-only mode" do
+      allow(Buildkite::TestCollector::OTel).to receive(:annotate)
+      Buildkite::TestCollector.otel_only = true
+
+      Buildkite::TestCollector.annotate("a thing happened")
+
+      expect(Buildkite::TestCollector::OTel).to have_received(:annotate).with("a thing happened")
+    ensure
+      Buildkite::TestCollector.otel_only = false
+    end
   end
 
   context "worker ID tag" do
@@ -180,6 +220,12 @@ RSpec.describe Buildkite::TestCollector do
       Buildkite::TestCollector.start_otel
 
       expect(Buildkite::TestCollector::OTel).not_to have_received(:configure!)
+    end
+
+    it "rejects otel_only rather than silently uploading nothing" do
+      expect {
+        Buildkite::TestCollector.configure(hook: hook, otel_only: true)
+      }.to raise_error(ArgumentError, /otel_only is currently only supported with the rspec hook/)
     end
   end
 

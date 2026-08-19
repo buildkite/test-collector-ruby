@@ -463,6 +463,7 @@ RSpec.describe Buildkite::TestCollector::OTel do
       :build_execution_provider,
       "https://example.invalid/v1/traces",
       {},
+      described_class.send(:execution_resource),
     )
 
     expect(execution_provider.id_generator).to equal(generator)
@@ -709,5 +710,164 @@ RSpec.describe Buildkite::TestCollector::OTel do
     expect(root_exporter.finished_spans.map(&:name)).to contain_exactly("test.execution")
   ensure
     described_class.shutdown
+  end
+
+  describe "OTLP-only mode" do
+    it "exports spans carrying the run and user tags as the resource" do
+      original = OpenTelemetry.tracer_provider
+      OpenTelemetry.tracer_provider = OpenTelemetry::Internal::ProxyTracerProvider.new
+      exporter = OpenTelemetry::SDK::Trace::Export::InMemorySpanExporter.new
+      allow(OpenTelemetry::Exporter::OTLP::Exporter).to receive(:new) { exporter }
+      allow(OpenTelemetry::Instrumentation.registry).to receive(:install_all)
+
+      described_class.configure!(
+        endpoint: "https://example.invalid/v1/traces",
+        run_env: {
+          "key" => "run-123",
+          "branch" => "main",
+          "commit_sha" => "abc123",
+          "collector" => "ruby-buildkite-test_collector",
+          "version" => Buildkite::TestCollector::VERSION,
+        },
+        otel_only: true,
+        resource_attributes: { "team" => "platform", :speed => :fast },
+      )
+
+      expect(described_class).to be_enabled
+      expect(described_class).to be_otel_only
+      expect(OpenTelemetry.tracer_provider).not_to equal(original)
+
+      span, = described_class.start_test_span
+      described_class.finish_test_span(span)
+      described_class.force_flush
+
+      resource = exporter.finished_spans.fetch(0).resource.attribute_enumerator.to_h
+      expect(resource).to include(
+        "buildkite.test.run.key" => "run-123",
+        "buildkite.test.run.branch" => "main",
+        "buildkite.test.run.commit_sha" => "abc123",
+        "buildkite.test.collector.name" => "ruby-buildkite-test_collector",
+        "buildkite.test.collector.version" => Buildkite::TestCollector::VERSION,
+        # User tags ride along as resource attributes, stringified.
+        "team" => "platform",
+        "speed" => "fast",
+      )
+    ensure
+      described_class.shutdown
+      OpenTelemetry.tracer_provider = original
+    end
+
+    it "leaves a suite-installed provider in place while roots still carry the run resource" do
+      original = OpenTelemetry.tracer_provider
+      suite_provider = OpenTelemetry::SDK::Trace::TracerProvider.new
+      OpenTelemetry.tracer_provider = suite_provider
+      exporter = OpenTelemetry::SDK::Trace::Export::InMemorySpanExporter.new
+      allow(OpenTelemetry::Exporter::OTLP::Exporter).to receive(:new) { exporter }
+
+      described_class.configure!(
+        endpoint: "https://example.invalid/v1/traces",
+        run_env: { "key" => "run-123" },
+        otel_only: true,
+      )
+
+      # The suite's provider is not replaced or reconfigured: the execution
+      # root comes from the collector's private provider, and the suite's
+      # spans reach Buildkite through the forwarder attached to its provider.
+      expect(OpenTelemetry.tracer_provider).to equal(suite_provider)
+
+      span, = described_class.start_test_span
+      described_class.finish_test_span(span)
+      described_class.force_flush
+
+      resource = exporter.finished_spans.fetch(0).resource.attribute_enumerator.to_h
+      expect(resource).to include("buildkite.test.run.key" => "run-123")
+    ensure
+      described_class.shutdown
+      suite_provider&.shutdown
+      OpenTelemetry.tracer_provider = original
+    end
+
+    it "forgets OTLP-only mode on shutdown" do
+      exporter = OpenTelemetry::SDK::Trace::Export::InMemorySpanExporter.new
+      original = OpenTelemetry.tracer_provider
+      OpenTelemetry.tracer_provider = OpenTelemetry::Internal::ProxyTracerProvider.new
+      allow(OpenTelemetry::Exporter::OTLP::Exporter).to receive(:new) { exporter }
+      allow(OpenTelemetry::Instrumentation.registry).to receive(:install_all)
+
+      described_class.configure!(
+        endpoint: "https://example.invalid/v1/traces",
+        otel_only: true,
+      )
+      expect(described_class).to be_otel_only
+
+      described_class.shutdown
+      expect(described_class).not_to be_otel_only
+    ensure
+      described_class.shutdown
+      OpenTelemetry.tracer_provider = original
+    end
+  end
+
+  describe ".annotate" do
+    it "adds an annotation event to the current span" do
+      exporter = OpenTelemetry::SDK::Trace::Export::InMemorySpanExporter.new
+      provider = OpenTelemetry::SDK::Trace::TracerProvider.new
+      provider.add_span_processor(
+        OpenTelemetry::SDK::Trace::Export::SimpleSpanProcessor.new(exporter)
+      )
+      tracer = provider.tracer("annotate-test")
+      described_class.instance_variable_set(:@tracer, tracer)
+
+      tracer.in_span("test.execution") do
+        described_class.annotate("something happened")
+      end
+      provider.force_flush
+
+      event = exporter.finished_spans.fetch(0).events.fetch(0)
+      expect(event.name).to eq("test.annotation")
+      expect(event.attributes).to eq("buildkite.annotation" => "something happened")
+    ensure
+      described_class.instance_variable_set(:@tracer, nil)
+      provider&.shutdown
+    end
+
+    it "does nothing when export is off or no span is recording" do
+      expect { described_class.annotate("ignored") }.not_to raise_error
+
+      described_class.instance_variable_set(:@tracer, double("tracer"))
+      expect { described_class.annotate("also ignored") }.not_to raise_error
+    ensure
+      described_class.instance_variable_set(:@tracer, nil)
+    end
+  end
+
+  it "records the test's exception on the span when the test offers one" do
+    exporter = OpenTelemetry::SDK::Trace::Export::InMemorySpanExporter.new
+    provider = OpenTelemetry::SDK::Trace::TracerProvider.new
+    provider.add_span_processor(
+      OpenTelemetry::SDK::Trace::Export::SimpleSpanProcessor.new(exporter)
+    )
+    described_class.instance_variable_set(:@tracer, provider.tracer("exception-test"))
+
+    error = RuntimeError.new("kaboom")
+    error.set_backtrace(["example.rb:1"])
+    test = double(
+      "trace",
+      otel_attributes: {},
+      otel_result: "failed",
+      otel_exception: error,
+    )
+
+    span, = described_class.start_test_span
+    described_class.finish_test_span(span, test: test)
+    provider.force_flush
+
+    finished = exporter.finished_spans.fetch(0)
+    event = finished.events.find { |e| e.name == "exception" }
+    expect(event.attributes).to include("exception.message" => "kaboom")
+    expect(finished.status.code).to eq(OpenTelemetry::Trace::Status::ERROR)
+  ensure
+    described_class.instance_variable_set(:@tracer, nil)
+    provider&.shutdown
   end
 end

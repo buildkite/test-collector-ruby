@@ -137,6 +137,34 @@ Export failures never fail a test or block the normal Test Engine upload. See th
 [OpenTelemetry guide](docs/opentelemetry.md) for what you get and how it
 fits around an existing OpenTelemetry setup.
 
+### OTLP-only submission (experimental)
+
+RSpec suites can go one step further and submit results *only* over OTLP, with
+no JSON upload at all. Each test execution becomes one `test.execution` span
+carrying the full execution details (name, location, result, failure reason and
+backtrace), and Buildkite synthesizes the test execution from the span
+server-side:
+
+```ruby
+Buildkite::TestCollector.configure(hook: :rspec, otel_only: true)
+```
+
+In this mode the collector's legacy machinery is switched off: nothing is
+uploaded to `/v1/uploads`, and `Net::HTTP` and `Object` are left unpatched. The
+gem's whole job is to configure OpenTelemetry so each test gets a suitable span:
+
+- `Buildkite::TestCollector.annotate` adds a `test.annotation` event to the
+  current span.
+- `Buildkite::TestCollector.tag_execution` sets attributes on the test span.
+- `tags:` given to `configure` become resource attributes on every span.
+- Your code can also talk to OpenTelemetry directly — the collector configures
+  the global tracer provider (unless your suite already has one), so
+  `OpenTelemetry::Trace.current_span.set_attribute(...)` works during a test,
+  and any instrumentation joins the test's trace.
+
+`otel_only` is currently RSpec-only and needs Ruby 3.3+. It's an alternative to
+`otel_enabled`; with both set, `otel_only` wins.
+
 ## More information
 
 For more use cases such as custom tags, annotations, and span tracking, please visit our [official Ruby collector documentation](https://buildkite.com/docs/test-engine/ruby-collectors) for details.

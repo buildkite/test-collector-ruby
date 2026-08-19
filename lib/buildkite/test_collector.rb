@@ -41,12 +41,17 @@ module Buildkite
       attr_accessor :test_runner
       attr_accessor :env
       attr_accessor :tags
+      attr_accessor :otel_only
       attr_accessor :batch_size
       attr_accessor :trace_min_duration
       attr_accessor :span_filters
     end
 
-    def self.configure(hook:, token: nil, url: nil, tracing_enabled: true, artifact_path: nil, location_prefix: nil, env: {}, tags: {}, otel_enabled: false, otel_instrumentations: nil)
+    def self.configure(hook:, token: nil, url: nil, tracing_enabled: true, artifact_path: nil, location_prefix: nil, env: {}, tags: {}, otel_enabled: false, otel_instrumentations: nil, otel_only: false)
+      if otel_only && hook.to_sym != :rspec
+        raise ArgumentError.new("otel_only is currently only supported with the rspec hook")
+      end
+
       self.api_token = (token || ENV["BUILDKITE_ANALYTICS_TOKEN"])&.strip
       self.url = url || ENV["BUILDKITE_ANALYTICS_ENDPOINT"] || DEFAULT_URL
       self.tracing_enabled = tracing_enabled
@@ -55,6 +60,7 @@ module Buildkite
       self.test_runner = hook.to_s
       self.env = env
       self.tags = worker_id_tag.merge(tags)
+      self.otel_only = otel_only
       self.batch_size = ENV.fetch("BUILDKITE_ANALYTICS_UPLOAD_BATCH_SIZE") { DEFAULT_UPLOAD_BATCH_SIZE }.to_i
 
       trace_min_ms_string = ENV["BUILDKITE_ANALYTICS_TRACE_MIN_MS"]
@@ -69,7 +75,19 @@ module Buildkite
 
       # Defer OTel setup until RSpec's before(:suite), after application and support files have loaded.
       @otel_options = nil
-      if otel_enabled && test_runner == "rspec"
+      if otel_only
+        @otel_options = {
+          # Undocumented, for development purposes.
+          endpoint: ENV["BUILDKITE_ANALYTICS_OTLP_ENDPOINT"] || Buildkite::TestCollector::OTel::DEFAULT_ENDPOINT,
+          api_token: api_token,
+          run_env: Buildkite::TestCollector::CI.env,
+          otel_only: true,
+          instrumentations: otel_instrumentations,
+          # Tags given to configure describe the whole run, so they ride along
+          # as resource attributes on every exported span.
+          resource_attributes: tags,
+        }
+      elsif otel_enabled && test_runner == "rspec"
         @otel_options = {
           # Undocumented, for development purposes.
           endpoint: ENV["BUILDKITE_ANALYTICS_OTLP_ENDPOINT"] || Buildkite::TestCollector::OTel::DEFAULT_ENDPOINT,
@@ -85,6 +103,10 @@ module Buildkite
       options = @otel_options
       @otel_options = nil
       Buildkite::TestCollector::OTel.configure!(**options) if options
+    end
+
+    def self.otel_only?
+      !!otel_only
     end
 
     def self.hook_into(hook)
@@ -107,9 +129,16 @@ module Buildkite
     private_class_method :worker_id_tag
 
     def self.annotate(content)
-      tracer = Buildkite::TestCollector::Uploader.tracer
-      tracer&.enter("annotation", **{ content: content })
-      tracer&.leave
+      # With OTLP as the only upload method there is no legacy trace to
+      # annotate, so the annotation becomes an event on the current
+      # OpenTelemetry test span instead.
+      if otel_only?
+        Buildkite::TestCollector::OTel.annotate(content)
+      else
+        tracer = Buildkite::TestCollector::Uploader.tracer
+        tracer&.enter("annotation", **{ content: content })
+        tracer&.leave
+      end
     end
 
     # Set a key=value tag on the current test execution.
