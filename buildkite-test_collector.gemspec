@@ -22,7 +22,7 @@ Gem::Specification.new do |spec|
   end
   spec.require_paths = ["lib"]
 
-  spec.required_ruby_version = Gem::Requirement.new(">= 2.3.0")
+  spec.required_ruby_version = Gem::Requirement.new(">= 3.0.0")
 
   spec.add_dependency "concurrent-ruby"
 
@@ -36,12 +36,8 @@ Gem::Specification.new do |spec|
   end
 
   spec.add_development_dependency "activesupport", ">= 4.2"
+  spec.add_development_dependency "cucumber", '~> 9.0'
   spec.add_development_dependency "ostruct"
   spec.add_development_dependency "rspec-core", '~> 3.10'
   spec.add_development_dependency "rspec-expectations", '~> 3.10'
-
-  # When running the legacy CI builds against versions of Ruby pre 2.7 we cannot include cucumber 9 as it's not supported.
-  if Gem::Version.new(RUBY_VERSION) >= Gem::Version.new('2.7')
-    spec.add_development_dependency "cucumber", '~> 9.0'
-  end
 end
