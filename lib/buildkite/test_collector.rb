@@ -46,7 +46,7 @@ module Buildkite
       attr_accessor :span_filters
     end
 
-    def self.configure(hook:, token: nil, url: nil, tracing_enabled: true, artifact_path: nil, location_prefix: nil, env: {}, tags: {}, otel_enabled: false)
+    def self.configure(hook:, token: nil, url: nil, tracing_enabled: true, artifact_path: nil, location_prefix: nil, env: {}, tags: {}, otel_enabled: false, otel_instrumentations: nil)
       if hook.to_sym == :cucumber && Gem::Version.new(RUBY_VERSION) < Gem::Version.new('2.7')
         raise UnsupportedFrameworkError.new("Cucumber is only supported in versions of Ruby >= 2.7")
       end
@@ -79,6 +79,7 @@ module Buildkite
           endpoint: ENV["BUILDKITE_ANALYTICS_OTLP_ENDPOINT"] || Buildkite::TestCollector::OTel::DEFAULT_ENDPOINT,
           api_token: api_token,
           run_env: Buildkite::TestCollector::CI.env,
+          instrumentations: otel_instrumentations,
         }
       end
       self.hook_into(hook)

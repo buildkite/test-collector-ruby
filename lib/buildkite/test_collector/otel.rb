@@ -7,6 +7,31 @@ module Buildkite::TestCollector
   module OTel
     DEFAULT_ENDPOINT = "https://tests-otlp.buildkite.com/v1/traces"
 
+    DEFAULT_INSTRUMENTATIONS = [:pg, :mysql2, :trilogy].freeze
+    BUNDLED_INSTRUMENTATIONS = {
+      pg: ["opentelemetry-instrumentation-pg", "OpenTelemetry::Instrumentation::PG"].freeze,
+      mysql2: ["opentelemetry-instrumentation-mysql2", "OpenTelemetry::Instrumentation::Mysql2"].freeze,
+      trilogy: ["opentelemetry-instrumentation-trilogy", "OpenTelemetry::Instrumentation::Trilogy"].freeze,
+    }.freeze
+
+    INSTRUMENTATION_NAMESPACE = "OpenTelemetry::Instrumentation::"
+    PATCH_TARGET_CONSTANT_PATHS = {
+      "OpenTelemetry::Instrumentation::PG" => ["PG::Connection"].freeze,
+      "OpenTelemetry::Instrumentation::Mysql2" => ["Mysql2::Client"].freeze,
+      "OpenTelemetry::Instrumentation::Trilogy" => ["Trilogy"].freeze,
+      "OpenTelemetry::Instrumentation::Net::HTTP" => ["Net::HTTP"].freeze,
+      "OpenTelemetry::Instrumentation::Redis" => [
+        "Redis::Client",
+        "RedisClient",
+      ].freeze,
+      "OpenTelemetry::Instrumentation::ActiveRecord" => [
+        "ActiveRecord::Base",
+        "ActiveRecord::Relation",
+      ].freeze,
+    }.freeze
+    private_constant :DEFAULT_INSTRUMENTATIONS, :BUNDLED_INSTRUMENTATIONS,
+      :INSTRUMENTATION_NAMESPACE, :PATCH_TARGET_CONSTANT_PATHS
+
     RESULT_ATTRIBUTE = "test.case.result.status"
 
     # OpenTelemetry defines "pass" and "fail", which we have to use where they
@@ -85,11 +110,11 @@ module Buildkite::TestCollector
       end
 
       # Turns on OpenTelemetry span export: loads the OTel libraries, sets up
-      # an exporter that sends spans to Buildkite, and starts instrumenting
-      # everything OpenTelemetry knows how to instrument. If anything goes
-      # wrong (missing gems, bad setup, etc.), we log a warning and leave
-      # OTel turned off rather than crashing the test run.
-      def configure!(endpoint: DEFAULT_ENDPOINT, api_token: nil, run_env: {})
+      # an exporter that sends spans to Buildkite, and installs the selected
+      # instrumentation when the collector owns the provider. If anything goes
+      # wrong (missing gems, bad setup, etc.), we log a warning and leave OTel
+      # turned off rather than crashing the test run.
+      def configure!(endpoint: DEFAULT_ENDPOINT, api_token: nil, run_env: {}, instrumentations: nil)
         return if enabled?
 
         require "opentelemetry/sdk"
@@ -104,7 +129,7 @@ module Buildkite::TestCollector
           OpenTelemetry::SDK::Trace::Export::BatchSpanProcessor.new(exporter)
         )
 
-        provider = install_processor(@processor)
+        provider = install_processor(@processor, instrumentations)
 
         @tracer = provider.tracer(
           "buildkite-test-collector", Buildkite::TestCollector::VERSION
@@ -192,7 +217,7 @@ module Buildkite::TestCollector
       # processor into whatever provider the test suite is already using
       # (its own, or OpenTelemetry's default one), and only take
       # responsibility for shutting down our own processor later.
-      def install_processor(processor)
+      def install_processor(processor, instrumentations)
         provider = OpenTelemetry.tracer_provider
 
         if provider.respond_to?(:add_span_processor)
@@ -207,15 +232,122 @@ module Buildkite::TestCollector
             c.id_generator = SecureRandomIdGenerator
             c.add_span_processor(processor)
           end
-          # Nobody else is instrumenting, so bring our own. Everything for now:
-          # narrowing this to a hand picked set is a decision for once
-          # dogfooding shows which spans are worth the noise.
-          require "opentelemetry/instrumentation/all"
-          OpenTelemetry::Instrumentation.registry.install_all
+          install_instrumentations(instrumentations)
           OpenTelemetry.tracer_provider
         else
           raise "existing OpenTelemetry tracer provider does not support adding a span processor"
         end
+      end
+
+      def install_instrumentations(selection)
+        selected_instrumentations(selection).each do |entry|
+          install_instrumentation(entry)
+        end
+      end
+
+      def selected_instrumentations(selection)
+        entries = selection.nil? ? DEFAULT_INSTRUMENTATIONS : Array(selection)
+        entries.each_with_object([]) do |entry, selected|
+          expanded = entry == :defaults ? DEFAULT_INSTRUMENTATIONS : [entry]
+          expanded.each { |instrumentation| selected << instrumentation unless selected.include?(instrumentation) }
+        end
+      end
+
+      def install_instrumentation(entry)
+        if entry.is_a?(Symbol)
+          bundled = BUNDLED_INSTRUMENTATIONS[entry]
+          unless bundled
+            warn "[buildkite-test_collector] Unknown OpenTelemetry instrumentation: #{entry.inspect}"
+            return
+          end
+
+          require_path, name = bundled
+          require require_path
+        elsif entry.is_a?(String)
+          name = entry
+        else
+          warn "[buildkite-test_collector] Unknown OpenTelemetry instrumentation: #{entry.inspect}"
+          return
+        end
+
+        instrumentation = OpenTelemetry::Instrumentation.registry.lookup(name)
+        unless instrumentation
+          warn "[buildkite-test_collector] OpenTelemetry instrumentation unavailable: #{name} is not registered"
+          return
+        end
+        unless instrumentation.present?
+          warn "[buildkite-test_collector] OpenTelemetry instrumentation unavailable: #{name} target library is not loaded"
+          return
+        end
+        unless instrumentation.compatible?
+          warn "[buildkite-test_collector] OpenTelemetry instrumentation incompatible: #{name}"
+          return
+        end
+
+        # Prepending is irreversible, so do not patch a target another library has already patched.
+        conflict = foreign_patch(name)
+        if conflict
+          patch, target = conflict
+          warn "[buildkite-test_collector] OpenTelemetry instrumentation unsafe: #{name} skipped; foreign patch #{module_name(patch)} found on #{target}"
+          return
+        end
+
+        installed = instrumentation.install
+        unless installed
+          warn "[buildkite-test_collector] OpenTelemetry instrumentation failed: #{name} could not be installed"
+        end
+      rescue LoadError => e
+        name ||= entry.inspect
+        warn "[buildkite-test_collector] OpenTelemetry instrumentation unavailable: #{name}: #{e.message}"
+      rescue StandardError => e
+        name ||= entry.inspect
+        warn "[buildkite-test_collector] OpenTelemetry instrumentation failed: #{name}: #{e.class}: #{e.message}"
+      end
+
+      # Instrumentation gems do not expose their patch targets. Keep the known
+      # targets explicit, and use the registered name as a best-effort fallback
+      # for customer-supplied instrumentation.
+      def patch_targets(name)
+        paths = PATCH_TARGET_CONSTANT_PATHS[name]
+        unless paths
+          return [] unless name.start_with?(INSTRUMENTATION_NAMESPACE)
+
+          paths = [name.delete_prefix(INSTRUMENTATION_NAMESPACE)]
+        end
+
+        paths.map { |path| resolve_constant(path) }.compact.uniq
+      end
+
+      def resolve_constant(path)
+        path.split("::").inject(::Object) do |namespace, constant|
+          namespace.const_get(constant, false)
+        end
+      rescue NameError
+        nil
+      end
+
+      def foreign_patch(name)
+        patch_targets(name).each do |target|
+          target_name = module_name(target)
+          [
+            [target, target_name],
+            [target.singleton_class, "#{target_name}.singleton_class"],
+          ].each do |owner, owner_name|
+            target_index = owner.ancestors.index(owner)
+            next unless target_index
+
+            patch = owner.ancestors[0...target_index].find do |ancestor|
+              !module_name(ancestor).start_with?(INSTRUMENTATION_NAMESPACE)
+            end
+            return [patch, owner_name] if patch
+          end
+        end
+        nil
+      end
+
+      def module_name(mod)
+        name = mod.respond_to?(:name) && mod.name
+        name && !name.empty? ? name : mod.inspect
       end
 
       # How long the finished span says the test took, in seconds. We report this

@@ -44,6 +44,7 @@ RSpec.describe "RSpec execution and OpenTelemetry correlation" do
       endpoint: "https://tests-otlp.buildkite.com/v1/traces",
       api_token: nil,
       run_env: run_env,
+      instrumentations: nil,
     )
     expect(library_loaded_when_configured).to eq("constant")
   end
