@@ -96,6 +96,7 @@ RSpec.describe Buildkite::TestCollector do
       run_env = { "key" => "run-key" }
       allow(Buildkite::TestCollector::CI).to receive(:env) { run_env }
       allow(Buildkite::TestCollector::OTel).to receive(:configure!)
+      allow(Buildkite::TestCollector::OTel).to receive(:enabled?) { true }
       # Stubbed so the OTLP-only hooks aren't installed into this very suite.
       allow(Buildkite::TestCollector).to receive(:hook_into)
       env_overlay["BUILDKITE_ANALYTICS_TOKEN"] = "MyToken"
@@ -120,6 +121,30 @@ RSpec.describe Buildkite::TestCollector do
         instrumentations: nil,
         resource_attributes: { "team" => "platform" },
       )
+    ensure
+      Buildkite::TestCollector.otel_only = false
+    end
+
+    it "rejects otel_enabled alongside otel_only, whichever way it is set" do
+      [true, false].each do |otel_enabled|
+        expect {
+          Buildkite::TestCollector.configure(hook: hook, otel_only: true, otel_enabled: otel_enabled)
+        }.to raise_error(ArgumentError, /otel_enabled and otel_only are mutually exclusive/)
+      end
+    end
+
+    it "warns prominently when otel_only is set but OpenTelemetry could not be configured" do
+      # configure! is stubbed to do nothing, so OTel stays disabled: the
+      # otel_only run would silently upload nothing without the banner.
+      allow(Buildkite::TestCollector::OTel).to receive(:configure!)
+      allow(Buildkite::TestCollector::OTel).to receive(:enabled?) { false }
+      allow(Buildkite::TestCollector).to receive(:hook_into)
+
+      Buildkite::TestCollector.configure(hook: hook, otel_only: true)
+
+      expect {
+        Buildkite::TestCollector.start_otel
+      }.to output(/NO TEST RESULTS UPLOADED/).to_stderr
     ensure
       Buildkite::TestCollector.otel_only = false
     end

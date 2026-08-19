@@ -47,9 +47,16 @@ module Buildkite
       attr_accessor :span_filters
     end
 
-    def self.configure(hook:, token: nil, url: nil, tracing_enabled: true, artifact_path: nil, location_prefix: nil, env: {}, tags: {}, otel_enabled: false, otel_instrumentations: nil, otel_only: false)
+    def self.configure(hook:, token: nil, url: nil, tracing_enabled: true, artifact_path: nil, location_prefix: nil, env: {}, tags: {}, otel_enabled: nil, otel_instrumentations: nil, otel_only: false)
       if otel_only && hook.to_sym != :rspec
         raise ArgumentError.new("otel_only is currently only supported with the rspec hook")
+      end
+
+      # They name one choice of upload mode, not two independent switches, so
+      # any explicit otel_enabled (even false) contradicts otel_only. Its nil
+      # default keeps unspecified distinct from an explicit value.
+      if otel_only && !otel_enabled.nil?
+        raise ArgumentError.new("otel_enabled and otel_only are mutually exclusive; pass at most one")
       end
 
       self.api_token = (token || ENV["BUILDKITE_ANALYTICS_TOKEN"])&.strip
@@ -102,11 +109,42 @@ module Buildkite
     def self.start_otel
       options = @otel_options
       @otel_options = nil
-      Buildkite::TestCollector::OTel.configure!(**options) if options
+      return unless options
+
+      Buildkite::TestCollector::OTel.configure!(**options)
+      warn_otel_only_disabled if options[:otel_only] && !Buildkite::TestCollector::OTel.enabled?
     end
 
     def self.otel_only?
       !!otel_only
+    end
+
+    # In otel_only mode OTLP is the only upload method, so if OpenTelemetry
+    # could not be set up (see the warning OTel.configure! just printed) there
+    # is nothing to fall back to: the suite still runs, but no results are
+    # uploaded at all. That deserves more than one easily-missed line.
+    def self.warn_otel_only_disabled
+      # Buildkite log output renders ANSI colour even though it isn't a TTY.
+      red, reset = if $stderr.tty? || ENV["BUILDKITE"]
+        ["\e[31;1m", "\e[0m"]
+      else
+        ["", ""]
+      end
+
+      warn <<~MESSAGE
+        #{red}
+        ############################################################
+        ##                                                        ##
+        ##  buildkite-test_collector: NO TEST RESULTS UPLOADED!   ##
+        ##                                                        ##
+        ##  otel_only is set, but OpenTelemetry could not be      ##
+        ##  configured (see the warning above). This mode has no  ##
+        ##  JSON fallback, so this run will upload NO results to  ##
+        ##  Buildkite Test Engine.                                ##
+        ##                                                        ##
+        ############################################################
+        #{reset}
+      MESSAGE
     end
 
     def self.hook_into(hook)

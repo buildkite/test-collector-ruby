@@ -163,7 +163,8 @@ gem's whole job is to configure OpenTelemetry so each test gets a suitable span:
   and any instrumentation joins the test's trace.
 
 `otel_only` is currently RSpec-only and needs Ruby 3.3+. It's an alternative to
-`otel_enabled`; with both set, `otel_only` wins.
+`otel_enabled`; the two are mutually exclusive, and passing both (either value)
+raises `ArgumentError`.
 
 ## More information
 
