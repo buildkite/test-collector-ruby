@@ -22,7 +22,7 @@ module Buildkite::TestCollector
 
     ROOT_SPAN_NAME = "test.execution"
     ROOT_MAX_QUEUE_SIZE = 8_192
-    ROOT_MAX_EXPORT_BATCH_SIZE = 64
+    ROOT_MAX_EXPORT_BATCH_SIZE = 512
     ROOT_SCHEDULE_DELAY_MILLISECONDS = 1_000
 
     require_relative "otel/root_span_metrics_reporter"
