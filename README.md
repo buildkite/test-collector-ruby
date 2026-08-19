@@ -11,6 +11,8 @@ Official [Buildkite Test Engine](https://buildkite.com/platform/test-engine) col
 
 ## 👉 Installing
 
+Ruby 3.3 or newer is required.
+
 ### Step 1
 
 [Create a test suite](https://buildkite.com/docs/test-analytics), and copy the API token that it gives you.
@@ -106,18 +108,15 @@ instrumentation to the defaults, or export only root spans. See the
 [OpenTelemetry guide](docs/opentelemetry.md#choosing-instrumentation) for the
 available options.
 
-The collector includes those three curated instrumentation gems instead of
-`opentelemetry-instrumentation-all`. Optional instrumentation remains the
-customer's Gemfile responsibility.
+The collector includes the OpenTelemetry SDK, exporter, and those three curated
+instrumentation gems instead of `opentelemetry-instrumentation-all`. Optional
+instrumentation remains the customer's Gemfile responsibility.
 
 Before installing bundled instrumentation selected by symbol, the collector
 checks its target for foreign patches and skips that instrumentation if it finds
 one. Instrumentation passed by its registered name is an explicit customer
 choice, so it is installed without this guard and its compatibility with other
 patches is the customer's responsibility.
-
-Export needs Ruby 3.3 or newer, which is what the OpenTelemetry gems require. On
-older Rubies the option is accepted and does nothing.
 
 Spans need `BUILDKITE_ANALYTICS_TOKEN` to be an agent OIDC token with the
 `write_uploads` scope, from `buildkite-agent oidc request-token`. A suite API

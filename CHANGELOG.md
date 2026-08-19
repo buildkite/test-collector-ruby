@@ -2,8 +2,11 @@
 
 ## Unreleased
 
+* **Breaking:** Require Ruby 3.3 or newer.
 * Replace `opentelemetry-instrumentation-all` with curated PG, mysql2, and
   Trilogy instrumentation dependencies and installation.
+* Ship the OpenTelemetry SDK, OTLP exporter, and curated instrumentation
+  dependencies consistently in every built gem.
 
 ## v2.14.0
 

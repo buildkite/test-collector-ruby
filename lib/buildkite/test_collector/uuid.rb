@@ -4,10 +4,7 @@ require "securerandom"
 
 class Buildkite::TestCollector::UUID
   GET_UUID = SecureRandom.method(:uuid)
-  # `uuid_v7` is only available on Ruby 3.3+; fall back to UUIDv4 on older Rubies.
-  # Once we require Ruby 3.3+ (planned alongside the OTel work), drop this
-  # fallback and just call SecureRandom.uuid_v7 directly.
-  GET_UUID_V7 = SecureRandom.respond_to?(:uuid_v7) ? SecureRandom.method(:uuid_v7) : GET_UUID
+  GET_UUID_V7 = SecureRandom.method(:uuid_v7)
   private_constant :GET_UUID, :GET_UUID_V7
 
   def self.call

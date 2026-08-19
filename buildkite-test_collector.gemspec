@@ -22,20 +22,14 @@ Gem::Specification.new do |spec|
   end
   spec.require_paths = ["lib"]
 
-  spec.required_ruby_version = Gem::Requirement.new(">= 3.0.0")
+  spec.required_ruby_version = Gem::Requirement.new(">= 3.3.0")
 
   spec.add_dependency "concurrent-ruby"
-
-  # OpenTelemetry export needs Ruby 3.3, so these ship as dependencies only for
-  # the Rubies that can run them. The collector requires them lazily and fails
-  # open without them, so older Rubies keep working with export unavailable.
-  if Gem::Version.new(RUBY_VERSION) >= Gem::Version.new('3.3')
-    spec.add_dependency "opentelemetry-exporter-otlp", "~> 0.34"
-    spec.add_dependency "opentelemetry-instrumentation-mysql2", "~> 0.34"
-    spec.add_dependency "opentelemetry-instrumentation-pg", "~> 0.37"
-    spec.add_dependency "opentelemetry-instrumentation-trilogy", "~> 0.69"
-    spec.add_dependency "opentelemetry-sdk", "~> 1.13"
-  end
+  spec.add_dependency "opentelemetry-exporter-otlp", "~> 0.34"
+  spec.add_dependency "opentelemetry-instrumentation-mysql2", "~> 0.34"
+  spec.add_dependency "opentelemetry-instrumentation-pg", "~> 0.37"
+  spec.add_dependency "opentelemetry-instrumentation-trilogy", "~> 0.69"
+  spec.add_dependency "opentelemetry-sdk", "~> 1.13"
 
   spec.add_development_dependency "activesupport", ">= 4.2"
   spec.add_development_dependency "cucumber", '~> 9.0'
