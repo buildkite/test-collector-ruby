@@ -640,6 +640,52 @@ RSpec.describe Buildkite::TestCollector::OTel do
     provider&.shutdown
   end
 
+  describe "VCR exemption" do
+    fake_request = Struct.new(:method, :uri)
+
+    it "registers an ignore_request hook matching only a POST to the OTLP endpoint" do
+      ignore_blocks = []
+      vcr_config = double("VCR configuration")
+      allow(vcr_config).to receive(:ignore_request) { |&block| ignore_blocks << block }
+      fake_vcr = double("VCR")
+      allow(fake_vcr).to receive(:configure).and_yield(vcr_config)
+      stub_const("VCR", fake_vcr)
+      allow(OpenTelemetry::Exporter::OTLP::Exporter).to receive(:new) do
+        OpenTelemetry::SDK::Trace::Export::InMemorySpanExporter.new
+      end
+
+      described_class.configure!(endpoint: "https://tests-otlp.example.invalid/v1/traces")
+
+      expect(ignore_blocks.length).to eq(1)
+      ignored = ignore_blocks.first
+      expect(ignored.call(fake_request.new(:post, "https://tests-otlp.example.invalid/v1/traces"))).to be true
+      expect(ignored.call(fake_request.new(:post, "https://tests-otlp.example.invalid:443/v1/traces"))).to be true
+      expect(ignored.call(fake_request.new(:get, "https://tests-otlp.example.invalid/v1/traces"))).to be false
+      expect(ignored.call(fake_request.new(:post, "https://example.invalid/v1/traces"))).to be false
+      expect(ignored.call(fake_request.new(:post, "https://tests-otlp.example.invalid/v1/uploads"))).to be false
+      expect(ignored.call(fake_request.new(:post, "not a uri at all "))).to be false
+    ensure
+      described_class.shutdown
+    end
+
+    it "still configures span export when VCR refuses to cooperate" do
+      fake_vcr = double("VCR")
+      allow(fake_vcr).to receive(:configure).and_raise(RuntimeError, "cassette in use")
+      stub_const("VCR", fake_vcr)
+      allow(OpenTelemetry::Exporter::OTLP::Exporter).to receive(:new) do
+        OpenTelemetry::SDK::Trace::Export::InMemorySpanExporter.new
+      end
+
+      expect {
+        described_class.configure!(endpoint: "https://example.invalid/v1/traces")
+      }.to output(/Could not exempt the OTLP endpoint from VCR/).to_stderr
+
+      expect(described_class).to be_enabled
+    ensure
+      described_class.shutdown
+    end
+  end
+
   it "configures collector-managed children without suite OpenTelemetry" do
     script = <<~'RUBY'
       require "buildkite/test_collector"

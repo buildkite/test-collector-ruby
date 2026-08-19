@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "securerandom"
+require "uri"
 
 module Buildkite::TestCollector
   module OTel
@@ -75,6 +76,8 @@ module Buildkite::TestCollector
         require "opentelemetry/sdk"
         require "opentelemetry/exporter/otlp"
         require "opentelemetry/trace/propagation/trace_context"
+
+        exempt_from_vcr(endpoint)
 
         headers = request_headers(run_env, api_token)
 
@@ -209,6 +212,33 @@ module Buildkite::TestCollector
           headers: headers,
         )
         OpenTelemetry::SDK::Trace::Export::BatchSpanProcessor.new(exporter, **options)
+      end
+
+      # Test suites that stub HTTP with VCR would otherwise intercept our
+      # span export and fail the run (or record it into a cassette). VCR's
+      # ignore_request hooks are additive, so this exempts exactly one
+      # request shape - a POST to the configured OTLP endpoint - and leaves
+      # the suite's network policy otherwise untouched. This runs from
+      # RSpec's before(:suite), after the consumer's own VCR configuration
+      # has loaded. WebMock used without VCR has no equivalent additive API,
+      # so that case stays consumer-configured.
+      def exempt_from_vcr(endpoint)
+        return unless defined?(::VCR)
+
+        target = URI(endpoint)
+        ::VCR.configure do |vcr_config|
+          vcr_config.ignore_request do |request|
+            uri = URI(request.uri)
+            request.method == :post &&
+              uri.host == target.host &&
+              uri.port == target.port &&
+              uri.path == target.path
+          rescue StandardError
+            false
+          end
+        end
+      rescue StandardError => e
+        warn "[buildkite-test_collector] Could not exempt the OTLP endpoint from VCR: #{e.class}: #{e.message}"
       end
 
       # In OTLP-only mode the collector-managed child provider carries the
