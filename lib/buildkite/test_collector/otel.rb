@@ -284,6 +284,11 @@ module Buildkite::TestCollector
           return
         end
 
+        unless PATCH_TARGET_CONSTANT_PATHS.key?(name)
+          warn "[buildkite-test_collector] OpenTelemetry instrumentation unsafe: #{name} skipped; patch targets are unknown"
+          return
+        end
+
         # Prepending is irreversible, so do not patch a target another library has already patched.
         conflict = foreign_patch(name)
         if conflict
@@ -304,17 +309,11 @@ module Buildkite::TestCollector
         warn "[buildkite-test_collector] OpenTelemetry instrumentation failed: #{name}: #{e.class}: #{e.message}"
       end
 
-      # Instrumentation gems do not expose their patch targets. Keep the known
-      # targets explicit, and use the registered name as a best-effort fallback
-      # for customer-supplied instrumentation.
+      # Instrumentation gems do not expose their patch targets, and their
+      # registered names do not reliably identify the constants they patch.
+      # Keep every target we inspect explicit instead of guessing.
       def patch_targets(name)
         paths = PATCH_TARGET_CONSTANT_PATHS[name]
-        unless paths
-          return [] unless name.start_with?(INSTRUMENTATION_NAMESPACE)
-
-          paths = [name.delete_prefix(INSTRUMENTATION_NAMESPACE)]
-        end
-
         paths.map { |path| resolve_constant(path) }.compact.uniq
       end
 

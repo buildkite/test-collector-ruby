@@ -274,12 +274,14 @@ RSpec.describe Buildkite::TestCollector::OTel do
     failed = double("failed", present?: true, compatible?: true)
     allow(failed).to receive(:install).and_raise("patch failed")
     successful = double("successful", present?: true, compatible?: true, install: true)
+    failed_name = "OpenTelemetry::Instrumentation::PG"
+    successful_name = "OpenTelemetry::Instrumentation::Redis"
     allow(registry).to receive(:lookup) do |name|
       {
         "Unavailable" => unavailable,
         "Incompatible" => incompatible,
-        "Failed" => failed,
-        "Successful" => successful,
+        failed_name => failed,
+        successful_name => successful,
       }[name]
     end
     messages = [
@@ -287,17 +289,37 @@ RSpec.describe Buildkite::TestCollector::OTel do
       "OpenTelemetry instrumentation unavailable: NotRegistered is not registered",
       "OpenTelemetry instrumentation unavailable: Unavailable target library is not loaded",
       "OpenTelemetry instrumentation incompatible: Incompatible",
-      "OpenTelemetry instrumentation failed: Failed: RuntimeError: patch failed",
+      "OpenTelemetry instrumentation failed: #{failed_name}: RuntimeError: patch failed",
     ]
     warnings = Regexp.new(messages.map { |message| Regexp.escape(message) }.join(".*"), Regexp::MULTILINE)
 
     expect do
       described_class.send(
         :install_instrumentations,
-        [:unknown, "NotRegistered", "Unavailable", "Incompatible", "Failed", "Successful"],
+        [:unknown, "NotRegistered", "Unavailable", "Incompatible", failed_name, successful_name],
       )
     end.to output(warnings).to_stderr
     expect(successful).to have_received(:install)
+  end
+
+  it "skips customer-supplied instrumentation whose patch targets are unknown" do
+    stub_const("Faraday", Module.new)
+    stub_const("Faraday::Connection", Class.new)
+    stub_const("ForeignFaradayPatch", Module.new)
+    Faraday::Connection.prepend(ForeignFaradayPatch)
+
+    name = "OpenTelemetry::Instrumentation::Faraday"
+    instrumentation = double(name, present?: true, compatible?: true, install: true)
+    allow(OpenTelemetry::Instrumentation.registry).to receive(:lookup)
+      .with(name)
+      .and_return(instrumentation)
+
+    expect do
+      described_class.send(:install_instrumentations, [name])
+    end.to output(
+      /instrumentation unsafe: #{Regexp.escape(name)} skipped; patch targets are unknown/
+    ).to_stderr
+    expect(instrumentation).not_to have_received(:install)
   end
 
   it "fails open when a bundled instrumentation definition cannot be loaded" do

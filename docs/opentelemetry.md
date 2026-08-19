@@ -110,7 +110,10 @@ when the collector is upgraded. Without `:defaults`, the list is exact.
 
 The collector exposes symbols for the instrumentation it bundles. For other
 instrumentation, add its gem to your bundle, require it before RSpec's
-`before(:suite)` hooks run, and pass its registered OpenTelemetry name:
+`before(:suite)` hooks run, and pass its registered OpenTelemetry name. Because
+OpenTelemetry does not expose instrumentation patch targets, the collector can
+install customer-supplied instrumentation only when it has an explicit guard
+for that instrumentation:
 
 ```ruby
 require "opentelemetry-instrumentation-redis"
@@ -135,8 +138,9 @@ root `test.execution` spans continue normally.
 
 Disabling another tracer does not necessarily remove patches it already
 installed. If its module remains prepended to the target, the collector still
-skips the corresponding instrumentation. Unknown, unavailable, incompatible,
-or failed entries are also reported and skipped.
+skips the corresponding instrumentation. Instrumentation whose patch targets
+are unknown is also skipped rather than installed without a guard. Unknown,
+unavailable, incompatible, or failed entries are reported and skipped as well.
 
 When the suite already owns OpenTelemetry, `otel_instrumentations` has no effect:
 the collector installs nothing and uses the suite's instrumentation unchanged.
