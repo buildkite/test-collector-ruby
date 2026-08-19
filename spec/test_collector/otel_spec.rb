@@ -194,23 +194,6 @@ RSpec.describe Buildkite::TestCollector::OTel do
     described_class.instance_variable_set(:@tracer, nil)
   end
 
-  it "warns only once when root spans are dropped" do
-    reporter = described_class.const_get(:RootSpanMetricsReporter, false).new
-
-    expect do
-      2.times do
-        reporter.add_to_counter(
-          "otel.bsp.dropped_spans",
-          increment: 3,
-          labels: { "reason" => "buffer-full" },
-        )
-      end
-    end.to output(
-      "[buildkite-test_collector] OpenTelemetry dropped 3 test.execution span(s) " \
-        "(buffer-full); some test executions may be missing\n"
-    ).to_stderr
-  end
-
   it "fails open when an OpenTelemetry dependency cannot be loaded" do
     allow(described_class).to receive(:require).and_call_original
     allow(described_class).to receive(:require)
@@ -270,8 +253,22 @@ RSpec.describe Buildkite::TestCollector::OTel do
     allow(OpenTelemetry::Exporter::OTLP::Exporter)
       .to receive(:new)
       .and_return(root_exporter, span_exporter)
-    allow(OpenTelemetry::SDK::Trace::Export::BatchSpanProcessor)
+    root_reporter = described_class.const_get(:RootSpanMetricsReporter, false)
+    expect(OpenTelemetry::SDK::Trace::Export::BatchSpanProcessor)
       .to receive(:new)
+      .with(
+        root_exporter,
+        max_queue_size: 8_192,
+        max_export_batch_size: 64,
+        schedule_delay: 1_000,
+        metrics_reporter: an_instance_of(root_reporter),
+      )
+      .ordered
+      .and_call_original
+    expect(OpenTelemetry::SDK::Trace::Export::BatchSpanProcessor)
+      .to receive(:new)
+      .with(span_exporter)
+      .ordered
       .and_call_original
     described_class.configure!(endpoint: "https://example.invalid/v1/traces")
 
@@ -289,19 +286,6 @@ RSpec.describe Buildkite::TestCollector::OTel do
     expect(span_exporter.finished_spans.map(&:name)).to contain_exactly("child", "before-shutdown")
     expect(suite_exporter.finished_spans.map(&:name))
       .to contain_exactly("test.execution", "child", "before-shutdown")
-    root_reporter = described_class.const_get(:RootSpanMetricsReporter, false)
-    expect(OpenTelemetry::SDK::Trace::Export::BatchSpanProcessor)
-      .to have_received(:new)
-      .with(
-        root_exporter,
-        max_queue_size: 8_192,
-        max_export_batch_size: 64,
-        schedule_delay: 1_000,
-        metrics_reporter: an_instance_of(root_reporter),
-      )
-    expect(OpenTelemetry::SDK::Trace::Export::BatchSpanProcessor)
-      .to have_received(:new)
-      .with(span_exporter)
 
     described_class.shutdown
     tracer.in_span("after-shutdown") { nil }

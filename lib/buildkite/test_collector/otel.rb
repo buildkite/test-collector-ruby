@@ -25,6 +25,9 @@ module Buildkite::TestCollector
     ROOT_MAX_EXPORT_BATCH_SIZE = 64
     ROOT_SCHEDULE_DELAY_MILLISECONDS = 1_000
 
+    require_relative "otel/root_span_metrics_reporter"
+    require_relative "otel/root_preserving_span_processor"
+
     # OpenTelemetry's default ID generator uses Ruby's global PRNG. Test suites
     # can seed that PRNG, making separate processes generate the same trace IDs.
     # Use the operating system's random source for the provider we create instead.
@@ -46,131 +49,6 @@ module Buildkite::TestCollector
       private_class_method :generate
     end
     private_constant :SecureRandomIdGenerator
-
-    # BatchSpanProcessor reports queue overflow only through a no-op metrics
-    # reporter by default. Root loss is too important to leave silent, so warn
-    # once if the reserved queue drops any spans.
-    class RootSpanMetricsReporter
-      def initialize
-        @mutex = Mutex.new
-        @warned = false
-      end
-
-      def add_to_counter(metric, increment: 1, labels: {})
-        return unless metric == "otel.bsp.dropped_spans"
-
-        should_warn = @mutex.synchronize do
-          next false if @warned
-
-          @warned = true
-        end
-        return unless should_warn
-
-        reason = labels["reason"]
-        warn(
-          "[buildkite-test_collector] OpenTelemetry dropped #{increment} " \
-          "test.execution span(s)#{" (#{reason})" if reason}; some test executions may be missing"
-        )
-      end
-
-      def record_value(_metric, value:, labels: {}); end
-
-      def observe_value(_metric, value:, labels: {}); end
-    end
-    private_constant :RootSpanMetricsReporter
-
-    # Root spans are the required input for an OTLP-only test execution, while
-    # automatic instrumentation can produce thousands of less important child
-    # spans. Give each kind its own batch processor so child queue pressure and
-    # child export failures cannot evict or reject test.execution spans.
-    class RootPreservingSpanProcessor
-      def initialize(root_processor, span_processor)
-        @root_processor = root_processor
-        @span_processor = span_processor
-      end
-
-      def on_start(span, parent_context)
-        processor_for(span).on_start(span, parent_context)
-      end
-
-      def on_finish(span)
-        processor_for(span).on_finish(span)
-      end
-
-      def force_flush(timeout: nil)
-        finish_processors(:force_flush, timeout)
-      end
-
-      def shutdown(timeout: nil)
-        finish_processors(:shutdown, timeout)
-      end
-
-      private
-
-      def processor_for(span)
-        span.name == ROOT_SPAN_NAME ? @root_processor : @span_processor
-      end
-
-      # Give roots first use of the caller's timeout, then use the remainder for
-      # other spans. Always invoke both processors so an exporter failure cannot
-      # leave the other processor's worker running.
-      def finish_processors(method, timeout)
-        deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + timeout if timeout
-        result = OpenTelemetry::SDK::Trace::Export::SUCCESS
-        error = nil
-
-        [@root_processor, @span_processor].each do |processor|
-          remaining = [deadline - Process.clock_gettime(Process::CLOCK_MONOTONIC), 0].max if deadline
-          begin
-            processor_result = processor.public_send(method, timeout: remaining)
-            result = [result, processor_result].max
-          rescue StandardError => e
-            error ||= e
-          end
-        end
-
-        raise error if error
-
-        result
-      end
-    end
-    private_constant :RootPreservingSpanProcessor
-
-    # Once you give OpenTelemetry a processor, there's no way to take it back.
-    # So after we shut down, we can't remove ourselves and spans would just
-    # pile up with nothing reading them. This wrapper fixes that by quietly
-    # ignoring everything once we're shut down, instead of leaving a real
-    # processor behind that nobody empties.
-    class OwnedSpanProcessor
-      def initialize(processor)
-        @processor = processor
-        @active = true
-      end
-
-      def on_start(span, parent_context)
-        @processor.on_start(span, parent_context) if @active
-      end
-
-      def on_finish(span)
-        @processor.on_finish(span) if @active
-      end
-
-      # OpenTelemetry checks the result we return, so we always need to give
-      # it a valid "success" value, even after we've stopped doing anything.
-      def force_flush(timeout: nil)
-        return OpenTelemetry::SDK::Trace::Export::SUCCESS unless @active
-
-        @processor.force_flush(timeout: timeout)
-      end
-
-      def shutdown(timeout: nil)
-        return OpenTelemetry::SDK::Trace::Export::SUCCESS unless @active
-
-        @active = false
-        @processor.shutdown(timeout: timeout)
-      end
-    end
-    private_constant :OwnedSpanProcessor
 
     class << self
       # True once OpenTelemetry has been turned on and set up successfully.
@@ -199,9 +77,10 @@ module Buildkite::TestCollector
           schedule_delay: ROOT_SCHEDULE_DELAY_MILLISECONDS,
           metrics_reporter: RootSpanMetricsReporter.new,
         )
-        span_processor = batch_processor(endpoint, headers)
-        @processor = OwnedSpanProcessor.new(
-          RootPreservingSpanProcessor.new(root_processor, span_processor)
+        children_processor = batch_processor(endpoint, headers)
+        @processor = RootPreservingSpanProcessor.new(
+          root: root_processor,
+          children: children_processor,
         )
 
         provider = install_processor(@processor)
