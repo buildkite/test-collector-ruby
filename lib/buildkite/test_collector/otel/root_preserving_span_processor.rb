@@ -3,14 +3,7 @@
 module Buildkite
   module TestCollector
     module OTel
-      # Root spans are the required input for an OTLP-only test execution, while
-      # automatic instrumentation can produce thousands of less important child
-      # spans. Give each kind its own batch processor so child queue pressure and
-      # child export failures cannot evict or reject test.execution spans.
-      #
-      # Once a processor is added to an OpenTelemetry provider it cannot be
-      # removed. This processor therefore becomes inert after shutdown rather
-      # than leaving its queues active with no workers to empty them.
+      # OpenTelemetry cannot remove installed processors, so shutdown makes this inert.
       class RootPreservingSpanProcessor
         def initialize(root:, children:)
           @root = root
@@ -18,7 +11,6 @@ module Buildkite
           @active = true
         end
 
-        # BatchSpanProcessor has no work to do until a span finishes.
         def on_start(_span, _parent_context); end
 
         def on_finish(span)
@@ -44,9 +36,7 @@ module Buildkite
           span.name == ROOT_SPAN_NAME ? @root : @children
         end
 
-        # Give roots first use of the caller's timeout, then use the remainder for
-        # other spans. Always invoke both processors so an exporter failure cannot
-        # leave the other processor's worker running.
+        # Roots get the shared timeout first; shutdown still attempts both workers.
         def finish_processors(method, timeout)
           deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + timeout if timeout
           result = success

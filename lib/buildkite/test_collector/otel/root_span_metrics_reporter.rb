@@ -3,9 +3,7 @@
 module Buildkite
   module TestCollector
     module OTel
-      # BatchSpanProcessor reports queue overflow only through a no-op metrics
-      # reporter by default. Root loss is too important to leave silent, so warn
-      # once if the reserved queue drops any spans.
+      # BatchSpanProcessor silently drops spans by default; warn once for roots.
       class RootSpanMetricsReporter
         def initialize
           @mutex = Mutex.new
