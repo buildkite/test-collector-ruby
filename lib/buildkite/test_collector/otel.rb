@@ -15,6 +15,9 @@ module Buildkite::TestCollector
     }.freeze
 
     INSTRUMENTATION_NAMESPACE = "OpenTelemetry::Instrumentation::"
+    # Derived from each instrumentation gem's installer because OpenTelemetry
+    # does not expose patch targets as metadata. Review these paths when adding
+    # an instrumentation or changing its supported gem version.
     PATCH_TARGET_CONSTANT_PATHS = {
       "OpenTelemetry::Instrumentation::PG" => ["PG::Connection"].freeze,
       "OpenTelemetry::Instrumentation::Mysql2" => ["Mysql2::Client"].freeze,
