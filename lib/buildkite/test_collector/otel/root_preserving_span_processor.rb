@@ -20,14 +20,18 @@ module Buildkite
         def force_flush(timeout: nil)
           return success unless @active
 
-          finish_processors(:force_flush, timeout)
+          finish_processors(timeout) do |processor, remaining|
+            processor.force_flush(timeout: remaining)
+          end
         end
 
         def shutdown(timeout: nil)
           return success unless @active
 
           @active = false
-          finish_processors(:shutdown, timeout)
+          finish_processors(timeout) do |processor, remaining|
+            processor.shutdown(timeout: remaining)
+          end
         end
 
         private
@@ -37,16 +41,16 @@ module Buildkite
         end
 
         # Roots get the shared timeout first; shutdown still attempts both workers.
-        def finish_processors(method, timeout)
+        def finish_processors(timeout)
           deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + timeout if timeout
-          result = success
+          worst_result = success
           error = nil
 
           [@root, @children].each do |processor|
             remaining = [deadline - Process.clock_gettime(Process::CLOCK_MONOTONIC), 0].max if deadline
             begin
-              processor_result = processor.public_send(method, timeout: remaining)
-              result = [result, processor_result].max
+              processor_result = yield(processor, remaining)
+              worst_result = [worst_result, processor_result].max
             rescue StandardError => e
               error ||= e
             end
@@ -54,7 +58,7 @@ module Buildkite
 
           raise error if error
 
-          result
+          worst_result
         end
 
         def success
