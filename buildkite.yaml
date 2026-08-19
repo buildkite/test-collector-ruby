@@ -28,30 +28,28 @@ steps:
       - "3.4"
       - "3.3"
 
-  - group: ":rspec: EOL Ruby :ruby:"
-    steps:
-      - label: ":rspec: Tests :ruby: {{matrix}}"
-        command:
-          - "gem install bundler:2.3.25"
-          - "bundle"
-          - "bundle exec rake"
-          - "bundle exec cucumber"
-        plugins:
-          - aws-assume-role-with-web-identity#v1.2.0:
-              role-arn: "${OIDC_ASSUME_ROLE_ARN:-arn:aws:iam::445615400570:role/pipeline-buildkite-test-collector-ruby-build}"
-              session-tags:
-                - organization_slug
-                - organization_id
-                - pipeline_slug
-                - build_branch
+  - label: ":rspec: Tests (EOL Ruby) :ruby: {{matrix}}"
+    command:
+      - "gem install bundler:2.3.25"
+      - "bundle"
+      - "bundle exec rake"
+      - "bundle exec cucumber"
+    plugins:
+      - aws-assume-role-with-web-identity#v1.2.0:
+          role-arn: "${OIDC_ASSUME_ROLE_ARN:-arn:aws:iam::445615400570:role/pipeline-buildkite-test-collector-ruby-build}"
+          session-tags:
+            - organization_slug
+            - organization_id
+            - pipeline_slug
+            - build_branch
 
-          - ecr#v2.9.0:
-              login: true
-              account_ids: "public.ecr.aws"
-              region: "us-east-1"
-          - docker#v3.7.0:
-              image: "public.ecr.aws/docker/library/ruby:{{matrix}}"
-        matrix:
-          - "3.2"
-          - "3.1"
-          - "3.0"
+      - ecr#v2.9.0:
+          login: true
+          account_ids: "public.ecr.aws"
+          region: "us-east-1"
+      - docker#v3.7.0:
+          image: "public.ecr.aws/docker/library/ruby:{{matrix}}"
+    matrix:
+      - "3.2"
+      - "3.1"
+      - "3.0"
