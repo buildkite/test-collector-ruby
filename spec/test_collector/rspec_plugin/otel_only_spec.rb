@@ -2,6 +2,7 @@
 
 require "opentelemetry/sdk"
 require "rspec/core/sandbox"
+require "buildkite/test_collector/rspec_plugin/otel_only"
 
 RSpec.describe "RSpec OTLP-only submission" do
   # Runs one example through the OTLP-only around hook. Sandboxed, so
@@ -9,7 +10,7 @@ RSpec.describe "RSpec OTLP-only submission" do
   def run_sandboxed_example(metadata = {}, &block)
     RSpec::Core::Sandbox.sandboxed do |config|
       config.output_stream = StringIO.new
-      load "buildkite/test_collector/library_hooks/rspec.rb"
+      load "buildkite/test_collector/library_hooks/rspec_otel_only.rb"
 
       group = RSpec.describe("OTLP-only group") do
         it("does something", metadata, &(block || proc { nil }))
@@ -108,5 +109,76 @@ RSpec.describe "RSpec OTLP-only submission" do
     annotation = span.events.find { |event| event.name == "test.annotation" }
     expect(annotation.attributes).to eq("buildkite.annotation" => "checkpoint reached")
     expect(span.attributes).to include("team" => "platform")
+  end
+end
+
+RSpec.describe Buildkite::TestCollector::RSpecPlugin::OTelOnlyTrace do
+  subject(:trace) do
+    described_class.new(
+      example,
+      history: {},
+      tags: tags,
+      location_prefix: location_prefix,
+    )
+  end
+
+  let(:example) { fake_example(file_path: "./spec/foo_spec.rb", status: :passed) }
+  let(:tags) { nil }
+  let(:location_prefix) { nil }
+
+  describe "#otel_attributes" do
+    it "carries the full execution details for server-side synthesis" do
+      allow(example).to receive(:exception) { nil }
+
+      expect(trace.otel_attributes).to eq(
+        "execution.via" => "otlp",
+        "test.scope" => "this is a fake example full description",
+        "test.name" => "fake example name",
+        "buildkite.test.location" => "./spec/foo_spec.rb:42",
+        "buildkite.test.file_name" => "./spec/foo_spec.rb",
+        "test.suite.name" => "this is a fake example full description",
+        "test.case.name" => "this is a fake example full description",
+        "code.file.path" => "./spec/foo_spec.rb",
+        "code.line.number" => 42,
+        "buildkite.test.result" => "passed",
+      )
+    end
+
+    it "includes failure details as attributes" do
+      allow(example).to receive(:exception) { StandardError.new("it broke") }
+      trace.failure_reason = "it broke"
+      trace.failure_expanded = [{ expanded: ["it broke"], backtrace: ["foo.rb:1"] }]
+
+      expect(trace.otel_attributes).to include(
+        "buildkite.test.result" => "failed",
+        "buildkite.test.failure_reason" => "it broke",
+        "buildkite.test.failure_expanded" =>
+          %([{"expanded":["it broke"],"backtrace":["foo.rb:1"]}]),
+      )
+    end
+
+    context "with execution tags" do
+      let(:tags) { { "team" => "platform" } }
+
+      it "includes them as span attributes" do
+        allow(example).to receive(:exception) { nil }
+
+        expect(trace.otel_attributes).to include("team" => "platform")
+      end
+    end
+
+    context "when location_prefix is provided" do
+      let(:location_prefix) { "some/prefix" }
+
+      it "prefixes the file and location paths" do
+        allow(example).to receive(:exception) { nil }
+
+        expect(trace.otel_attributes).to include(
+          "buildkite.test.file_name" => "some/prefix/spec/foo_spec.rb",
+          "code.file.path" => "some/prefix/spec/foo_spec.rb",
+          "buildkite.test.location" => "some/prefix/spec/foo_spec.rb:42",
+        )
+      end
+    end
   end
 end

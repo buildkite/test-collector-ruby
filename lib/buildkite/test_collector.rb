@@ -111,6 +111,7 @@ module Buildkite
 
     def self.hook_into(hook)
       file = "test_collector/library_hooks/#{hook}"
+      file += "_otel_only" if otel_only?
       require_relative file
     rescue LoadError
       raise ArgumentError.new("#{hook.inspect} is not a supported Buildkite Analytics Test library hook.")

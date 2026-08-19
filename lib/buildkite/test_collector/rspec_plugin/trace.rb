@@ -3,16 +3,13 @@
 module Buildkite::TestCollector::RSpecPlugin
   class Trace < Buildkite::TestCollector::Trace
     attr_accessor :example, :failure_reason, :failure_expanded
-    # The exception that failed the test, recorded onto the OpenTelemetry span
-    # when OTLP is the only upload method.
-    attr_accessor :otel_exception
     attr_reader :history
     attr_reader :tags
     attr_reader :location_prefix
 
     FILE_PATH_REGEX = /^(.*?\.(rb|feature))/
 
-    def initialize(example, history:, failure_reason: nil, failure_expanded: [], tags: nil, location_prefix: nil, external_id: nil, trace_id: nil, otel_only: false)
+    def initialize(example, history:, failure_reason: nil, failure_expanded: [], tags: nil, location_prefix: nil, external_id: nil, trace_id: nil)
       @example = example
       @history = history
       @failure_reason = failure_reason
@@ -21,7 +18,6 @@ module Buildkite::TestCollector::RSpecPlugin
       @location_prefix = location_prefix
       @external_id = external_id
       @trace_id = trace_id
-      @otel_only = otel_only
     end
 
     def result
@@ -46,11 +42,8 @@ module Buildkite::TestCollector::RSpecPlugin
     end
 
     # What the span says about the test itself. Same file path as the execution
-    # upload, so the two agree. When OTLP is the only upload method, the span
-    # instead carries everything a JSON upload would have said.
+    # upload, so the two agree.
     def otel_attributes
-      return otel_only_attributes if @otel_only
-
       attributes = {
         "test.case.name" => example.full_description,
         "test.suite.name" => scope,
@@ -62,40 +55,6 @@ module Buildkite::TestCollector::RSpecPlugin
     end
 
     private
-
-    # The full execution details, mirroring the fields of a JSON upload.
-    # `execution.via` tells the ingestion pipeline that no JSON is coming and
-    # it should synthesize the execution from this span alone.
-    def otel_only_attributes
-      file_path = strip_invalid_utf8_chars(prepend_location_prefix(file_name))
-      attributes = {
-        "execution.via" => "otlp",
-        "test.scope" => strip_invalid_utf8_chars(scope),
-        "test.name" => strip_invalid_utf8_chars(name),
-        "buildkite.test.location" => strip_invalid_utf8_chars(prepend_location_prefix(location)),
-        "buildkite.test.file_name" => file_path,
-        "test.suite.name" => strip_invalid_utf8_chars(scope),
-        "test.case.name" => strip_invalid_utf8_chars(example.full_description),
-        "code.file.path" => file_path,
-        "code.line.number" => source_line_number,
-        "buildkite.test.result" => otel_result,
-      }
-
-      if failure_reason
-        attributes["buildkite.test.failure_reason"] = strip_invalid_utf8_chars(failure_reason)
-      end
-      if failure_expanded && !failure_expanded.empty?
-        attributes["buildkite.test.failure_expanded"] = JSON.generate(strip_invalid_utf8_chars(failure_expanded))
-      end
-
-      # Tags set through Buildkite::TestCollector.tag_execution become plain
-      # span attributes, which the server turns back into execution tags.
-      tags&.each do |key, value|
-        attributes[key.to_s] = strip_invalid_utf8_chars(value.to_s)
-      end
-
-      attributes.reject { |_, value| value.nil? }
-    end
 
     # Shared examples report the location of the shared block, so use the call
     # site instead, the same way file_name does.

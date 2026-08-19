@@ -1,6 +1,49 @@
 # frozen_string_literal: true
 
+require_relative "trace"
+
 module Buildkite::TestCollector::RSpecPlugin
+  # In OTLP-only mode the span carries everything a JSON upload would have
+  # said, so the server can synthesize the execution from the span alone
+  # (`execution.via` opts in to that). A subclass so the standard Trace stays
+  # untouched for the JSON upload paths.
+  class OTelOnlyTrace < Trace
+    # The exception that failed the test, recorded onto the OpenTelemetry span
+    # when OTLP is the only upload method.
+    attr_accessor :otel_exception
+
+    def otel_attributes
+      file_path = strip_invalid_utf8_chars(prepend_location_prefix(file_name))
+      attributes = {
+        "execution.via" => "otlp",
+        "test.scope" => strip_invalid_utf8_chars(scope),
+        "test.name" => strip_invalid_utf8_chars(name),
+        "buildkite.test.location" => strip_invalid_utf8_chars(prepend_location_prefix(location)),
+        "buildkite.test.file_name" => file_path,
+        "test.suite.name" => strip_invalid_utf8_chars(scope),
+        "test.case.name" => strip_invalid_utf8_chars(example.full_description),
+        "code.file.path" => file_path,
+        "code.line.number" => source_line_number,
+        "buildkite.test.result" => otel_result,
+      }
+
+      if failure_reason
+        attributes["buildkite.test.failure_reason"] = strip_invalid_utf8_chars(failure_reason)
+      end
+      if failure_expanded && !failure_expanded.empty?
+        attributes["buildkite.test.failure_expanded"] = JSON.generate(strip_invalid_utf8_chars(failure_expanded))
+      end
+
+      # Tags set through Buildkite::TestCollector.tag_execution become plain
+      # span attributes, which the server turns back into execution tags.
+      tags&.each do |key, value|
+        attributes[key.to_s] = strip_invalid_utf8_chars(value.to_s)
+      end
+
+      attributes.reject { |_, value| value.nil? }
+    end
+  end
+
   # RSpec integration for OTLP-only result submission. Nothing is uploaded as
   # JSON and none of the legacy tracing is installed: every example gets one
   # OpenTelemetry `test.execution` span carrying everything the server needs
@@ -58,12 +101,11 @@ module Buildkite::TestCollector::RSpecPlugin
       # so nothing here may raise into the test run: the describing work is
       # delegated to OTel.finish_test_span, which fails open.
       def finish(span, example, raised, tags)
-        trace = Buildkite::TestCollector::RSpecPlugin::Trace.new(
+        trace = Buildkite::TestCollector::RSpecPlugin::OTelOnlyTrace.new(
           example,
           history: {},
           tags: tags,
           location_prefix: Buildkite::TestCollector.location_prefix,
-          otel_only: true,
         )
 
         exception = raised || example.exception

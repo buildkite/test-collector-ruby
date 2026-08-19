@@ -96,6 +96,8 @@ RSpec.describe Buildkite::TestCollector do
       run_env = { "key" => "run-key" }
       allow(Buildkite::TestCollector::CI).to receive(:env) { run_env }
       allow(Buildkite::TestCollector::OTel).to receive(:configure!)
+      # Stubbed so the OTLP-only hooks aren't installed into this very suite.
+      allow(Buildkite::TestCollector).to receive(:hook_into)
       env_overlay["BUILDKITE_ANALYTICS_TOKEN"] = "MyToken"
 
       Buildkite::TestCollector.configure(
@@ -105,6 +107,7 @@ RSpec.describe Buildkite::TestCollector do
       )
 
       expect(Buildkite::TestCollector.otel_only?).to eq true
+      expect(Buildkite::TestCollector).to have_received(:hook_into).with(hook)
       expect(Buildkite::TestCollector::OTel).not_to have_received(:configure!)
 
       Buildkite::TestCollector.start_otel
