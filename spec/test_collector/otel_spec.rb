@@ -181,19 +181,6 @@ RSpec.describe Buildkite::TestCollector::OTel do
     described_class.instance_variable_set(:@tracer, nil)
   end
 
-  it "warns when shutting down cannot flush every span" do
-    processor = double("OpenTelemetry processor")
-    allow(processor).to receive(:shutdown)
-      .and_return(OpenTelemetry::SDK::Trace::Export::FAILURE)
-    described_class.instance_variable_set(:@processor, processor)
-
-    expect { described_class.shutdown }
-      .to output(/OpenTelemetry span export did not flush all spans/).to_stderr
-  ensure
-    described_class.instance_variable_set(:@processor, nil)
-    described_class.instance_variable_set(:@tracer, nil)
-  end
-
   it "fails open when an OpenTelemetry dependency cannot be loaded" do
     allow(described_class).to receive(:require).and_call_original
     allow(described_class).to receive(:require)
@@ -206,6 +193,26 @@ RSpec.describe Buildkite::TestCollector::OTel do
         run_env: { "key" => "run-123" },
       )
     end.to output(/OpenTelemetry span export disabled: LoadError/).to_stderr
+    expect(described_class).not_to be_enabled
+  end
+
+  it "shuts down a root processor when child processor setup fails" do
+    root_processor = spy(
+      "OpenTelemetry root processor",
+      shutdown: OpenTelemetry::SDK::Trace::Export::SUCCESS,
+    )
+    calls = 0
+    allow(described_class).to receive(:batch_processor) do
+      calls += 1
+      raise ArgumentError, "invalid child queue configuration" if calls == 2
+
+      root_processor
+    end
+
+    expect do
+      described_class.configure!(endpoint: "https://example.invalid/v1/traces")
+    end.to output(/OpenTelemetry span export disabled: ArgumentError/).to_stderr
+    expect(root_processor).to have_received(:shutdown).with(timeout: 0)
     expect(described_class).not_to be_enabled
   end
 

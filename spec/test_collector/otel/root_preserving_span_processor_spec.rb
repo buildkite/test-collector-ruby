@@ -41,6 +41,39 @@ RSpec.describe processor_class do
       expect(children_processor).to have_received(:on_finish).with(child_span)
       expect(root_processor).not_to have_received(:on_finish)
     end
+
+    it "keeps a root when the native child queue overflows" do
+      root_exporter = OpenTelemetry::SDK::Trace::Export::InMemorySpanExporter.new
+      children_exporter = OpenTelemetry::SDK::Trace::Export::InMemorySpanExporter.new
+      root_batch = OpenTelemetry::SDK::Trace::Export::BatchSpanProcessor.new(
+        root_exporter,
+        max_queue_size: 4,
+        max_export_batch_size: 4,
+        start_thread_on_boot: false,
+      )
+      children_batch = OpenTelemetry::SDK::Trace::Export::BatchSpanProcessor.new(
+        children_exporter,
+        max_queue_size: 4,
+        max_export_batch_size: 4,
+        start_thread_on_boot: false,
+      )
+      native_processor = described_class.new(root: root_batch, children: children_batch)
+      provider = OpenTelemetry::SDK::Trace::TracerProvider.new
+      provider.add_span_processor(native_processor)
+      tracer = provider.tracer("queue-pressure-test")
+
+      execution = tracer.start_span("test.execution")
+      OpenTelemetry::Trace.with_span(execution) do
+        10.times { |index| tracer.in_span("child-#{index}") { nil } }
+      end
+      execution.finish
+      native_processor.force_flush
+
+      expect(root_exporter.finished_spans.map(&:name)).to contain_exactly("test.execution")
+      expect(children_exporter.finished_spans.size).to eq(4)
+    ensure
+      native_processor&.shutdown
+    end
   end
 
   describe "#force_flush" do

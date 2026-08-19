@@ -69,19 +69,7 @@ module Buildkite::TestCollector
         require "opentelemetry/trace/propagation/trace_context"
 
         headers = request_headers(run_env, api_token)
-        root_processor = batch_processor(
-          endpoint,
-          headers,
-          max_queue_size: ROOT_MAX_QUEUE_SIZE,
-          max_export_batch_size: ROOT_MAX_EXPORT_BATCH_SIZE,
-          schedule_delay: ROOT_SCHEDULE_DELAY_MILLISECONDS,
-          metrics_reporter: RootSpanMetricsReporter.new,
-        )
-        children_processor = batch_processor(endpoint, headers)
-        @processor = RootPreservingSpanProcessor.new(
-          root: root_processor,
-          children: children_processor,
-        )
+        @processor = build_span_processor(endpoint, headers)
 
         provider = install_processor(@processor)
 
@@ -157,10 +145,7 @@ module Buildkite::TestCollector
       # Turns off span export and flushes anything left in the queue. Safe to
       # call even if we were never turned on.
       def shutdown
-        result = @processor&.shutdown(timeout: PROCESSOR_TIMEOUT_SECONDS)
-        if result && result != OpenTelemetry::SDK::Trace::Export::SUCCESS
-          warn "[buildkite-test_collector] OpenTelemetry span export did not flush all spans"
-        end
+        @processor&.shutdown(timeout: PROCESSOR_TIMEOUT_SECONDS)
       rescue StandardError => e
         warn "[buildkite-test_collector] Could not shut down OpenTelemetry span export: #{e.class}: #{e.message}"
       ensure
@@ -169,6 +154,31 @@ module Buildkite::TestCollector
       end
 
       private
+
+      def build_span_processor(endpoint, headers)
+        root_processor = batch_processor(
+          endpoint,
+          headers,
+          max_queue_size: ROOT_MAX_QUEUE_SIZE,
+          max_export_batch_size: ROOT_MAX_EXPORT_BATCH_SIZE,
+          schedule_delay: ROOT_SCHEDULE_DELAY_MILLISECONDS,
+          metrics_reporter: RootSpanMetricsReporter.new,
+        )
+        children_processor = batch_processor(endpoint, headers)
+        RootPreservingSpanProcessor.new(
+          root: root_processor,
+          children: children_processor,
+        )
+      rescue StandardError
+        [root_processor, children_processor].compact.each do |processor|
+          begin
+            processor.shutdown(timeout: 0)
+          rescue StandardError
+            nil
+          end
+        end
+        raise
+      end
 
       def batch_processor(endpoint, headers, options = {})
         exporter = OpenTelemetry::Exporter::OTLP::Exporter.new(
