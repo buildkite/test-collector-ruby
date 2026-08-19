@@ -71,15 +71,23 @@ module Buildkite
         self.span_filters << MinDurationSpanFilter.new(self.trace_min_duration)
       end
 
+      # Defer OTel setup until RSpec's before(:suite), after application and support files have loaded.
+      @otel_options = nil
       if otel_enabled && test_runner == "rspec"
-        Buildkite::TestCollector::OTel.configure!(
+        @otel_options = {
           # Undocumented, for development purposes.
           endpoint: ENV["BUILDKITE_ANALYTICS_OTLP_ENDPOINT"] || Buildkite::TestCollector::OTel::DEFAULT_ENDPOINT,
           api_token: api_token,
           run_env: Buildkite::TestCollector::CI.env,
-        )
+        }
       end
       self.hook_into(hook)
+    end
+
+    def self.start_otel
+      options = @otel_options
+      @otel_options = nil
+      Buildkite::TestCollector::OTel.configure!(**options) if options
     end
 
     def self.hook_into(hook)

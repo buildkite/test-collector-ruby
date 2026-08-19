@@ -5,7 +5,7 @@ require "securerandom"
 module Buildkite::TestCollector
   # Opt-in OpenTelemetry span emission.
   module OTel
-    DEFAULT_ENDPOINT = "https://test-otlp.buildkite.com/v1/traces"
+    DEFAULT_ENDPOINT = "https://tests-otlp.buildkite.com/v1/traces"
 
     RESULT_ATTRIBUTE = "test.case.result.status"
 
