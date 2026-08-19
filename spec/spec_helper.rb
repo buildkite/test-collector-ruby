@@ -2,10 +2,7 @@
 
 require "buildkite/test_collector"
 require "active_support/notifications"
-
-if Gem::Version.new(RUBY_VERSION) >= Gem::Version.new('2.7')
-  require "cucumber"
-end
+require "cucumber"
 
 Dir["spec/support/**/*.rb"].each { |f| require File.expand_path(f) }
 
