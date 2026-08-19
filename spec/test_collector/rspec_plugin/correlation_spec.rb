@@ -41,7 +41,7 @@ RSpec.describe "RSpec execution and OpenTelemetry correlation" do
     end
 
     expect(Buildkite::TestCollector::OTel).to have_received(:configure!).with(
-      endpoint: "https://test-otlp.buildkite.com/v1/traces",
+      endpoint: "https://tests-otlp.buildkite.com/v1/traces",
       api_token: nil,
       run_env: run_env,
     )

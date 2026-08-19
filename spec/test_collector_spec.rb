@@ -69,14 +69,14 @@ RSpec.describe Buildkite::TestCollector do
       Buildkite::TestCollector.start_otel
 
       expect(Buildkite::TestCollector::OTel).to have_received(:configure!).with(
-        endpoint: "https://test-otlp.buildkite.com/v1/traces",
+        endpoint: "https://tests-otlp.buildkite.com/v1/traces",
         api_token: "MyToken",
         run_env: run_env,
       )
     end
 
     it "can override the endpoint for local development" do
-      env_overlay["BUILDKITE_ANALYTICS_OTLP_ENDPOINT"] = "http://test-otlp.buildkite.localhost/v1/traces"
+      env_overlay["BUILDKITE_ANALYTICS_OTLP_ENDPOINT"] = "http://tests-otlp.buildkite.localhost/v1/traces"
       allow(Buildkite::TestCollector::CI).to receive(:env) { { "key" => "run-key" } }
       allow(Buildkite::TestCollector::OTel).to receive(:configure!)
 
@@ -85,7 +85,7 @@ RSpec.describe Buildkite::TestCollector do
 
       expect(Buildkite::TestCollector::OTel).to have_received(:configure!).with(
         hash_including(
-          endpoint: "http://test-otlp.buildkite.localhost/v1/traces",
+          endpoint: "http://tests-otlp.buildkite.localhost/v1/traces",
         ),
       )
     end
