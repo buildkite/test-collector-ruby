@@ -19,6 +19,60 @@ RSpec.describe "RSpec execution and OpenTelemetry correlation" do
     end
   end
 
+  it "sets up OpenTelemetry after application libraries have loaded" do
+    run_env = { "key" => "run-key" }
+    library_loaded_when_configured = nil
+    allow(Buildkite::TestCollector::CI).to receive(:env) { run_env }
+    allow(ENV).to receive(:[]).and_call_original
+    allow(ENV).to receive(:[]).with("BUILDKITE_ANALYTICS_TOKEN").and_return(nil)
+    allow(ENV).to receive(:[]).with("BUILDKITE_ANALYTICS_OTLP_ENDPOINT").and_return(nil)
+    allow(Buildkite::TestCollector::OTel).to receive(:configure!) do
+      library_loaded_when_configured = defined?(LateLoadedApplicationLibrary)
+    end
+    Buildkite::TestCollector.configure(hook: :rspec, otel_enabled: true)
+
+    RSpec::Core::Sandbox.sandboxed do |config|
+      config.output_stream = StringIO.new
+      load "buildkite/test_collector/library_hooks/rspec.rb"
+
+      stub_const("LateLoadedApplicationLibrary", Module.new)
+      group = RSpec.describe("Late-loaded application") { it("passes") { nil } }
+      config.with_suite_hooks { group.run(RSpec.configuration.reporter) }
+    end
+
+    expect(Buildkite::TestCollector::OTel).to have_received(:configure!).with(
+      endpoint: "https://test-otlp.buildkite.com/v1/traces",
+      api_token: nil,
+      run_env: run_env,
+    )
+    expect(library_loaded_when_configured).to eq("constant")
+  end
+
+  it "starts setup after the application configures its provider" do
+    default_provider = OpenTelemetry::Internal::ProxyTracerProvider.new
+    suite_provider = OpenTelemetry::SDK::Trace::TracerProvider.new
+    active_provider = default_provider
+    provider_when_configured = nil
+    allow(OpenTelemetry).to receive(:tracer_provider) { active_provider }
+    allow(Buildkite::TestCollector::OTel).to receive(:configure!) do
+      provider_when_configured = OpenTelemetry.tracer_provider
+    end
+    Buildkite::TestCollector.configure(hook: :rspec, otel_enabled: true)
+
+    RSpec::Core::Sandbox.sandboxed do |config|
+      config.output_stream = StringIO.new
+      config.before(:suite) { active_provider = suite_provider }
+      load "buildkite/test_collector/library_hooks/rspec.rb"
+
+      group = RSpec.describe("Application-owned OpenTelemetry") { it("passes") { nil } }
+      config.with_suite_hooks { group.run(RSpec.configuration.reporter) }
+    end
+
+    expect(provider_when_configured).to equal(suite_provider)
+  ensure
+    suite_provider&.shutdown
+  end
+
   it "describes the execution on its span, and puts the span's trace ID on the upload" do
     exporter = OpenTelemetry::SDK::Trace::Export::InMemorySpanExporter.new
     provider = OpenTelemetry::SDK::Trace::TracerProvider.new
