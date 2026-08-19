@@ -47,10 +47,6 @@ module Buildkite
     end
 
     def self.configure(hook:, token: nil, url: nil, tracing_enabled: true, artifact_path: nil, location_prefix: nil, env: {}, tags: {}, otel_enabled: false, otel_instrumentations: nil)
-      if hook.to_sym == :cucumber && Gem::Version.new(RUBY_VERSION) < Gem::Version.new('2.7')
-        raise UnsupportedFrameworkError.new("Cucumber is only supported in versions of Ruby >= 2.7")
-      end
-
       self.api_token = (token || ENV["BUILDKITE_ANALYTICS_TOKEN"])&.strip
       self.url = url || ENV["BUILDKITE_ANALYTICS_ENDPOINT"] || DEFAULT_URL
       self.tracing_enabled = tracing_enabled
