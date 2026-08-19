@@ -47,11 +47,12 @@ RSpec.describe Buildkite::TestCollector do
       allow(Buildkite::TestCollector::OTel).to receive(:configure!)
 
       Buildkite::TestCollector.configure(hook: hook)
+      Buildkite::TestCollector.start_otel
 
       expect(Buildkite::TestCollector::OTel).not_to have_received(:configure!)
     end
 
-    it "exports to the Buildkite OTLP endpoint, independently of legacy detailed tracing" do
+    it "stores OpenTelemetry options without setting it up during configuration" do
       run_env = { "key" => "run-key" }
       allow(Buildkite::TestCollector::CI).to receive(:env) { run_env }
       allow(Buildkite::TestCollector::OTel).to receive(:configure!)
@@ -62,6 +63,10 @@ RSpec.describe Buildkite::TestCollector do
         tracing_enabled: false,
         otel_enabled: true,
       )
+
+      expect(Buildkite::TestCollector::OTel).not_to have_received(:configure!)
+
+      Buildkite::TestCollector.start_otel
 
       expect(Buildkite::TestCollector::OTel).to have_received(:configure!).with(
         endpoint: "https://test-otlp.buildkite.com/v1/traces",
@@ -76,9 +81,12 @@ RSpec.describe Buildkite::TestCollector do
       allow(Buildkite::TestCollector::OTel).to receive(:configure!)
 
       Buildkite::TestCollector.configure(hook: hook, otel_enabled: true)
+      Buildkite::TestCollector.start_otel
 
       expect(Buildkite::TestCollector::OTel).to have_received(:configure!).with(
-        hash_including(endpoint: "http://test-otlp.buildkite.localhost/v1/traces"),
+        hash_including(
+          endpoint: "http://test-otlp.buildkite.localhost/v1/traces",
+        ),
       )
     end
   end
@@ -112,6 +120,7 @@ RSpec.describe Buildkite::TestCollector do
         hook: hook,
         otel_enabled: true,
       )
+      Buildkite::TestCollector.start_otel
 
       expect(Buildkite::TestCollector::OTel).not_to have_received(:configure!)
     end
@@ -151,6 +160,7 @@ RSpec.describe Buildkite::TestCollector do
           hook: hook,
           otel_enabled: true,
         )
+        Buildkite::TestCollector.start_otel
 
         expect(Buildkite::TestCollector::OTel).not_to have_received(:configure!)
       end

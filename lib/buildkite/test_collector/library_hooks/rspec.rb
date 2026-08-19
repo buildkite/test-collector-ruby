@@ -10,6 +10,8 @@ Buildkite::TestCollector.uploader = Buildkite::TestCollector::Uploader
 
 RSpec.configure do |config|
   config.before(:suite) do
+    Buildkite::TestCollector.start_otel
+
     config.add_formatter Buildkite::TestCollector::RSpecPlugin::Reporter
   end
 
