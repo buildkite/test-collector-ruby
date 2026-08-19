@@ -181,6 +181,36 @@ RSpec.describe Buildkite::TestCollector::OTel do
     described_class.instance_variable_set(:@tracer, nil)
   end
 
+  it "warns when shutting down cannot flush every span" do
+    processor = double("OpenTelemetry processor")
+    allow(processor).to receive(:shutdown)
+      .and_return(OpenTelemetry::SDK::Trace::Export::FAILURE)
+    described_class.instance_variable_set(:@processor, processor)
+
+    expect { described_class.shutdown }
+      .to output(/OpenTelemetry span export did not flush all spans/).to_stderr
+  ensure
+    described_class.instance_variable_set(:@processor, nil)
+    described_class.instance_variable_set(:@tracer, nil)
+  end
+
+  it "warns only once when root spans are dropped" do
+    reporter = described_class.const_get(:RootSpanMetricsReporter, false).new
+
+    expect do
+      2.times do
+        reporter.add_to_counter(
+          "otel.bsp.dropped_spans",
+          increment: 3,
+          labels: { "reason" => "buffer-full" },
+        )
+      end
+    end.to output(
+      "[buildkite-test_collector] OpenTelemetry dropped 3 test.execution span(s) " \
+        "(buffer-full); some test executions may be missing\n"
+    ).to_stderr
+  end
+
   it "fails open when an OpenTelemetry dependency cannot be loaded" do
     allow(described_class).to receive(:require).and_call_original
     allow(described_class).to receive(:require)
@@ -222,7 +252,7 @@ RSpec.describe Buildkite::TestCollector::OTel do
     expect(config).to have_received(:add_span_processor).with(processor)
   end
 
-  it "exports through the suite's own provider without taking it over" do
+  it "exports roots through a reserved queue without taking over the suite's provider" do
     original = OpenTelemetry.tracer_provider
     suite_exporter = OpenTelemetry::SDK::Trace::Export::InMemorySpanExporter.new
     provider = OpenTelemetry::SDK::Trace::TracerProvider.new
@@ -231,24 +261,54 @@ RSpec.describe Buildkite::TestCollector::OTel do
     )
     OpenTelemetry.tracer_provider = provider
 
-    buildkite_exporter = OpenTelemetry::SDK::Trace::Export::InMemorySpanExporter.new
-    allow(OpenTelemetry::Exporter::OTLP::Exporter).to receive(:new) { buildkite_exporter }
+    root_exporter = OpenTelemetry::SDK::Trace::Export::InMemorySpanExporter.new
+    span_exporter = OpenTelemetry::SDK::Trace::Export::InMemorySpanExporter.new
+    allow(root_exporter).to receive(:shutdown)
+      .and_return(OpenTelemetry::SDK::Trace::Export::SUCCESS)
+    allow(span_exporter).to receive(:shutdown)
+      .and_return(OpenTelemetry::SDK::Trace::Export::SUCCESS)
+    allow(OpenTelemetry::Exporter::OTLP::Exporter)
+      .to receive(:new)
+      .and_return(root_exporter, span_exporter)
+    allow(OpenTelemetry::SDK::Trace::Export::BatchSpanProcessor)
+      .to receive(:new)
+      .and_call_original
     described_class.configure!(endpoint: "https://example.invalid/v1/traces")
 
     tracer = provider.tracer("suite")
+    execution_span, = described_class.start_test_span
+    described_class.with_test_span(execution_span) do
+      tracer.in_span("child") { nil }
+    end
+    described_class.finish_test_span(execution_span)
     tracer.in_span("before-shutdown") { nil }
     provider.force_flush
 
     expect(OpenTelemetry.tracer_provider).to equal(provider)
-    expect(buildkite_exporter.finished_spans.map(&:name)).to include("before-shutdown")
-    expect(suite_exporter.finished_spans.map(&:name)).to include("before-shutdown")
+    expect(root_exporter.finished_spans.map(&:name)).to contain_exactly("test.execution")
+    expect(span_exporter.finished_spans.map(&:name)).to contain_exactly("child", "before-shutdown")
+    expect(suite_exporter.finished_spans.map(&:name))
+      .to contain_exactly("test.execution", "child", "before-shutdown")
+    root_reporter = described_class.const_get(:RootSpanMetricsReporter, false)
+    expect(OpenTelemetry::SDK::Trace::Export::BatchSpanProcessor)
+      .to have_received(:new)
+      .with(
+        root_exporter,
+        max_queue_size: 8_192,
+        max_export_batch_size: 64,
+        schedule_delay: 1_000,
+        metrics_reporter: an_instance_of(root_reporter),
+      )
+    expect(OpenTelemetry::SDK::Trace::Export::BatchSpanProcessor)
+      .to have_received(:new)
+      .with(span_exporter)
 
     described_class.shutdown
     tracer.in_span("after-shutdown") { nil }
     provider.force_flush
 
     # Our processor goes quiet, the suite's keeps working.
-    expect(buildkite_exporter.finished_spans.map(&:name)).not_to include("after-shutdown")
+    expect(span_exporter.finished_spans.map(&:name)).not_to include("after-shutdown")
     expect(suite_exporter.finished_spans.map(&:name)).to include("after-shutdown")
   ensure
     described_class.shutdown

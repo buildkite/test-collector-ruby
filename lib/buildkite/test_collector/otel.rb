@@ -18,7 +18,12 @@ module Buildkite::TestCollector
       "skipped" => "skipped",
     }.freeze
 
-    PROCESSOR_TIMEOUT_SECONDS = 5
+    PROCESSOR_TIMEOUT_SECONDS = 30
+
+    ROOT_SPAN_NAME = "test.execution"
+    ROOT_MAX_QUEUE_SIZE = 8_192
+    ROOT_MAX_EXPORT_BATCH_SIZE = 64
+    ROOT_SCHEDULE_DELAY_MILLISECONDS = 1_000
 
     # OpenTelemetry's default ID generator uses Ruby's global PRNG. Test suites
     # can seed that PRNG, making separate processes generate the same trace IDs.
@@ -41,6 +46,95 @@ module Buildkite::TestCollector
       private_class_method :generate
     end
     private_constant :SecureRandomIdGenerator
+
+    # BatchSpanProcessor reports queue overflow only through a no-op metrics
+    # reporter by default. Root loss is too important to leave silent, so warn
+    # once if the reserved queue drops any spans.
+    class RootSpanMetricsReporter
+      def initialize
+        @mutex = Mutex.new
+        @warned = false
+      end
+
+      def add_to_counter(metric, increment: 1, labels: {})
+        return unless metric == "otel.bsp.dropped_spans"
+
+        should_warn = @mutex.synchronize do
+          next false if @warned
+
+          @warned = true
+        end
+        return unless should_warn
+
+        reason = labels["reason"]
+        warn(
+          "[buildkite-test_collector] OpenTelemetry dropped #{increment} " \
+          "test.execution span(s)#{" (#{reason})" if reason}; some test executions may be missing"
+        )
+      end
+
+      def record_value(_metric, value:, labels: {}); end
+
+      def observe_value(_metric, value:, labels: {}); end
+    end
+    private_constant :RootSpanMetricsReporter
+
+    # Root spans are the required input for an OTLP-only test execution, while
+    # automatic instrumentation can produce thousands of less important child
+    # spans. Give each kind its own batch processor so child queue pressure and
+    # child export failures cannot evict or reject test.execution spans.
+    class RootPreservingSpanProcessor
+      def initialize(root_processor, span_processor)
+        @root_processor = root_processor
+        @span_processor = span_processor
+      end
+
+      def on_start(span, parent_context)
+        processor_for(span).on_start(span, parent_context)
+      end
+
+      def on_finish(span)
+        processor_for(span).on_finish(span)
+      end
+
+      def force_flush(timeout: nil)
+        finish_processors(:force_flush, timeout)
+      end
+
+      def shutdown(timeout: nil)
+        finish_processors(:shutdown, timeout)
+      end
+
+      private
+
+      def processor_for(span)
+        span.name == ROOT_SPAN_NAME ? @root_processor : @span_processor
+      end
+
+      # Give roots first use of the caller's timeout, then use the remainder for
+      # other spans. Always invoke both processors so an exporter failure cannot
+      # leave the other processor's worker running.
+      def finish_processors(method, timeout)
+        deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + timeout if timeout
+        result = OpenTelemetry::SDK::Trace::Export::SUCCESS
+        error = nil
+
+        [@root_processor, @span_processor].each do |processor|
+          remaining = [deadline - Process.clock_gettime(Process::CLOCK_MONOTONIC), 0].max if deadline
+          begin
+            processor_result = processor.public_send(method, timeout: remaining)
+            result = [result, processor_result].max
+          rescue StandardError => e
+            error ||= e
+          end
+        end
+
+        raise error if error
+
+        result
+      end
+    end
+    private_constant :RootPreservingSpanProcessor
 
     # Once you give OpenTelemetry a processor, there's no way to take it back.
     # So after we shut down, we can't remove ourselves and spans would just
@@ -96,12 +190,18 @@ module Buildkite::TestCollector
         require "opentelemetry/exporter/otlp"
         require "opentelemetry/trace/propagation/trace_context"
 
-        exporter = OpenTelemetry::Exporter::OTLP::Exporter.new(
-          endpoint: endpoint,
-          headers: request_headers(run_env, api_token),
+        headers = request_headers(run_env, api_token)
+        root_processor = batch_processor(
+          endpoint,
+          headers,
+          max_queue_size: ROOT_MAX_QUEUE_SIZE,
+          max_export_batch_size: ROOT_MAX_EXPORT_BATCH_SIZE,
+          schedule_delay: ROOT_SCHEDULE_DELAY_MILLISECONDS,
+          metrics_reporter: RootSpanMetricsReporter.new,
         )
+        span_processor = batch_processor(endpoint, headers)
         @processor = OwnedSpanProcessor.new(
-          OpenTelemetry::SDK::Trace::Export::BatchSpanProcessor.new(exporter)
+          RootPreservingSpanProcessor.new(root_processor, span_processor)
         )
 
         provider = install_processor(@processor)
@@ -122,7 +222,7 @@ module Buildkite::TestCollector
         return [nil, nil] unless enabled?
 
         span = @tracer.start_span(
-          "test.execution",
+          ROOT_SPAN_NAME,
           with_parent: OpenTelemetry::Context.empty,
           links: job_span_links,
           kind: :internal,
@@ -178,7 +278,10 @@ module Buildkite::TestCollector
       # Turns off span export and flushes anything left in the queue. Safe to
       # call even if we were never turned on.
       def shutdown
-        @processor&.shutdown(timeout: PROCESSOR_TIMEOUT_SECONDS)
+        result = @processor&.shutdown(timeout: PROCESSOR_TIMEOUT_SECONDS)
+        if result && result != OpenTelemetry::SDK::Trace::Export::SUCCESS
+          warn "[buildkite-test_collector] OpenTelemetry span export did not flush all spans"
+        end
       rescue StandardError => e
         warn "[buildkite-test_collector] Could not shut down OpenTelemetry span export: #{e.class}: #{e.message}"
       ensure
@@ -187,6 +290,14 @@ module Buildkite::TestCollector
       end
 
       private
+
+      def batch_processor(endpoint, headers, options = {})
+        exporter = OpenTelemetry::Exporter::OTLP::Exporter.new(
+          endpoint: endpoint,
+          headers: headers,
+        )
+        OpenTelemetry::SDK::Trace::Export::BatchSpanProcessor.new(exporter, **options)
+      end
 
       # We don't set up our own tracer provider. Instead we plug our
       # processor into whatever provider the test suite is already using
