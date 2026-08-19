@@ -105,6 +105,10 @@ or export only root spans. See the
 [OpenTelemetry guide](docs/opentelemetry.md#choosing-instrumentation) for the
 available options.
 
+The collector includes those three curated instrumentation gems instead of
+`opentelemetry-instrumentation-all`. Optional instrumentation remains the
+customer's Gemfile responsibility.
+
 Export needs Ruby 3.3 or newer, which is what the OpenTelemetry gems require. On
 older Rubies the option is accepted and does nothing.
 

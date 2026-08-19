@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## Unreleased
+
+* Replace `opentelemetry-instrumentation-all` with curated PG, mysql2, and
+  Trilogy instrumentation dependencies and installation.
+
 ## v2.14.0
 
 * Send `location_prefix` in `run_env`
