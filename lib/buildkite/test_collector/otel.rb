@@ -220,6 +220,9 @@ module Buildkite::TestCollector
           # installing anything. Installing our own would also push spans the
           # suite never asked for into the suite's own exporters.
           provider.add_span_processor(processor)
+          unless instrumentations.nil?
+            warn "[buildkite-test_collector] OpenTelemetry instrumentation selection ignored because the test suite already configured OpenTelemetry: #{instrumentations.inspect}"
+          end
           provider
         elsif provider.is_a?(OpenTelemetry::Internal::ProxyTracerProvider)
           OpenTelemetry::SDK.configure do |c|
@@ -241,15 +244,12 @@ module Buildkite::TestCollector
 
       def selected_instrumentations(selection)
         entries = selection.nil? ? DEFAULT_INSTRUMENTATIONS : Array(selection)
-        entries.each_with_object([]) do |entry, selected|
-          expanded = entry == :defaults ? DEFAULT_INSTRUMENTATIONS : [entry]
-          expanded.each { |instrumentation| selected << instrumentation unless selected.include?(instrumentation) }
-        end
+        entries.flat_map { |entry| entry == :defaults ? DEFAULT_INSTRUMENTATIONS : [entry] }.uniq
       end
 
       def install_instrumentation(entry)
         collector_provided = entry.is_a?(Symbol)
-        if entry.is_a?(Symbol)
+        if collector_provided
           bundled = BUNDLED_INSTRUMENTATIONS[entry]
           unless bundled
             warn "[buildkite-test_collector] Unknown OpenTelemetry instrumentation: #{entry.inspect}"

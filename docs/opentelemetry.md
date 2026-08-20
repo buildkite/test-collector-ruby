@@ -142,6 +142,7 @@ or failed entries are reported and skipped.
 
 When the suite already owns OpenTelemetry, `otel_instrumentations` has no effect:
 the collector installs nothing and uses the suite's instrumentation unchanged.
+A warning reports any non-`nil` selection that was ignored.
 
 ## What gets sent
 

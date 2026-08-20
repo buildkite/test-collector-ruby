@@ -423,10 +423,14 @@ RSpec.describe Buildkite::TestCollector::OTel do
       OpenTelemetry::SDK::Trace::Export::InMemorySpanExporter.new
     end
 
-    described_class.configure!(
-      endpoint: "https://example.invalid/v1/traces",
-      instrumentations: [:pg],
-    )
+    expect do
+      described_class.configure!(
+        endpoint: "https://example.invalid/v1/traces",
+        instrumentations: [:pg],
+      )
+    end.to output(
+      /instrumentation selection ignored because the test suite already configured OpenTelemetry: \[:pg\]/
+    ).to_stderr
 
     expect(described_class).to be_enabled
     expect(registry).not_to have_received(:lookup)
