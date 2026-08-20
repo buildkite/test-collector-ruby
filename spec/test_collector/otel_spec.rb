@@ -302,7 +302,7 @@ RSpec.describe Buildkite::TestCollector::OTel do
     expect(successful).to have_received(:install)
   end
 
-  it "skips customer-supplied instrumentation whose patch targets are unknown" do
+  it "installs customer-supplied instrumentation without applying the collector guard" do
     stub_const("Faraday", Module.new)
     stub_const("Faraday::Connection", Class.new)
     stub_const("ForeignFaradayPatch", Module.new)
@@ -314,12 +314,9 @@ RSpec.describe Buildkite::TestCollector::OTel do
       .with(name)
       .and_return(instrumentation)
 
-    expect do
-      described_class.send(:install_instrumentations, [name])
-    end.to output(
-      /instrumentation unsafe: #{Regexp.escape(name)} skipped; patch targets are unknown/
-    ).to_stderr
-    expect(instrumentation).not_to have_received(:install)
+    described_class.send(:install_instrumentations, [name])
+
+    expect(instrumentation).to have_received(:install)
   end
 
   it "fails open when a bundled instrumentation definition cannot be loaded" do
@@ -334,49 +331,52 @@ RSpec.describe Buildkite::TestCollector::OTel do
     ).to_stderr
   end
 
-  it "keeps setup and requests safe when a foreign HTTP prepend would collide" do
-    stub_const("Net::HTTP", Class.new do
-      def request
+  it "keeps setup and queries safe when a foreign prepend would collide with a default" do
+    stub_const("PG", Module.new)
+    stub_const("PG::Connection", Class.new do
+      def exec
         :ok
       end
     end)
-    stub_const("DatadogHTTPPatch", Module.new do
-      def request
-        annotate_span_with_response!(:span, :response, :options)
+    stub_const("ForeignPGPatch", Module.new do
+      def exec
+        annotate_query!(:span, :query, :options)
         super
       end
 
       private
 
-      def annotate_span_with_response!(_span, _response, _options)
+      def annotate_query!(_span, _query, _options)
       end
     end)
     otel_patch = Module.new do
-      def request
-        response = super
-        annotate_span_with_response!(:span, response)
+      def exec
+        result = super
+        annotate_query!(:span, result)
       end
     end
-    Net::HTTP.prepend(DatadogHTTPPatch)
+    PG::Connection.prepend(ForeignPGPatch)
 
-    name = "OpenTelemetry::Instrumentation::Net::HTTP"
+    name = "OpenTelemetry::Instrumentation::PG"
     instrumentation = double(name, present?: true, compatible?: true)
     allow(instrumentation).to receive(:install) do
-      Net::HTTP.prepend(otel_patch)
+      PG::Connection.prepend(otel_patch)
       true
     end
+    allow(described_class).to receive(:require)
+      .with("opentelemetry-instrumentation-pg")
     allow(OpenTelemetry::Instrumentation.registry).to receive(:lookup)
       .with(name)
       .and_return(instrumentation)
 
     expect do
-      described_class.send(:install_instrumentations, [name])
+      described_class.send(:install_instrumentations, [:pg])
     end.to output(
-      /instrumentation unsafe: #{Regexp.escape(name)} skipped; foreign patch DatadogHTTPPatch found on Net::HTTP/
+      /instrumentation unsafe: #{Regexp.escape(name)} skipped; foreign patch ForeignPGPatch found on PG::Connection/
     ).to_stderr
 
     expect(instrumentation).not_to have_received(:install)
-    expect(Net::HTTP.new.request).to eq(:ok)
+    expect(PG::Connection.new.exec).to eq(:ok)
   end
 
   it "exports through the suite's own provider without taking it over" do

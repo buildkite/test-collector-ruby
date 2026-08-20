@@ -22,15 +22,6 @@ module Buildkite::TestCollector
       "OpenTelemetry::Instrumentation::PG" => ["PG::Connection"].freeze,
       "OpenTelemetry::Instrumentation::Mysql2" => ["Mysql2::Client"].freeze,
       "OpenTelemetry::Instrumentation::Trilogy" => ["Trilogy"].freeze,
-      "OpenTelemetry::Instrumentation::Net::HTTP" => ["Net::HTTP"].freeze,
-      "OpenTelemetry::Instrumentation::Redis" => [
-        "Redis::Client",
-        "RedisClient",
-      ].freeze,
-      "OpenTelemetry::Instrumentation::ActiveRecord" => [
-        "ActiveRecord::Base",
-        "ActiveRecord::Relation",
-      ].freeze,
     }.freeze
     private_constant :DEFAULT_INSTRUMENTATIONS, :BUNDLED_INSTRUMENTATIONS,
       :INSTRUMENTATION_NAMESPACE, :PATCH_TARGET_CONSTANT_PATHS
@@ -257,6 +248,7 @@ module Buildkite::TestCollector
       end
 
       def install_instrumentation(entry)
+        collector_provided = entry.is_a?(Symbol)
         if entry.is_a?(Symbol)
           bundled = BUNDLED_INSTRUMENTATIONS[entry]
           unless bundled
@@ -287,17 +279,14 @@ module Buildkite::TestCollector
           return
         end
 
-        unless PATCH_TARGET_CONSTANT_PATHS.key?(name)
-          warn "[buildkite-test_collector] OpenTelemetry instrumentation unsafe: #{name} skipped; patch targets are unknown"
-          return
-        end
-
-        # Prepending is irreversible, so do not patch a target another library has already patched.
-        conflict = foreign_patch(name)
-        if conflict
-          patch, target = conflict
-          warn "[buildkite-test_collector] OpenTelemetry instrumentation unsafe: #{name} skipped; foreign patch #{module_name(patch)} found on #{target}"
-          return
+        if collector_provided
+          # Prepending is irreversible, so do not patch a target another library has already patched.
+          conflict = foreign_patch(name)
+          if conflict
+            patch, target = conflict
+            warn "[buildkite-test_collector] OpenTelemetry instrumentation unsafe: #{name} skipped; foreign patch #{module_name(patch)} found on #{target}"
+            return
+          end
         end
 
         installed = instrumentation.install
