@@ -69,8 +69,80 @@ We fit in around your setup rather than replacing it:
   yours keeps working.
 
 If you don't have OpenTelemetry set up, we create a tracer provider and install
-the instrumentation this gem bundles, so you get spans for the databases, caches,
-HTTP clients and background jobs your tests touch.
+the applicable curated SQL instrumentation, as described below.
+
+## Choosing instrumentation
+
+Instrumentation selection applies only when the collector creates the
+OpenTelemetry provider. The default set is `pg`, `mysql2`, and `trilogy`; each is
+installed only when its target library is already loaded. You do not need to set
+`otel_instrumentations` to use these defaults: omit the option completely, or
+set it to `nil`.
+
+```ruby
+# Applicable curated defaults; no otel_instrumentations option needed
+Buildkite::TestCollector.configure(hook: :rspec, otel_enabled: true)
+
+# Applicable curated defaults, explicitly
+Buildkite::TestCollector.configure(
+  hook: :rspec,
+  otel_enabled: true,
+  otel_instrumentations: [:defaults],
+)
+
+# Root test.execution spans only
+Buildkite::TestCollector.configure(
+  hook: :rspec,
+  otel_enabled: true,
+  otel_instrumentations: [],
+)
+
+# An exact stable subset of bundled instrumentation
+Buildkite::TestCollector.configure(
+  hook: :rspec,
+  otel_enabled: true,
+  otel_instrumentations: [:pg],
+)
+```
+
+`:defaults` expands to the collector's current default set, which may change
+when the collector is upgraded. Without `:defaults`, the list is exact.
+
+The collector exposes symbols for the instrumentation it bundles. For other
+instrumentation, add its gem to your bundle, require it before RSpec's
+`before(:suite)` hooks run, and pass its registered OpenTelemetry name:
+
+```ruby
+require "opentelemetry-instrumentation-redis"
+
+Buildkite::TestCollector.configure(
+  hook: :rspec,
+  otel_enabled: true,
+  otel_instrumentations: [
+    :defaults,
+    "OpenTelemetry::Instrumentation::Redis",
+  ],
+)
+```
+
+The collector does not require target application libraries such as `pg` or
+`redis`. Immediately before installing a bundled default, it checks the target
+for an existing foreign prepend, such as a Datadog, New Relic, or Sentry patch.
+The collector cannot determine whether two arbitrary prepends are compatible,
+so it conservatively skips that default whenever it finds one. The warning names
+the module and target that caused the skip; other instrumentation and the root
+`test.execution` spans continue normally.
+
+Disabling another tracer does not necessarily remove patches it already
+installed. If its module remains prepended to the target, the collector still
+skips the corresponding default. Customer-supplied instrumentation is installed
+as explicitly requested without this guard, so its compatibility with other
+patches is the customer's responsibility. Unknown, unavailable, incompatible,
+or failed entries are reported and skipped.
+
+When the suite already owns OpenTelemetry, `otel_instrumentations` has no effect:
+the collector installs nothing and uses the suite's instrumentation unchanged.
+A warning reports any non-`nil` selection that was ignored.
 
 ## What gets sent
 

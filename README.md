@@ -97,9 +97,24 @@ Buildkite::TestCollector.configure(hook: :rspec, otel_enabled: true)
 ```
 
 If your suite already runs OpenTelemetry, we use your existing setup and your
-instrumentation as it is. If it doesn't, we set one up and install the
-instrumentation this gem bundles, so you get spans for the databases, caches,
-HTTP clients, and background jobs your tests actually touch.
+instrumentation as it is. A non-`nil` `otel_instrumentations` selection is
+ignored with a warning in that path. If the suite doesn't run OpenTelemetry, we
+set one up and install the applicable curated SQL instrumentation (`pg`,
+`mysql2`, and `trilogy`). You can omit `otel_instrumentations` completely to use
+those defaults. Set it only to select an exact subset, add customer-supplied
+instrumentation to the defaults, or export only root spans. See the
+[OpenTelemetry guide](docs/opentelemetry.md#choosing-instrumentation) for the
+available options.
+
+The collector includes those three curated instrumentation gems instead of
+`opentelemetry-instrumentation-all`. Optional instrumentation remains the
+customer's Gemfile responsibility.
+
+Before installing bundled instrumentation selected by symbol, the collector
+checks its target for foreign patches and skips that instrumentation if it finds
+one. Instrumentation passed by its registered name is an explicit customer
+choice, so it is installed without this guard and its compatibility with other
+patches is the customer's responsibility.
 
 Export needs Ruby 3.3 or newer, which is what the OpenTelemetry gems require. On
 older Rubies the option is accepted and does nothing.
