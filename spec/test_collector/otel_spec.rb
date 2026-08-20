@@ -386,7 +386,7 @@ RSpec.describe Buildkite::TestCollector::OTel do
     allow(described_class).to receive(:batch_processor).and_return(child_processor)
 
     described_class.send(
-      :attach_execution_children,
+      :configure_child_export,
       "https://example.invalid/v1/traces",
       {},
       nil,
@@ -415,7 +415,7 @@ RSpec.describe Buildkite::TestCollector::OTel do
     allow(described_class).to receive(:batch_processor).and_return(child_processor)
 
     described_class.send(
-      :attach_execution_children,
+      :configure_child_export,
       "https://example.invalid/v1/traces",
       {},
       [],

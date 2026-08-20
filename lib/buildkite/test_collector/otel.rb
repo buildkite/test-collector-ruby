@@ -72,7 +72,7 @@ module Buildkite::TestCollector
         headers = request_headers(run_env, api_token)
         @execution_provider = build_execution_provider(endpoint, headers)
         @tracer = @execution_provider.tracer(TRACER_NAME, Buildkite::TestCollector::VERSION)
-        attach_execution_children(endpoint, headers, instrumentations)
+        configure_child_export(endpoint, headers, instrumentations)
       rescue LoadError, StandardError => e
         warn "[buildkite-test_collector] OpenTelemetry span export disabled: #{e.class}: #{e.message}"
         shutdown
@@ -168,7 +168,7 @@ module Buildkite::TestCollector
         OpenTelemetry::SDK::Trace::Export::BatchSpanProcessor.new(exporter, **options)
       end
 
-      def attach_execution_children(endpoint, headers, instrumentations)
+      def configure_child_export(endpoint, headers, instrumentations)
         provider = OpenTelemetry.tracer_provider
         collector_managed = provider.is_a?(OpenTelemetry::Internal::ProxyTracerProvider)
         unless collector_managed || provider.respond_to?(:add_span_processor)
@@ -185,7 +185,7 @@ module Buildkite::TestCollector
           OpenTelemetry::SDK.configure do |config|
             config.id_generator = SecureRandomIdGenerator
             config.add_span_processor(child_forwarder)
-            config.use_all unless instrumentations == []
+            config.use_all if instrumentations.nil?
           end
         else
           provider.add_span_processor(child_forwarder)
