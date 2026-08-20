@@ -45,6 +45,18 @@ RSpec.describe forwarder_class do
     expect(processor).to have_received(:on_finish).with(span).once
   end
 
+  it "enqueues an accepted span before deactivation can begin" do
+    mutex_owned = false
+    allow(processor).to receive(:on_finish) do
+      mutex_owned = forwarder.instance_variable_get(:@mutex).owned?
+    end
+    forwarder.on_start(span, execution_context)
+
+    forwarder.on_finish(span)
+
+    expect(mutex_owned).to be(true)
+  end
+
   it "becomes inert without shutting down the child processor" do
     forwarder.on_start(span, execution_context)
 

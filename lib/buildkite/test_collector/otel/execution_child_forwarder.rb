@@ -25,9 +25,9 @@ module Buildkite
         end
 
         def on_finish(span)
-@mutex.synchronize do
-  @processor.on_finish(span) if @active && @spans.delete(span)
-end
+          @mutex.synchronize do
+            @processor.on_finish(span) if @active && @spans.delete(span)
+          end
         rescue StandardError => e
           warn "[buildkite-test_collector] Could not export OpenTelemetry child span: #{e.class}: #{e.message}"
         end
