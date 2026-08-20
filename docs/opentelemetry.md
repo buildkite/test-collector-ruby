@@ -82,16 +82,18 @@ spans are rejected.
 OpenTelemetry's SDK owns the batching, retries and transport. `test.execution`
 spans have a reserved, faster-draining queue and are exported separately from
 automatically instrumented spans, so a flood or invalid batch of child spans
-cannot displace the execution roots. Both queues share one bounded 30-second
-flush when the suite finishes, roots first. A hard exit or a sustained endpoint
-failure can still lose spans because the queues live in process memory.
+cannot displace the execution roots. When the suite finishes, both queues share
+one 30-second flush budget passed to the SDK, roots first. A hard exit or a
+sustained endpoint failure can still lose spans because the queues live in
+process memory.
 
 ## When something goes wrong
 
 Export never fails a test. If the OpenTelemetry gems are missing, setup fails, or
 spans can't be delivered, the collector warns and carries on, and your test
-results upload as they always have. Suite shutdown can wait up to 30 seconds for
-buffered spans to finish exporting.
+results upload as they always have. Suite shutdown gives the OpenTelemetry SDK a
+30-second budget to export buffered spans; the SDK's own retry backoff can run
+past it when the endpoint keeps failing.
 
 Export failures are reported through OpenTelemetry's own logger. The collector
 also warns if its reserved root queue drops any `test.execution` spans; normal
