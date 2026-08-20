@@ -265,9 +265,9 @@ RSpec.describe Buildkite::TestCollector::OTel do
       .to receive(:new)
       .with(
         root_exporter,
-        max_queue_size: 8_192,
-        max_export_batch_size: 512,
-        schedule_delay: 1_000,
+        max_queue_size: described_class::ROOT_MAX_QUEUE_SIZE,
+        max_export_batch_size: described_class::ROOT_MAX_EXPORT_BATCH_SIZE,
+        schedule_delay: described_class::ROOT_SCHEDULE_DELAY_MILLISECONDS,
         metrics_reporter: an_instance_of(root_reporter),
       )
       .ordered
