@@ -67,6 +67,8 @@ module Buildkite::TestCollector
         return if enabled?
 
         # Non-empty selections are reserved for future :all and preset support.
+        # Raising fails open by design: the rescue below reports the reserved
+        # value and disables export rather than crashing the suite.
         unless instrumentations.nil? || instrumentations == []
           raise ArgumentError, "otel_instrumentations must be omitted or []"
         end

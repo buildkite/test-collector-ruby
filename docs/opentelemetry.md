@@ -123,13 +123,15 @@ Buildkite::TestCollector.configure(
 ```
 
 For this release, omitting `otel_instrumentations` and setting it to `[]` are the
-only supported choices. The collector does not inspect instrumentation patches,
-so compatibility between customer-selected instrumentation and other APM or
-test-library patches remains the customer's responsibility.
+only supported choices. Any other value is reserved for a future release and
+disables span export with a warning, in every path. The collector does not
+inspect instrumentation patches, so compatibility between customer-selected
+instrumentation and other APM or test-library patches remains the customer's
+responsibility.
 
-When the suite already owns OpenTelemetry, `otel_instrumentations` has no effect:
-the collector installs nothing and uses the suite's instrumentation unchanged.
-A warning reports any non-`nil` selection that was ignored.
+When the suite already owns OpenTelemetry, a supported `otel_instrumentations`
+selection has no effect: the collector installs nothing and uses the suite's
+instrumentation unchanged. A warning reports an `[]` selection that was ignored.
 
 ## What gets sent
 
