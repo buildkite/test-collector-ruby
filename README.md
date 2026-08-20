@@ -96,12 +96,15 @@ default, so opt in when you configure the collector:
 Buildkite::TestCollector.configure(hook: :rspec, otel_enabled: true)
 ```
 
-If your suite already runs OpenTelemetry, we use your existing setup and your
-instrumentation as it is. An `otel_instrumentations: []` selection is ignored
-with a warning in that path. If the suite doesn't run OpenTelemetry, we
-set one up and install all applicable instrumentation registered when the suite
-starts. The collector does not include instrumentation gems. Add and explicitly
-require each one you want to use:
+Execution roots use a private AlwaysOn provider so a suite's sampling policy
+cannot remove them. If the suite already runs OpenTelemetry, the collector
+forwards its sampled spans created during a test execution without changing the
+suite's provider, sampler, instrumentation, exporters, or lifecycle.
+
+If the suite does not configure OpenTelemetry, the collector configures a global
+provider for child spans and installs all applicable instrumentation registered
+when the suite starts. The collector does not include instrumentation gems. Add
+and explicitly require each one you want to use:
 
 ```ruby
 # Gemfile
@@ -119,7 +122,8 @@ Adding a gem to the Gemfile may auto-require it in applications that call
 recommended setup. To disable instrumentations and export only root
 `test.execution` spans, set `otel_instrumentations: []`. Any other value is
 reserved for a future release and disables span export with a warning,
-regardless of who owns the OpenTelemetry setup. See the
+regardless of who owns the provider. In suite-owned mode, a supported
+`otel_instrumentations: []` selection is ignored with a warning. See the
 [OpenTelemetry guide](docs/opentelemetry.md#choosing-instrumentation) for more.
 
 Export needs Ruby 3.3 or newer, which is what the OpenTelemetry gems require. On

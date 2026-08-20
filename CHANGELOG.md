@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+* Preserve OpenTelemetry `test.execution` roots with a private AlwaysOn provider
+  while retaining suite-owned or customer-installed child instrumentation.
+
 ## v2.14.0
 
 * Send `location_prefix` in `run_env`
