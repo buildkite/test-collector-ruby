@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "opentelemetry/sdk"
+require "timeout"
 
 forwarder_class = Buildkite::TestCollector::OTel.const_get(:ExecutionChildForwarder, false)
 
@@ -54,6 +55,32 @@ RSpec.describe forwarder_class do
     expect(processor).to have_received(:force_flush).with(timeout: 5).once
     expect(processor).not_to have_received(:shutdown)
     expect(processor).not_to have_received(:on_finish)
+  end
+
+  it "does not block span completion or deactivation during a flush" do
+    flush_started = Queue.new
+    release_flush = Queue.new
+    flush_thread = nil
+    allow(processor).to receive(:force_flush) do
+      flush_started << true
+      release_flush.pop
+      success
+    end
+    forwarder.on_start(span, execution_context)
+
+    flush_thread = Thread.new { forwarder.force_flush }
+    flush_started.pop
+    Timeout.timeout(1) do
+      forwarder.on_finish(span)
+      forwarder.shutdown
+    end
+    release_flush << true
+
+    expect(flush_thread.value).to eq(success)
+    expect(processor).to have_received(:on_finish).with(span).once
+  ensure
+    release_flush&.push(true) if flush_thread&.alive?
+    flush_thread&.join
   end
 
   it "does not expose child processor failures to the suite" do

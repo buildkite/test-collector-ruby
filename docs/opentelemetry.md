@@ -70,7 +70,8 @@ We fit around your setup rather than replacing it:
   ambient spans are not sent to Buildkite.
 - **Your exporters see only your spans.** The private execution root goes only to
   Buildkite. Suite children retain its trace ID and parent span ID through normal
-  OpenTelemetry context propagation.
+  OpenTelemetry context propagation. Because your backend does not receive that
+  root, it may display these test traces as partial or headless.
 - **Child sampling is yours.** `AlwaysOff` records no children. A parent-based
   sampler commonly keeps children because the private root is sampled; that is
   the suite's configured parent-based behavior, not a Buildkite override.

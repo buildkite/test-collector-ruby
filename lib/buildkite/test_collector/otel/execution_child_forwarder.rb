@@ -25,19 +25,17 @@ module Buildkite
         end
 
         def on_finish(span)
-          @mutex.synchronize do
-            @processor.on_finish(span) if @active && @spans.delete(span)
-          end
+          tracked = @mutex.synchronize { @active && @spans.delete(span) }
+          @processor.on_finish(span) if tracked
         rescue StandardError => e
           warn "[buildkite-test_collector] Could not export OpenTelemetry child span: #{e.class}: #{e.message}"
         end
 
         def force_flush(timeout: nil)
-          @mutex.synchronize do
-            return success unless @active
+          active = @mutex.synchronize { @active }
+          return success unless active
 
-            @processor.force_flush(timeout: timeout)
-          end
+          @processor.force_flush(timeout: timeout)
         rescue StandardError => e
           warn "[buildkite-test_collector] Could not flush OpenTelemetry child spans: #{e.class}: #{e.message}"
           OpenTelemetry::SDK::Trace::Export::FAILURE
