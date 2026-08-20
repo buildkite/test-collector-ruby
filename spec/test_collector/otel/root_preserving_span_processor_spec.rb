@@ -15,7 +15,10 @@ RSpec.describe processor_class do
   let(:children_processor) do
     spy("children processor", force_flush: success, shutdown: success)
   end
-  let(:root_span) { double("root span", name: "test.execution") }
+  let(:buildkite_scope) { double("buildkite scope", name: "buildkite-test-collector") }
+  let(:root_span) do
+    double("root span", name: "test.execution", instrumentation_scope: buildkite_scope)
+  end
   let(:child_span) { double("child span", name: "http.request") }
 
   describe "#on_start" do
@@ -42,6 +45,19 @@ RSpec.describe processor_class do
       expect(root_processor).not_to have_received(:on_finish)
     end
 
+    it "does not give a suite span sharing the root name a reserved slot" do
+      impostor = double(
+        "suite span",
+        name: "test.execution",
+        instrumentation_scope: double("suite scope", name: "acme-suite"),
+      )
+
+      processor.on_finish(impostor)
+
+      expect(children_processor).to have_received(:on_finish).with(impostor)
+      expect(root_processor).not_to have_received(:on_finish)
+    end
+
     it "keeps a root when the native child queue overflows" do
       root_exporter = OpenTelemetry::SDK::Trace::Export::InMemorySpanExporter.new
       children_exporter = OpenTelemetry::SDK::Trace::Export::InMemorySpanExporter.new
@@ -60,7 +76,7 @@ RSpec.describe processor_class do
       native_processor = described_class.new(root: root_batch, children: children_batch)
       provider = OpenTelemetry::SDK::Trace::TracerProvider.new
       provider.add_span_processor(native_processor)
-      tracer = provider.tracer("queue-pressure-test")
+      tracer = provider.tracer(Buildkite::TestCollector::OTel::TRACER_NAME)
 
       execution = tracer.start_span("test.execution")
       OpenTelemetry::Trace.with_span(execution) do

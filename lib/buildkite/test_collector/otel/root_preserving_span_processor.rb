@@ -37,7 +37,14 @@ module Buildkite
         private
 
         def processor_for(span)
-          span.name == ROOT_SPAN_NAME ? @root : @children
+          root?(span) ? @root : @children
+        end
+
+        # Only roots this collector started may use the reserved queue. A suite
+        # span that happens to share the name must not consume root slots.
+        def root?(span)
+          span.name == ROOT_SPAN_NAME &&
+            span.instrumentation_scope.name == TRACER_NAME
         end
 
         # Roots get the shared timeout first; shutdown still attempts both workers.

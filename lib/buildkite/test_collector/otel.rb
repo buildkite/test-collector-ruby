@@ -20,6 +20,8 @@ module Buildkite::TestCollector
 
     PROCESSOR_TIMEOUT_SECONDS = 30
 
+    TRACER_NAME = "buildkite-test-collector"
+
     ROOT_SPAN_NAME = "test.execution"
     ROOT_MAX_QUEUE_SIZE = 8_192
     ROOT_MAX_EXPORT_BATCH_SIZE = 512
@@ -73,9 +75,7 @@ module Buildkite::TestCollector
 
         provider = install_processor(@processor)
 
-        @tracer = provider.tracer(
-          "buildkite-test-collector", Buildkite::TestCollector::VERSION
-        )
+        @tracer = provider.tracer(TRACER_NAME, Buildkite::TestCollector::VERSION)
       rescue LoadError, StandardError => e
         warn "[buildkite-test_collector] OpenTelemetry span export disabled: #{e.class}: #{e.message}"
         shutdown
