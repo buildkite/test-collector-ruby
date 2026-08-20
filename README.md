@@ -109,6 +109,12 @@ The collector includes those three curated instrumentation gems instead of
 `opentelemetry-instrumentation-all`. Optional instrumentation remains the
 customer's Gemfile responsibility.
 
+Before installing bundled instrumentation selected by symbol, the collector
+checks its target for foreign patches and skips that instrumentation if it finds
+one. Instrumentation passed by its registered name is an explicit customer
+choice, so it is installed without this guard and its compatibility with other
+patches is the customer's responsibility.
+
 Export needs Ruby 3.3 or newer, which is what the OpenTelemetry gems require. On
 older Rubies the option is accepted and does nothing.
 
