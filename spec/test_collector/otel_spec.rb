@@ -226,7 +226,7 @@ RSpec.describe Buildkite::TestCollector::OTel do
     )
   end
 
-  it "uses process-safe random IDs for the provider it creates" do
+  it "uses process-safe random IDs and installs all registered instrumentation for its provider" do
     provider = OpenTelemetry::Internal::ProxyTracerProvider.new
     config = double("OpenTelemetry SDK configuration")
     processor = double("span processor")
@@ -235,168 +235,38 @@ RSpec.describe Buildkite::TestCollector::OTel do
     allow(OpenTelemetry::SDK).to receive(:configure).and_yield(config)
     allow(config).to receive(:id_generator=)
     allow(config).to receive(:add_span_processor)
+    allow(config).to receive(:use_all)
 
-    described_class.send(:install_processor, processor, [])
+    described_class.send(:install_processor, processor, nil)
 
     expect(config).to have_received(:id_generator=).with(generator)
     expect(config).to have_received(:add_span_processor).with(processor)
+    expect(config).to have_received(:use_all).once
   end
 
-  it "expands defaults while preserving exact and root-only selections" do
-    redis = "OpenTelemetry::Instrumentation::Redis"
+  it "does not install registered instrumentation with an empty selection" do
+    provider = OpenTelemetry::Internal::ProxyTracerProvider.new
+    config = double("OpenTelemetry SDK configuration")
+    processor = double("span processor")
+    allow(OpenTelemetry).to receive(:tracer_provider).and_return(provider)
+    allow(OpenTelemetry::SDK).to receive(:configure).and_yield(config)
+    allow(config).to receive(:id_generator=)
+    allow(config).to receive(:add_span_processor)
+    allow(config).to receive(:use_all)
 
-    expect(described_class.send(:selected_instrumentations, nil))
-      .to eq([:pg, :mysql2, :trilogy])
-    expect(described_class.send(:selected_instrumentations, [:defaults]))
-      .to eq([:pg, :mysql2, :trilogy])
-    expect(described_class.send(:selected_instrumentations, [:defaults, redis, :pg]))
-      .to eq([:pg, :mysql2, :trilogy, redis])
-    expect(described_class.send(:selected_instrumentations, [:pg]))
-      .to eq([:pg])
-    expect(described_class.send(:selected_instrumentations, []))
-      .to be_empty
+    described_class.send(:install_processor, processor, [])
+
+    expect(config).not_to have_received(:use_all)
   end
 
-  it "requires and installs curated defaults plus customer-supplied instrumentation" do
-    names = [
-      "OpenTelemetry::Instrumentation::PG",
-      "OpenTelemetry::Instrumentation::Mysql2",
-      "OpenTelemetry::Instrumentation::Trilogy",
-      "OpenTelemetry::Instrumentation::Redis",
-    ]
-    instrumentations = names.to_h do |name|
-      [name, double(name, present?: true, compatible?: true, install: true)]
-    end
-    registry = OpenTelemetry::Instrumentation.registry
-    allow(described_class).to receive(:require)
-    allow(registry).to receive(:lookup) { |name| instrumentations[name] }
-
-    described_class.send(
-      :install_instrumentations,
-      [:defaults, "OpenTelemetry::Instrumentation::Redis"],
-    )
-
-    expect(described_class).to have_received(:require)
-      .with("opentelemetry-instrumentation-pg")
-    expect(described_class).to have_received(:require)
-      .with("opentelemetry-instrumentation-mysql2")
-    expect(described_class).to have_received(:require)
-      .with("opentelemetry-instrumentation-trilogy")
-    instrumentations.each_value do |instrumentation|
-      expect(instrumentation).to have_received(:install).once
-    end
-  end
-
-  it "warns and continues past unknown, unavailable, incompatible, and failed entries" do
-    registry = OpenTelemetry::Instrumentation.registry
-    unavailable = double("unavailable", present?: false)
-    incompatible = double("incompatible", present?: true, compatible?: false)
-    failed = double("failed", present?: true, compatible?: true)
-    allow(failed).to receive(:install).and_raise("patch failed")
-    successful = double("successful", present?: true, compatible?: true, install: true)
-    failed_name = "OpenTelemetry::Instrumentation::PG"
-    successful_name = "OpenTelemetry::Instrumentation::Redis"
-    allow(registry).to receive(:lookup) do |name|
-      {
-        "Unavailable" => unavailable,
-        "Incompatible" => incompatible,
-        failed_name => failed,
-        successful_name => successful,
-      }[name]
-    end
-    messages = [
-      "Unknown OpenTelemetry instrumentation: :unknown",
-      "OpenTelemetry instrumentation unavailable: NotRegistered is not registered",
-      "OpenTelemetry instrumentation unavailable: Unavailable target library is not loaded",
-      "OpenTelemetry instrumentation incompatible: Incompatible",
-      "OpenTelemetry instrumentation failed: #{failed_name}: RuntimeError: patch failed",
-    ]
-    warnings = Regexp.new(messages.map { |message| Regexp.escape(message) }.join(".*"), Regexp::MULTILINE)
-
+  it "fails open for instrumentation selections reserved for a later release" do
     expect do
-      described_class.send(
-        :install_instrumentations,
-        [:unknown, "NotRegistered", "Unavailable", "Incompatible", failed_name, successful_name],
-      )
-    end.to output(warnings).to_stderr
-    expect(successful).to have_received(:install)
-  end
-
-  it "installs customer-supplied instrumentation without applying the collector guard" do
-    stub_const("Faraday", Module.new)
-    stub_const("Faraday::Connection", Class.new)
-    stub_const("ForeignFaradayPatch", Module.new)
-    Faraday::Connection.prepend(ForeignFaradayPatch)
-
-    name = "OpenTelemetry::Instrumentation::Faraday"
-    instrumentation = double(name, present?: true, compatible?: true, install: true)
-    allow(OpenTelemetry::Instrumentation.registry).to receive(:lookup)
-      .with(name)
-      .and_return(instrumentation)
-
-    described_class.send(:install_instrumentations, [name])
-
-    expect(instrumentation).to have_received(:install)
-  end
-
-  it "fails open when a bundled instrumentation definition cannot be loaded" do
-    allow(described_class).to receive(:require)
-      .with("opentelemetry-instrumentation-pg")
-      .and_raise(LoadError, "missing pg instrumentation")
-
-    expect do
-      described_class.send(:install_instrumentations, [:pg])
+      described_class.configure!(instrumentations: [:all])
     end.to output(
-      /instrumentation unavailable: OpenTelemetry::Instrumentation::PG: missing pg instrumentation/
-    ).to_stderr
-  end
-
-  it "keeps setup and queries safe when a foreign prepend would collide with a default" do
-    stub_const("PG", Module.new)
-    stub_const("PG::Connection", Class.new do
-      def exec
-        :ok
-      end
-    end)
-    stub_const("ForeignPGPatch", Module.new do
-      def exec
-        annotate_query!(:span, :query, :options)
-        super
-      end
-
-      private
-
-      def annotate_query!(_span, _query, _options)
-      end
-    end)
-    otel_patch = Module.new do
-      def exec
-        result = super
-        annotate_query!(:span, result)
-      end
-    end
-    PG::Connection.prepend(ForeignPGPatch)
-
-    name = "OpenTelemetry::Instrumentation::PG"
-    instrumentation = double(name, present?: true, compatible?: true)
-    allow(instrumentation).to receive(:install) do
-      PG::Connection.prepend(otel_patch)
-      true
-    end
-    allow(described_class).to receive(:require)
-      .with("opentelemetry-instrumentation-pg")
-    allow(OpenTelemetry::Instrumentation.registry).to receive(:lookup)
-      .with(name)
-      .and_return(instrumentation)
-
-    expect do
-      described_class.send(:install_instrumentations, [:pg])
-    end.to output(
-      /instrumentation unsafe: #{Regexp.escape(name)} skipped; foreign patch ForeignPGPatch found on PG::Connection/
+      /OpenTelemetry span export disabled: ArgumentError: otel_instrumentations must be omitted or \[\]/
     ).to_stderr
 
-    expect(instrumentation).not_to have_received(:install)
-    expect(PG::Connection.new.exec).to eq(:ok)
+    expect(described_class).not_to be_enabled
   end
 
   it "exports roots through a reserved queue without taking over the suite's provider" do
@@ -467,9 +337,7 @@ RSpec.describe Buildkite::TestCollector::OTel do
   it "leaves instrumentation alone when the suite runs its own OpenTelemetry" do
     original = OpenTelemetry.tracer_provider
     OpenTelemetry.tracer_provider = OpenTelemetry::SDK::Trace::TracerProvider.new
-    registry = OpenTelemetry::Instrumentation.registry
-    allow(registry).to receive(:lookup)
-    allow(described_class).to receive(:require).and_call_original
+    allow(OpenTelemetry::SDK).to receive(:configure)
     allow(OpenTelemetry::Exporter::OTLP::Exporter).to receive(:new) do
       OpenTelemetry::SDK::Trace::Export::InMemorySpanExporter.new
     end
@@ -477,16 +345,14 @@ RSpec.describe Buildkite::TestCollector::OTel do
     expect do
       described_class.configure!(
         endpoint: "https://example.invalid/v1/traces",
-        instrumentations: [:pg],
+        instrumentations: [],
       )
     end.to output(
-      /instrumentation selection ignored because the test suite already configured OpenTelemetry: \[:pg\]/
+      /instrumentation selection ignored because the test suite already configured OpenTelemetry: \[\]/
     ).to_stderr
 
     expect(described_class).to be_enabled
-    expect(registry).not_to have_received(:lookup)
-    expect(described_class).not_to have_received(:require)
-      .with("opentelemetry-instrumentation-pg")
+    expect(OpenTelemetry::SDK).not_to have_received(:configure)
   ensure
     described_class.shutdown
     OpenTelemetry.tracer_provider = original

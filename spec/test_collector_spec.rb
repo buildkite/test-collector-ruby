@@ -62,7 +62,7 @@ RSpec.describe Buildkite::TestCollector do
         hook: hook,
         tracing_enabled: false,
         otel_enabled: true,
-        otel_instrumentations: [:defaults, "OpenTelemetry::Instrumentation::Redis"],
+        otel_instrumentations: [],
       )
 
       expect(Buildkite::TestCollector::OTel).not_to have_received(:configure!)
@@ -73,7 +73,7 @@ RSpec.describe Buildkite::TestCollector do
         endpoint: "https://tests-otlp.buildkite.com/v1/traces",
         api_token: "MyToken",
         run_env: run_env,
-        instrumentations: [:defaults, "OpenTelemetry::Instrumentation::Redis"],
+        instrumentations: [],
       )
     end
 
