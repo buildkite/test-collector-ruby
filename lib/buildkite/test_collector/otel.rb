@@ -269,10 +269,19 @@ module Buildkite::TestCollector
       # Builds the HTTP headers sent with every exported span. The server
       # figures out which test run this belongs to from the run key, and
       # figures out which job sent it from the auth token, so we don't need
-      # to send that separately.
+      # to send that separately. The build and job IDs go along when the
+      # Buildkite Agent provides them; the endpoint decides whether they're
+      # valid, so we don't second-guess their format here.
       def request_headers(run_env, api_token)
         headers = { "Buildkite-Tests-Run-Key" => run_env["key"] }
         headers["Authorization"] = "Token token=\"#{api_token}\"" if api_token
+
+        build_id = ENV["BUILDKITE_BUILD_ID"]
+        headers["Buildkite-Build-ID"] = build_id unless build_id.nil? || build_id.empty?
+
+        job_id = ENV["BUILDKITE_JOB_ID"]
+        headers["Buildkite-Job-ID"] = job_id unless job_id.nil? || job_id.empty?
+
         headers
       end
     end

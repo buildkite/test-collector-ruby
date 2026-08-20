@@ -217,12 +217,40 @@ RSpec.describe Buildkite::TestCollector::OTel do
   end
 
   it "sends the run key and token as request headers" do
+    allow(ENV).to receive(:[]).and_call_original
+    allow(ENV).to receive(:[]).with("BUILDKITE_BUILD_ID").and_return(nil)
+    allow(ENV).to receive(:[]).with("BUILDKITE_JOB_ID").and_return(nil)
+
     headers = described_class.send(:request_headers, { "key" => "test-run-id" }, "suite-token")
 
     expect(headers).to eq(
       "Buildkite-Tests-Run-Key" => "test-run-id",
       "Authorization" => %(Token token="suite-token"),
     )
+  end
+
+  it "sends the build and job IDs as request headers when the Agent provides them" do
+    allow(ENV).to receive(:[]).and_call_original
+    allow(ENV).to receive(:[]).with("BUILDKITE_BUILD_ID").and_return("build-123")
+    allow(ENV).to receive(:[]).with("BUILDKITE_JOB_ID").and_return("job-456")
+
+    headers = described_class.send(:request_headers, { "key" => "test-run-id" }, "suite-token")
+
+    expect(headers).to include(
+      "Buildkite-Build-ID" => "build-123",
+      "Buildkite-Job-ID" => "job-456",
+    )
+  end
+
+  it "leaves out a build or job ID header when its environment variable is blank" do
+    allow(ENV).to receive(:[]).and_call_original
+    allow(ENV).to receive(:[]).with("BUILDKITE_BUILD_ID").and_return("")
+    allow(ENV).to receive(:[]).with("BUILDKITE_JOB_ID").and_return("job-456")
+
+    headers = described_class.send(:request_headers, { "key" => "test-run-id" }, "suite-token")
+
+    expect(headers).not_to have_key("Buildkite-Build-ID")
+    expect(headers).to include("Buildkite-Job-ID" => "job-456")
   end
 
   it "uses process-safe random IDs for the provider it creates" do
