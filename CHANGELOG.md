@@ -2,8 +2,8 @@
 
 ## Unreleased
 
-* Replace `opentelemetry-instrumentation-all` with curated PG, mysql2, and
-  Trilogy instrumentation dependencies and installation.
+* Replace `opentelemetry-instrumentation-all` with curated Net::HTTP, PG,
+  mysql2, and Trilogy instrumentation dependencies and installation.
 
 ## v2.14.0
 

@@ -69,15 +69,15 @@ We fit in around your setup rather than replacing it:
   yours keeps working.
 
 If you don't have OpenTelemetry set up, we create a tracer provider and install
-the applicable curated SQL instrumentation, as described below.
+the applicable curated instrumentation, as described below.
 
 ## Choosing instrumentation
 
 Instrumentation selection applies only when the collector creates the
-OpenTelemetry provider. The default set is `pg`, `mysql2`, and `trilogy`; each is
-installed only when its target library is already loaded. You do not need to set
-`otel_instrumentations` to use these defaults: omit the option completely, or
-set it to `nil`.
+OpenTelemetry provider. The default set is `net_http`, `pg`, `mysql2`, and
+`trilogy`; each is installed only when its target library is already loaded. You
+do not need to set `otel_instrumentations` to use these defaults: omit the option
+completely, or set it to `nil`.
 
 ```ruby
 # Applicable curated defaults; no otel_instrumentations option needed

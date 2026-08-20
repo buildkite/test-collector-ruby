@@ -246,11 +246,11 @@ RSpec.describe Buildkite::TestCollector::OTel do
     redis = "OpenTelemetry::Instrumentation::Redis"
 
     expect(described_class.send(:selected_instrumentations, nil))
-      .to eq([:pg, :mysql2, :trilogy])
+      .to eq([:net_http, :pg, :mysql2, :trilogy])
     expect(described_class.send(:selected_instrumentations, [:defaults]))
-      .to eq([:pg, :mysql2, :trilogy])
+      .to eq([:net_http, :pg, :mysql2, :trilogy])
     expect(described_class.send(:selected_instrumentations, [:defaults, redis, :pg]))
-      .to eq([:pg, :mysql2, :trilogy, redis])
+      .to eq([:net_http, :pg, :mysql2, :trilogy, redis])
     expect(described_class.send(:selected_instrumentations, [:pg]))
       .to eq([:pg])
     expect(described_class.send(:selected_instrumentations, []))
@@ -259,6 +259,7 @@ RSpec.describe Buildkite::TestCollector::OTel do
 
   it "requires and installs curated defaults plus customer-supplied instrumentation" do
     names = [
+      "OpenTelemetry::Instrumentation::Net::HTTP",
       "OpenTelemetry::Instrumentation::PG",
       "OpenTelemetry::Instrumentation::Mysql2",
       "OpenTelemetry::Instrumentation::Trilogy",
@@ -276,6 +277,8 @@ RSpec.describe Buildkite::TestCollector::OTel do
       [:defaults, "OpenTelemetry::Instrumentation::Redis"],
     )
 
+    expect(described_class).to have_received(:require)
+      .with("opentelemetry-instrumentation-net_http")
     expect(described_class).to have_received(:require)
       .with("opentelemetry-instrumentation-pg")
     expect(described_class).to have_received(:require)
@@ -397,6 +400,46 @@ RSpec.describe Buildkite::TestCollector::OTel do
 
     expect(instrumentation).not_to have_received(:install)
     expect(PG::Connection.new.exec).to eq(:ok)
+  end
+
+  it "installs Net::HTTP instrumentation alongside the collector's own patch" do
+    stub_const("Net::HTTP", Class.new)
+    Net::HTTP.prepend(Buildkite::TestCollector::Network::NetHTTPPatch)
+
+    name = "OpenTelemetry::Instrumentation::Net::HTTP"
+    instrumentation = double(name, present?: true, compatible?: true, install: true)
+    allow(described_class).to receive(:require)
+      .with("opentelemetry-instrumentation-net_http")
+    allow(OpenTelemetry::Instrumentation.registry).to receive(:lookup)
+      .with(name)
+      .and_return(instrumentation)
+
+    described_class.send(:install_instrumentations, [:net_http])
+
+    expect(instrumentation).to have_received(:install)
+  end
+
+  it "skips Net::HTTP instrumentation when another tracer patched it first" do
+    stub_const("Net::HTTP", Class.new)
+    stub_const("DatadogNetHTTPPatch", Module.new)
+    Net::HTTP.prepend(DatadogNetHTTPPatch)
+    Net::HTTP.prepend(Buildkite::TestCollector::Network::NetHTTPPatch)
+
+    name = "OpenTelemetry::Instrumentation::Net::HTTP"
+    instrumentation = double(name, present?: true, compatible?: true, install: true)
+    allow(described_class).to receive(:require)
+      .with("opentelemetry-instrumentation-net_http")
+    allow(OpenTelemetry::Instrumentation.registry).to receive(:lookup)
+      .with(name)
+      .and_return(instrumentation)
+
+    expect do
+      described_class.send(:install_instrumentations, [:net_http])
+    end.to output(
+      /instrumentation unsafe: #{Regexp.escape(name)} skipped; foreign patch DatadogNetHTTPPatch found on Net::HTTP/
+    ).to_stderr
+
+    expect(instrumentation).not_to have_received(:install)
   end
 
   it "exports roots through a reserved queue without taking over the suite's provider" do

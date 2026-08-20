@@ -7,8 +7,9 @@ module Buildkite::TestCollector
   module OTel
     DEFAULT_ENDPOINT = "https://tests-otlp.buildkite.com/v1/traces"
 
-    DEFAULT_INSTRUMENTATIONS = [:pg, :mysql2, :trilogy].freeze
+    DEFAULT_INSTRUMENTATIONS = [:net_http, :pg, :mysql2, :trilogy].freeze
     BUNDLED_INSTRUMENTATIONS = {
+      net_http: ["opentelemetry-instrumentation-net_http", "OpenTelemetry::Instrumentation::Net::HTTP"].freeze,
       pg: ["opentelemetry-instrumentation-pg", "OpenTelemetry::Instrumentation::PG"].freeze,
       mysql2: ["opentelemetry-instrumentation-mysql2", "OpenTelemetry::Instrumentation::Mysql2"].freeze,
       trilogy: ["opentelemetry-instrumentation-trilogy", "OpenTelemetry::Instrumentation::Trilogy"].freeze,
@@ -19,6 +20,7 @@ module Buildkite::TestCollector
     # does not expose patch targets as metadata. Review these paths when adding
     # an instrumentation or changing its supported gem version.
     PATCH_TARGET_CONSTANT_PATHS = {
+      "OpenTelemetry::Instrumentation::Net::HTTP" => ["Net::HTTP"].freeze,
       "OpenTelemetry::Instrumentation::PG" => ["PG::Connection"].freeze,
       "OpenTelemetry::Instrumentation::Mysql2" => ["Mysql2::Client"].freeze,
       "OpenTelemetry::Instrumentation::Trilogy" => ["Trilogy"].freeze,
@@ -328,7 +330,10 @@ module Buildkite::TestCollector
             next unless target_index
 
             patch = owner.ancestors[0...target_index].find do |ancestor|
-              !module_name(ancestor).start_with?(INSTRUMENTATION_NAMESPACE)
+              # The collector's legacy HTTP tracing wrapper composes safely
+              # with OTel and is installed before OTel setup.
+              !module_name(ancestor).start_with?(INSTRUMENTATION_NAMESPACE) &&
+                ancestor != Buildkite::TestCollector::Network::NetHTTPPatch
             end
             return [patch, owner_name] if patch
           end

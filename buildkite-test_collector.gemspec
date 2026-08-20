@@ -32,6 +32,7 @@ Gem::Specification.new do |spec|
   if Gem::Version.new(RUBY_VERSION) >= Gem::Version.new('3.3')
     spec.add_dependency "opentelemetry-exporter-otlp", "~> 0.34"
     spec.add_dependency "opentelemetry-instrumentation-mysql2", "~> 0.34"
+    spec.add_dependency "opentelemetry-instrumentation-net_http", "~> 0.29"
     spec.add_dependency "opentelemetry-instrumentation-pg", "~> 0.37"
     spec.add_dependency "opentelemetry-instrumentation-trilogy", "~> 0.69"
     spec.add_dependency "opentelemetry-sdk", "~> 1.13"
