@@ -106,7 +106,8 @@ execution.
 ## Choosing instrumentation
 
 Instrumentation selection applies only when the collector configures the global
-provider. The collector includes the OpenTelemetry SDK and OTLP
+provider, and works the same with `otel_enabled` and `otel_only`.
+The collector includes the OpenTelemetry SDK and OTLP
 exporter, but no instrumentation gems. Add the instrumentation you want to your
 bundle and require it explicitly:
 

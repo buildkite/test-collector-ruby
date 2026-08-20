@@ -157,6 +157,10 @@ gem's whole job is to configure OpenTelemetry so each test gets a suitable span:
   current span.
 - `Buildkite::TestCollector.tag_execution` sets attributes on the test span.
 - `tags:` given to `configure` become resource attributes on every span.
+- Instrumentation works exactly as it does with `otel_enabled`: everything you
+  require and register installs, and `otel_instrumentations: []` exports only
+  the `test.execution` spans. See
+  [choosing instrumentation](docs/opentelemetry.md#choosing-instrumentation).
 - Your code can also talk to OpenTelemetry directly — the collector configures
   the global tracer provider (unless your suite already has one), so
   `OpenTelemetry::Trace.current_span.set_attribute(...)` works during a test,
