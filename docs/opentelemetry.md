@@ -69,76 +69,63 @@ We fit in around your setup rather than replacing it:
   yours keeps working.
 
 If you don't have OpenTelemetry set up, we create a tracer provider and install
-the applicable curated SQL instrumentation, as described below.
+all applicable instrumentation registered when the suite starts, as described
+below.
 
 ## Choosing instrumentation
 
 Instrumentation selection applies only when the collector creates the
-OpenTelemetry provider. The default set is `pg`, `mysql2`, and `trilogy`; each is
-installed only when its target library is already loaded. You do not need to set
-`otel_instrumentations` to use these defaults: omit the option completely, or
-set it to `nil`.
+OpenTelemetry provider. The collector includes the OpenTelemetry SDK and OTLP
+exporter, but no instrumentation gems. Add the instrumentation you want to your
+bundle and require it explicitly:
 
 ```ruby
-# Applicable curated defaults; no otel_instrumentations option needed
-Buildkite::TestCollector.configure(hook: :rspec, otel_enabled: true)
+# Gemfile
+group :test do
+  gem "opentelemetry-instrumentation-pg", require: false
+  gem "opentelemetry-instrumentation-redis", require: false
+end
+```
 
-# Applicable curated defaults, explicitly
+```ruby
+# spec/spec_helper.rb
+require "opentelemetry-instrumentation-pg"
+require "opentelemetry-instrumentation-redis"
+require "buildkite/test_collector"
+
 Buildkite::TestCollector.configure(
   hook: :rspec,
   otel_enabled: true,
-  otel_instrumentations: [:defaults],
 )
+```
 
-# Root test.execution spans only
+A Gemfile entry makes the gem available but does not always load it. Some
+applications call `Bundler.require` and auto-require their gems, but that is
+host-dependent and can be disabled with `require: false`. Explicitly requiring
+each instrumentation is the recommended setup.
+
+Requiring an instrumentation gem registers its definition; it does not install
+the instrumentation immediately. The collector defers OpenTelemetry setup until
+RSpec's `before(:suite)` hooks and asks the SDK to install all registered
+instrumentation. The SDK skips instrumentation whose target library is absent
+or incompatible and reports individual installation failures without stopping
+the remaining installations.
+
+To export root `test.execution` spans without installing any registered
+instrumentation, pass an empty list:
+
+```ruby
 Buildkite::TestCollector.configure(
   hook: :rspec,
   otel_enabled: true,
   otel_instrumentations: [],
 )
-
-# An exact stable subset of bundled instrumentation
-Buildkite::TestCollector.configure(
-  hook: :rspec,
-  otel_enabled: true,
-  otel_instrumentations: [:pg],
-)
 ```
 
-`:defaults` expands to the collector's current default set, which may change
-when the collector is upgraded. Without `:defaults`, the list is exact.
-
-The collector exposes symbols for the instrumentation it bundles. For other
-instrumentation, add its gem to your bundle, require it before RSpec's
-`before(:suite)` hooks run, and pass its registered OpenTelemetry name:
-
-```ruby
-require "opentelemetry-instrumentation-redis"
-
-Buildkite::TestCollector.configure(
-  hook: :rspec,
-  otel_enabled: true,
-  otel_instrumentations: [
-    :defaults,
-    "OpenTelemetry::Instrumentation::Redis",
-  ],
-)
-```
-
-The collector does not require target application libraries such as `pg` or
-`redis`. Immediately before installing a bundled default, it checks the target
-for an existing foreign prepend, such as a Datadog, New Relic, or Sentry patch.
-The collector cannot determine whether two arbitrary prepends are compatible,
-so it conservatively skips that default whenever it finds one. The warning names
-the module and target that caused the skip; other instrumentation and the root
-`test.execution` spans continue normally.
-
-Disabling another tracer does not necessarily remove patches it already
-installed. If its module remains prepended to the target, the collector still
-skips the corresponding default. Customer-supplied instrumentation is installed
-as explicitly requested without this guard, so its compatibility with other
-patches is the customer's responsibility. Unknown, unavailable, incompatible,
-or failed entries are reported and skipped.
+For this release, omitting `otel_instrumentations` and setting it to `[]` are the
+only supported choices. The collector does not inspect instrumentation patches,
+so compatibility between customer-selected instrumentation and other APM or
+test-library patches remains the customer's responsibility.
 
 When the suite already owns OpenTelemetry, `otel_instrumentations` has no effect:
 the collector installs nothing and uses the suite's instrumentation unchanged.

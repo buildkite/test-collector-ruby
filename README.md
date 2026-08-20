@@ -99,22 +99,26 @@ Buildkite::TestCollector.configure(hook: :rspec, otel_enabled: true)
 If your suite already runs OpenTelemetry, we use your existing setup and your
 instrumentation as it is. A non-`nil` `otel_instrumentations` selection is
 ignored with a warning in that path. If the suite doesn't run OpenTelemetry, we
-set one up and install the applicable curated SQL instrumentation (`pg`,
-`mysql2`, and `trilogy`). You can omit `otel_instrumentations` completely to use
-those defaults. Set it only to select an exact subset, add customer-supplied
-instrumentation to the defaults, or export only root spans. See the
-[OpenTelemetry guide](docs/opentelemetry.md#choosing-instrumentation) for the
-available options.
+set one up and install all applicable instrumentation registered when the suite
+starts. The collector does not include instrumentation gems. Add and explicitly
+require each one you want to use:
 
-The collector includes those three curated instrumentation gems instead of
-`opentelemetry-instrumentation-all`. Optional instrumentation remains the
-customer's Gemfile responsibility.
+```ruby
+# Gemfile
+gem "opentelemetry-instrumentation-pg", require: false
 
-Before installing bundled instrumentation selected by symbol, the collector
-checks its target for foreign patches and skips that instrumentation if it finds
-one. Instrumentation passed by its registered name is an explicit customer
-choice, so it is installed without this guard and its compatibility with other
-patches is the customer's responsibility.
+# spec/spec_helper.rb
+require "opentelemetry-instrumentation-pg"
+require "buildkite/test_collector"
+
+Buildkite::TestCollector.configure(hook: :rspec, otel_enabled: true)
+```
+
+Adding a gem to the Gemfile may auto-require it in applications that call
+`Bundler.require`, but that is not guaranteed. An explicit `require` is the
+recommended setup. To disable instrumentations and export only root
+`test.execution` spans, set `otel_instrumentations: []`. See the
+[OpenTelemetry guide](docs/opentelemetry.md#choosing-instrumentation) for more.
 
 Export needs Ruby 3.3 or newer, which is what the OpenTelemetry gems require. On
 older Rubies the option is accepted and does nothing.
