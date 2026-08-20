@@ -82,9 +82,9 @@ spans are rejected.
 OpenTelemetry's SDK owns the batching, retries and transport. `test.execution`
 spans have a reserved, faster-draining queue and are exported separately from
 automatically instrumented spans, so a flood or invalid batch of child spans
-cannot displace the execution roots. Both queues get a bounded 30-second flush
-when the suite finishes. A hard exit or a sustained endpoint failure can still
-lose spans because the queues live in process memory.
+cannot displace the execution roots. Both queues share one bounded 30-second
+flush when the suite finishes, roots first. A hard exit or a sustained endpoint
+failure can still lose spans because the queues live in process memory.
 
 ## When something goes wrong
 
