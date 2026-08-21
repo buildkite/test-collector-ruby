@@ -64,7 +64,14 @@ module Buildkite::TestCollector
       end
 
       def configure!(endpoint: DEFAULT_ENDPOINT, api_token: nil, run_env: {}, instrumentations: nil, otel_only: false, resource_attributes: {})
-        return if enabled?
+        if enabled?
+          # A warm worker re-running a suite reconfigures while the exporters
+          # from the previous run are still alive, possibly with a fresh
+          # (e.g. expiring OIDC) token that the exporters' snapshotted
+          # Authorization headers would otherwise never learn about.
+          refresh_authorization(api_token)
+          return
+        end
 
         # Non-empty selections are reserved for future :all and preset support.
         # Raising fails open by design: the rescue below reports the reserved
@@ -79,6 +86,7 @@ module Buildkite::TestCollector
 
         exempt_from_vcr(endpoint)
 
+        @api_token = api_token
         headers = request_headers(run_env, api_token)
 
         # In OTLP-only mode the run-level detail (run key, branch, commit,
@@ -189,6 +197,8 @@ module Buildkite::TestCollector
         @execution_provider = nil
         @execution_child_processor = nil
         @execution_child_forwarder = nil
+        @exporters = nil
+        @api_token = nil
         @tracer = nil
         @otel_only = nil
       end
@@ -221,7 +231,35 @@ module Buildkite::TestCollector
           endpoint: endpoint,
           headers: headers,
         )
+        # Retained so refresh_authorization can reach the headers each
+        # exporter snapshotted at construction.
+        (@exporters ||= []) << exporter
         OpenTelemetry::SDK::Trace::Export::BatchSpanProcessor.new(exporter, **options)
+      end
+
+      # The OTLP exporter copies its headers at construction and offers no way
+      # to change them, so a token refreshed between suite runs would never
+      # reach the long-lived exporters and every later batch would carry the
+      # expired token. Updating the snapshot in place reaches into the
+      # exporter's internals for want of a public API; if those internals
+      # change, the fallback is a warning and the previous token.
+      def refresh_authorization(api_token)
+        return if api_token.nil? || api_token == @api_token
+
+        @api_token = api_token
+        value = authorization_header(api_token)
+        refreshed = Array(@exporters).count do |exporter|
+          headers = exporter.instance_variable_defined?(:@headers) && exporter.instance_variable_get(:@headers)
+          next false unless headers.is_a?(Hash)
+
+          headers["Authorization"] = value
+          true
+        end
+        if refreshed < Array(@exporters).length
+          warn "[buildkite-test_collector] Could not refresh the OTLP Authorization header; export continues with the previous token"
+        end
+      rescue StandardError => e
+        warn "[buildkite-test_collector] Could not refresh the OTLP Authorization header: #{e.class}: #{e.message}"
       end
 
       # Test suites that stub HTTP with VCR would otherwise intercept our
@@ -421,8 +459,12 @@ module Buildkite::TestCollector
 
       def request_headers(run_env, api_token)
         headers = { "Buildkite-Tests-Run-Key" => run_env["key"] }
-        headers["Authorization"] = "Token token=\"#{api_token}\"" if api_token
+        headers["Authorization"] = authorization_header(api_token) if api_token
         headers
+      end
+
+      def authorization_header(api_token)
+        "Token token=\"#{api_token}\""
       end
     end
   end

@@ -640,6 +640,67 @@ RSpec.describe Buildkite::TestCollector::OTel do
     provider&.shutdown
   end
 
+  describe "token refresh" do
+    def exporter_authorization_headers
+      described_class.instance_variable_get(:@exporters).map do |exporter|
+        exporter.instance_variable_get(:@headers)["Authorization"]
+      end
+    end
+
+    it "refreshes the Authorization header when reconfigured with a new token" do
+      original = OpenTelemetry.tracer_provider
+      suite_provider = OpenTelemetry::SDK::Trace::TracerProvider.new
+      OpenTelemetry.tracer_provider = suite_provider
+
+      described_class.configure!(
+        endpoint: "https://example.invalid/v1/traces",
+        api_token: "before-refresh",
+        run_env: { "key" => "run-123" },
+      )
+      # Both the execution exporter and the child exporter carry the token.
+      expect(exporter_authorization_headers).to eq(['Token token="before-refresh"'] * 2)
+      provider_before = described_class.instance_variable_get(:@execution_provider)
+
+      # A warm worker re-running configure with a refreshed (e.g. expiring
+      # OIDC) token: the live exporters must adopt it, without rebuilding.
+      described_class.configure!(
+        endpoint: "https://example.invalid/v1/traces",
+        api_token: "after-refresh",
+        run_env: { "key" => "run-123" },
+      )
+
+      expect(exporter_authorization_headers).to eq(['Token token="after-refresh"'] * 2)
+      expect(described_class.instance_variable_get(:@execution_provider)).to equal(provider_before)
+    ensure
+      described_class.shutdown
+      suite_provider&.shutdown
+      OpenTelemetry.tracer_provider = original
+    end
+
+    it "keeps the current token when reconfigured without one" do
+      original = OpenTelemetry.tracer_provider
+      suite_provider = OpenTelemetry::SDK::Trace::TracerProvider.new
+      OpenTelemetry.tracer_provider = suite_provider
+
+      described_class.configure!(
+        endpoint: "https://example.invalid/v1/traces",
+        api_token: "the-token",
+        run_env: { "key" => "run-123" },
+      )
+      described_class.configure!(
+        endpoint: "https://example.invalid/v1/traces",
+        api_token: nil,
+        run_env: { "key" => "run-123" },
+      )
+
+      expect(exporter_authorization_headers).to eq(['Token token="the-token"'] * 2)
+    ensure
+      described_class.shutdown
+      suite_provider&.shutdown
+      OpenTelemetry.tracer_provider = original
+    end
+  end
+
   describe "VCR exemption" do
     fake_request = Struct.new(:method, :uri)
 
