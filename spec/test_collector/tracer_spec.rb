@@ -143,6 +143,7 @@ RSpec.describe Buildkite::TestCollector::Tracer do
         fake_env("BUILDKITE_ANALYTICS_ENDPOINT", nil)
         fake_env("BUILDKITE_ANALYTICS_TRACE_MIN_MS", (min_duration * 1000).to_s)
         fake_env("BUILDKITE_ANALYTICS_LOCATION_PREFIX", nil)
+        fake_env("BUILDKITE_AGENT_ID", nil)
         Buildkite::TestCollector.configure(hook: :minitest)
       end
 
