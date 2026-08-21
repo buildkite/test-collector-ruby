@@ -187,6 +187,10 @@ module Buildkite::TestCollector
             config.add_span_processor(child_forwarder)
             config.use_all if instrumentations.nil?
           end
+
+          if OpenTelemetry.tracer_provider.is_a?(OpenTelemetry::Internal::ProxyTracerProvider)
+            raise "OpenTelemetry SDK did not install a tracer provider"
+          end
         else
           provider.add_span_processor(child_forwarder)
           unless instrumentations.nil?

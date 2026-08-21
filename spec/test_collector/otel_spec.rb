@@ -315,7 +315,7 @@ RSpec.describe Buildkite::TestCollector::OTel do
     described_class.shutdown
   end
 
-  it "cleans up a child worker when collector provider setup partially fails" do
+  it "cleans up a child worker when the SDK fails to install its provider" do
     success = OpenTelemetry::SDK::Trace::Export::SUCCESS
     execution_processor = spy(
       "execution processor",
@@ -336,7 +336,6 @@ RSpec.describe Buildkite::TestCollector::OTel do
     allow(config).to receive(:add_span_processor) { |attached| forwarder = attached }
     allow(OpenTelemetry::SDK).to receive(:configure) do |&block|
       block.call(config)
-      raise "provider setup failed"
     end
     allow(described_class).to receive(:batch_processor)
       .and_return(execution_processor, child_processor)
@@ -347,7 +346,7 @@ RSpec.describe Buildkite::TestCollector::OTel do
         instrumentations: [],
       )
     end.to output(
-      /OpenTelemetry child span export disabled: RuntimeError: provider setup failed; test.execution export remains enabled/
+      /OpenTelemetry child span export disabled: RuntimeError: OpenTelemetry SDK did not install a tracer provider; test.execution export remains enabled/
     ).to_stderr
 
     trace_id = "\1" * 16
@@ -376,9 +375,11 @@ RSpec.describe Buildkite::TestCollector::OTel do
       shutdown: OpenTelemetry::SDK::Trace::Export::SUCCESS,
     )
     provider = OpenTelemetry::Internal::ProxyTracerProvider.new
+    configured_provider = double("configured provider")
     config = double("OpenTelemetry SDK configuration")
     generator = described_class.const_get(:SecureRandomIdGenerator, false)
-    allow(OpenTelemetry).to receive(:tracer_provider).and_return(provider)
+    allow(OpenTelemetry).to receive(:tracer_provider)
+      .and_return(provider, configured_provider)
     allow(OpenTelemetry::SDK).to receive(:configure).and_yield(config)
     allow(config).to receive(:add_span_processor)
     allow(config).to receive(:id_generator=)
@@ -402,12 +403,14 @@ RSpec.describe Buildkite::TestCollector::OTel do
 
   it "does not install registered instrumentation with an empty selection" do
     provider = OpenTelemetry::Internal::ProxyTracerProvider.new
+    configured_provider = double("configured provider")
     config = double("OpenTelemetry SDK configuration")
     child_processor = spy(
       "execution child processor",
       shutdown: OpenTelemetry::SDK::Trace::Export::SUCCESS,
     )
-    allow(OpenTelemetry).to receive(:tracer_provider).and_return(provider)
+    allow(OpenTelemetry).to receive(:tracer_provider)
+      .and_return(provider, configured_provider)
     allow(OpenTelemetry::SDK).to receive(:configure).and_yield(config)
     allow(config).to receive(:id_generator=)
     allow(config).to receive(:add_span_processor)

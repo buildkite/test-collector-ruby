@@ -73,8 +73,11 @@ We fit around your setup rather than replacing it:
   OpenTelemetry context propagation. Because your backend does not receive that
   root, it may display these test traces as partial or headless.
 - **Child sampling is yours.** `AlwaysOff` records no children. A parent-based
-  sampler commonly keeps children because the private root is sampled; that is
-  the suite's configured parent-based behavior, not a Buildkite override.
+  sampler commonly keeps children because the private root is sampled. This can
+  increase the span volume sent to your exporters during tests, even when its
+  root policy normally samples traces down. That is the suite's configured
+  parent-based behavior, not a Buildkite override. Only children marked as
+  sampled are sent to Buildkite; record-only spans are not exported.
 
 Set up the suite's provider and instrumentation before RSpec runs
 `before(:suite)` hooks. Context-propagated asynchronous work is included even if

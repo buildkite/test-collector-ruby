@@ -5,7 +5,8 @@
 * Preserve OpenTelemetry `test.execution` roots with a private AlwaysOn provider
   while retaining suite-owned or customer-installed child instrumentation. Suite
   backends may display execution children as partial traces because private roots
-  are sent only to Buildkite.
+  are sent only to Buildkite. Parent-based suite samplers may also export more
+  children during tests because the private root is sampled.
 
 ## v2.14.0
 
