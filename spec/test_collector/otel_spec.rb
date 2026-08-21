@@ -188,6 +188,39 @@ RSpec.describe Buildkite::TestCollector::OTel do
     described_class.shutdown
   end
 
+  it "flushes roots and children against one shared deadline" do
+    execution_provider = double("execution provider")
+    child_processor = double("execution child processor")
+    described_class.instance_variable_set(:@execution_provider, execution_provider)
+    described_class.instance_variable_set(:@execution_child_processor, child_processor)
+    allow(Process).to receive(:clock_gettime)
+      .with(Process::CLOCK_MONOTONIC)
+      .and_return(10.0, 12.0, 13.0)
+
+    expect(execution_provider).to receive(:force_flush).with(timeout: 28.0).ordered
+    expect(child_processor).to receive(:force_flush).with(timeout: 27.0).ordered
+
+    described_class.force_flush
+  ensure
+    described_class.instance_variable_set(:@execution_provider, nil)
+    described_class.instance_variable_set(:@execution_child_processor, nil)
+  end
+
+  it "still flushes children when the root flush fails" do
+    execution_provider = double("execution provider")
+    child_processor = double("execution child processor")
+    allow(execution_provider).to receive(:force_flush).and_raise("root flush failed")
+    described_class.instance_variable_set(:@execution_provider, execution_provider)
+    described_class.instance_variable_set(:@execution_child_processor, child_processor)
+
+    expect(child_processor).to receive(:force_flush)
+    expect { described_class.force_flush }
+      .to output(/Could not flush OpenTelemetry spans.*root flush failed/).to_stderr
+  ensure
+    described_class.instance_variable_set(:@execution_provider, nil)
+    described_class.instance_variable_set(:@execution_child_processor, nil)
+  end
+
   it "attempts child shutdown when root shutdown fails" do
     execution_provider = double("execution provider")
     child_processor = spy(

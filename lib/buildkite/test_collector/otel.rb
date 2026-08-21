@@ -184,11 +184,24 @@ module Buildkite::TestCollector
 
       # Pushes any finished spans out now without stopping export. Used at the
       # end of a suite when the process (and maybe another suite run) lives on.
+      # Both queues share one budget, roots first, like shutdown_exports, so
+      # an unreachable endpoint cannot block the suite twice over.
       def force_flush
-        @execution_provider&.force_flush(timeout: PROCESSOR_TIMEOUT_SECONDS)
-        @execution_child_processor&.force_flush(timeout: PROCESSOR_TIMEOUT_SECONDS)
-      rescue StandardError => e
-        warn "[buildkite-test_collector] Could not flush OpenTelemetry spans: #{e.class}: #{e.message}"
+        deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + PROCESSOR_TIMEOUT_SECONDS
+        error = nil
+
+        [@execution_provider, @execution_child_processor].compact.each do |component|
+          remaining = [deadline - Process.clock_gettime(Process::CLOCK_MONOTONIC), 0].max
+          begin
+            component.force_flush(timeout: remaining)
+          rescue StandardError => e
+            error ||= e
+          end
+        end
+
+        if error
+          warn "[buildkite-test_collector] Could not flush OpenTelemetry spans: #{error.class}: #{error.message}"
+        end
       end
 
       def shutdown
