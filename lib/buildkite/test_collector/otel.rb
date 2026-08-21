@@ -65,10 +65,14 @@ module Buildkite::TestCollector
 
       def configure!(endpoint: DEFAULT_ENDPOINT, api_token: nil, run_env: {}, instrumentations: nil, otel_only: false, resource_attributes: {})
         if enabled?
-          # A warm worker re-running a suite reconfigures while the exporters
-          # from the previous run are still alive, possibly with a fresh
-          # (e.g. expiring OIDC) token that the exporters' snapshotted
-          # Authorization headers would otherwise never learn about.
+          # One process serves one run: the exporters and providers live for
+          # the whole process, so run identity is fixed at first configure.
+          # Only credentials may change within that lifetime - a warm worker
+          # re-running a suite can bring a fresh (e.g. expiring OIDC) token
+          # that the exporters' snapshotted Authorization headers would
+          # otherwise never learn about. A different run key means a new run,
+          # which needs a new process; warn rather than misattribute silently.
+          warn_run_mismatch(run_env)
           refresh_authorization(api_token)
           return
         end
@@ -87,6 +91,7 @@ module Buildkite::TestCollector
         exempt_from_vcr(endpoint)
 
         @api_token = api_token
+        @run_key = run_env["key"]
         headers = request_headers(run_env, api_token)
 
         # In OTLP-only mode the run-level detail (run key, branch, commit,
@@ -199,6 +204,7 @@ module Buildkite::TestCollector
         @execution_child_forwarder = nil
         @exporters = nil
         @api_token = nil
+        @run_key = nil
         @tracer = nil
         @otel_only = nil
       end
@@ -235,6 +241,18 @@ module Buildkite::TestCollector
         # exporter snapshotted at construction.
         (@exporters ||= []) << exporter
         OpenTelemetry::SDK::Trace::Export::BatchSpanProcessor.new(exporter, **options)
+      end
+
+      # Run identity (run key, resource, Run-Key header) is fixed for the
+      # process; reconfiguring with a different run key cannot take effect,
+      # so make the misattribution visible instead of silent.
+      def warn_run_mismatch(run_env)
+        key = run_env["key"]
+        return if key.nil? || key == @run_key
+
+        warn "[buildkite-test_collector] OpenTelemetry span export is already configured for run #{@run_key.inspect} " \
+          "and cannot switch to run #{key.inspect}: results will still be attributed to the earlier run. " \
+          "Reporting a new run requires a new process."
       end
 
       # The OTLP exporter copies its headers at construction and offers no way

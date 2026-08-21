@@ -230,6 +230,12 @@ cannot displace or poison execution roots. When the suite finishes, both queues
 share one 30-second flush budget, roots first. A hard exit or sustained endpoint
 failure can still lose spans because the queues live in process memory.
 
+One process reports one run. Export survives repeated suite runs in the same
+process (warm workers), and a refreshed token is picked up when the collector
+is reconfigured, but run identity is fixed when export starts: reconfiguring
+with a different run key warns and keeps attributing results to the original
+run. Reporting a new run requires a new process.
+
 ## When something goes wrong
 
 Export never fails a test. If root setup fails, the collector warns and the

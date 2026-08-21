@@ -677,6 +677,37 @@ RSpec.describe Buildkite::TestCollector::OTel do
       OpenTelemetry.tracer_provider = original
     end
 
+    it "warns when reconfigured with a different run key, keeping the original run" do
+      original = OpenTelemetry.tracer_provider
+      suite_provider = OpenTelemetry::SDK::Trace::TracerProvider.new
+      OpenTelemetry.tracer_provider = suite_provider
+
+      described_class.configure!(
+        endpoint: "https://example.invalid/v1/traces",
+        run_env: { "key" => "run-one" },
+      )
+
+      expect {
+        described_class.configure!(
+          endpoint: "https://example.invalid/v1/traces",
+          run_env: { "key" => "run-two" },
+        )
+      }.to output(/already configured for run "run-one".*requires a new process/m).to_stderr
+
+      # Same run key, or none: not a new run, so no warning.
+      expect {
+        described_class.configure!(
+          endpoint: "https://example.invalid/v1/traces",
+          run_env: { "key" => "run-one" },
+        )
+        described_class.configure!(endpoint: "https://example.invalid/v1/traces")
+      }.not_to output.to_stderr
+    ensure
+      described_class.shutdown
+      suite_provider&.shutdown
+      OpenTelemetry.tracer_provider = original
+    end
+
     it "keeps the current token when reconfigured without one" do
       original = OpenTelemetry.tracer_provider
       suite_provider = OpenTelemetry::SDK::Trace::TracerProvider.new
