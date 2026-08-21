@@ -93,15 +93,15 @@ RSpec.describe Buildkite::TestCollector do
     end
   end
 
-  context "runner ID tag" do
+  context "worker ID tag" do
     let(:hook) { :rspec }
 
-    it "tags executions with ci.runner.id from BUILDKITE_AGENT_ID" do
+    it "tags executions with ci.worker.id from BUILDKITE_AGENT_ID" do
       env_overlay["BUILDKITE_AGENT_ID"] = "agent-123"
 
       Buildkite::TestCollector.configure(hook: hook)
 
-      expect(Buildkite::TestCollector.tags).to eq("ci.runner.id" => "agent-123")
+      expect(Buildkite::TestCollector.tags).to eq("ci.worker.id" => "agent-123")
     end
 
     it "omits the tag when BUILDKITE_AGENT_ID is unset" do
@@ -131,9 +131,9 @@ RSpec.describe Buildkite::TestCollector do
     it "lets an explicit caller-supplied tag override the automatic one" do
       env_overlay["BUILDKITE_AGENT_ID"] = "agent-123"
 
-      Buildkite::TestCollector.configure(hook: hook, tags: { "ci.runner.id" => "custom" })
+      Buildkite::TestCollector.configure(hook: hook, tags: { "ci.worker.id" => "custom" })
 
-      expect(Buildkite::TestCollector.tags).to eq("ci.runner.id" => "custom")
+      expect(Buildkite::TestCollector.tags).to eq("ci.worker.id" => "custom")
     end
 
     it "preserves other caller-supplied tags alongside the automatic one" do
@@ -142,7 +142,7 @@ RSpec.describe Buildkite::TestCollector do
       Buildkite::TestCollector.configure(hook: hook, tags: { "team" => "test-engine" })
 
       expect(Buildkite::TestCollector.tags).to eq(
-        "ci.runner.id" => "agent-123",
+        "ci.worker.id" => "agent-123",
         "team" => "test-engine",
       )
     end
