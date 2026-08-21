@@ -100,6 +100,7 @@ RSpec.describe Buildkite::TestCollector do
       # Stubbed so the OTLP-only hooks aren't installed into this very suite.
       allow(Buildkite::TestCollector).to receive(:hook_into)
       env_overlay["BUILDKITE_ANALYTICS_TOKEN"] = "MyToken"
+      env_overlay["BUILDKITE_AGENT_ID"] = "agent-123"
 
       Buildkite::TestCollector.configure(
         hook: hook,
@@ -119,7 +120,8 @@ RSpec.describe Buildkite::TestCollector do
         run_env: run_env,
         otel_only: true,
         instrumentations: nil,
-        resource_attributes: { "team" => "platform" },
+        # The merged tags, so the automatic worker tag reaches OTLP too.
+        resource_attributes: { "ci.worker.id" => "agent-123", "team" => "platform" },
       )
     ensure
       Buildkite::TestCollector.otel_only = false

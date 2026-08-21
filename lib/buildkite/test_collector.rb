@@ -90,9 +90,10 @@ module Buildkite
           run_env: Buildkite::TestCollector::CI.env,
           otel_only: true,
           instrumentations: otel_instrumentations,
-          # Tags given to configure describe the whole run, so they ride along
-          # as resource attributes on every exported span.
-          resource_attributes: tags,
+          # Tags describe the whole run, so they ride along as resource
+          # attributes on every exported span. The merged self.tags, not the
+          # raw argument, so the automatic ci.worker.id tag comes too.
+          resource_attributes: self.tags,
         }
       elsif otel_enabled && test_runner == "rspec"
         @otel_options = {
