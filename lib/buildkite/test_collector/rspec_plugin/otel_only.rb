@@ -63,6 +63,8 @@ module Buildkite::TestCollector::RSpecPlugin
             Buildkite::TestCollector.start_otel
           end
 
+          # Never runs for pre-skipped examples (skip/xit), so they produce no
+          # execution — accepted, matching the JSON upload paths.
           config.around(:each) do |example|
             Buildkite::TestCollector::RSpecPlugin::OTelOnly.trace(example) { example.run }
           end
