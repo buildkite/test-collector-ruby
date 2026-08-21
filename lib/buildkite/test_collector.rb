@@ -54,7 +54,7 @@ module Buildkite
       self.location_prefix = location_prefix || ENV["BUILDKITE_ANALYTICS_LOCATION_PREFIX"]
       self.test_runner = hook.to_s
       self.env = env
-      self.tags = default_tags.merge(tags)
+      self.tags = runner_id_tag.merge(tags)
       self.batch_size = ENV.fetch("BUILDKITE_ANALYTICS_UPLOAD_BATCH_SIZE") { DEFAULT_UPLOAD_BATCH_SIZE }.to_i
 
       trace_min_ms_string = ENV["BUILDKITE_ANALYTICS_TRACE_MIN_MS"]
@@ -98,13 +98,13 @@ module Buildkite
     # so failures can be grouped by runner. Omitted when the agent doesn't
     # expose an ID (e.g. outside Buildkite), so callers can still supply their
     # own "ci.runner.id" tag without it being clobbered.
-    def self.default_tags
+    def self.runner_id_tag
       agent_id = ENV["BUILDKITE_AGENT_ID"]
       return {} if agent_id.nil? || agent_id.strip.empty?
 
       { "ci.runner.id" => agent_id }
     end
-    private_class_method :default_tags
+    private_class_method :runner_id_tag
 
     def self.annotate(content)
       tracer = Buildkite::TestCollector::Uploader.tracer
