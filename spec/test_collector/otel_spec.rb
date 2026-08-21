@@ -448,12 +448,15 @@ RSpec.describe Buildkite::TestCollector::OTel do
     )
   end
 
-  it "uses an AlwaysOn sampler and process-safe random IDs for execution roots" do
+  it "uses an AlwaysOn sampler, process-safe random IDs, and the suite resource for execution roots" do
     processor = spy(
       "execution processor",
       shutdown: OpenTelemetry::SDK::Trace::Export::SUCCESS,
     )
     generator = described_class.const_get(:SecureRandomIdGenerator, false)
+    resource = OpenTelemetry::SDK::Resources::Resource.create("service.name" => "my-suite")
+    provider = OpenTelemetry::SDK::Trace::TracerProvider.new(resource: resource)
+    allow(OpenTelemetry).to receive(:tracer_provider).and_return(provider)
     allow(described_class).to receive(:batch_processor).and_return(processor)
 
     execution_provider = described_class.send(
@@ -464,14 +467,19 @@ RSpec.describe Buildkite::TestCollector::OTel do
 
     expect(execution_provider.id_generator).to equal(generator)
     expect(execution_provider.sampler).to equal(OpenTelemetry::SDK::Trace::Samplers::ALWAYS_ON)
+    expect(execution_provider.resource).to equal(resource)
   ensure
     execution_provider&.shutdown
+    provider&.shutdown
   end
 
   it "exports roots privately and only forwards execution children" do
     suite_exporter = OpenTelemetry::SDK::Trace::Export::InMemorySpanExporter.new
     allow(suite_exporter).to receive(:shutdown).and_call_original
-    provider = OpenTelemetry::SDK::Trace::TracerProvider.new
+    suite_resource = OpenTelemetry::SDK::Resources::Resource.create(
+      "service.name" => "my-suite",
+    )
+    provider = OpenTelemetry::SDK::Trace::TracerProvider.new(resource: suite_resource)
     provider.add_span_processor(
       OpenTelemetry::SDK::Trace::Export::SimpleSpanProcessor.new(suite_exporter)
     )
@@ -542,6 +550,8 @@ RSpec.describe Buildkite::TestCollector::OTel do
     exported_child = child_exporter.finished_spans.find { |span| span.name == "child" }
     expect(exported_child.trace_id).to eq(exported_root.trace_id)
     expect(exported_child.parent_span_id).to eq(exported_root.span_id)
+    expect(exported_root.resource).to equal(suite_resource)
+    expect(exported_child.resource).to equal(suite_resource)
 
     described_class.shutdown
     tracer.in_span("after-shutdown") { nil }
@@ -655,8 +665,14 @@ RSpec.describe Buildkite::TestCollector::OTel do
       Buildkite::TestCollector::OTel.instance_variable_get(:@execution_provider).force_flush
       Buildkite::TestCollector::OTel.instance_variable_get(:@execution_child_processor).force_flush
 
+      root = exporters[0].finished_spans.find { |span| span.name == "test.execution" }
+      child = exporters[1].finished_spans.find { |span| span.name == "child" }
+      root_resource = root.resource.attribute_enumerator.to_h
+      child_resource = child.resource.attribute_enumerator.to_h
       puts "global-provider-configured=#{!OpenTelemetry.tracer_provider.equal?(original_provider)}"
       puts "exporters=#{exporters.length}"
+      puts "resources-match=#{root_resource == child_resource}"
+      puts "root-resource-empty=#{root_resource.empty?}"
       puts exporters.flat_map { |exporter| exporter.finished_spans.map(&:name) }
       Buildkite::TestCollector::OTel.shutdown
     RUBY
@@ -667,6 +683,8 @@ RSpec.describe Buildkite::TestCollector::OTel do
     expect(stdout.lines.map(&:chomp)).to include(
       "global-provider-configured=true",
       "exporters=2",
+      "resources-match=true",
+      "root-resource-empty=false",
       "test.execution",
       "child",
     )

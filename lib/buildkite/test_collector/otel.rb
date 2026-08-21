@@ -152,6 +152,7 @@ module Buildkite::TestCollector
         execution_provider = OpenTelemetry::SDK::Trace::TracerProvider.new(
           sampler: OpenTelemetry::SDK::Trace::Samplers::ALWAYS_ON,
           id_generator: SecureRandomIdGenerator,
+          resource: execution_resource,
         )
         execution_provider.add_span_processor(execution_processor)
         execution_provider
@@ -208,6 +209,13 @@ module Buildkite::TestCollector
 
       def execution_context_key
         @execution_context_key ||= OpenTelemetry::Context.create_key("buildkite.test.execution")
+      end
+
+      def execution_resource
+        provider = OpenTelemetry.tracer_provider
+        return provider.resource if provider.respond_to?(:resource)
+
+        OpenTelemetry::SDK::Resources::Resource.default
       end
 
       def shutdown_exports(timeout)
