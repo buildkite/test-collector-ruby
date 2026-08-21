@@ -93,6 +93,61 @@ RSpec.describe Buildkite::TestCollector do
     end
   end
 
+  context "worker ID tag" do
+    let(:hook) { :rspec }
+
+    it "tags executions with ci.worker.id from BUILDKITE_AGENT_ID" do
+      env_overlay["BUILDKITE_AGENT_ID"] = "agent-123"
+
+      Buildkite::TestCollector.configure(hook: hook)
+
+      expect(Buildkite::TestCollector.tags).to eq("ci.worker.id" => "agent-123")
+    end
+
+    it "omits the tag when BUILDKITE_AGENT_ID is unset" do
+      env_overlay.delete("BUILDKITE_AGENT_ID")
+
+      Buildkite::TestCollector.configure(hook: hook)
+
+      expect(Buildkite::TestCollector.tags).to eq({})
+    end
+
+    it "omits the tag when BUILDKITE_AGENT_ID is empty" do
+      env_overlay["BUILDKITE_AGENT_ID"] = ""
+
+      Buildkite::TestCollector.configure(hook: hook)
+
+      expect(Buildkite::TestCollector.tags).to eq({})
+    end
+
+    it "omits the tag when BUILDKITE_AGENT_ID is whitespace-only" do
+      env_overlay["BUILDKITE_AGENT_ID"] = "   "
+
+      Buildkite::TestCollector.configure(hook: hook)
+
+      expect(Buildkite::TestCollector.tags).to eq({})
+    end
+
+    it "lets an explicit caller-supplied tag override the automatic one" do
+      env_overlay["BUILDKITE_AGENT_ID"] = "agent-123"
+
+      Buildkite::TestCollector.configure(hook: hook, tags: { "ci.worker.id" => "custom" })
+
+      expect(Buildkite::TestCollector.tags).to eq("ci.worker.id" => "custom")
+    end
+
+    it "preserves other caller-supplied tags alongside the automatic one" do
+      env_overlay["BUILDKITE_AGENT_ID"] = "agent-123"
+
+      Buildkite::TestCollector.configure(hook: hook, tags: { "team" => "test-engine" })
+
+      expect(Buildkite::TestCollector.tags).to eq(
+        "ci.worker.id" => "agent-123",
+        "team" => "test-engine",
+      )
+    end
+  end
+
   context "Minitest" do
     let(:hook) { :minitest }
 

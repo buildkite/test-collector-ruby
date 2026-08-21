@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+* Automatically tag executions with `ci.worker.id` from `BUILDKITE_AGENT_ID`, so failures can be grouped by the agent that ran them. An explicit caller-supplied `ci.worker.id` tag still takes precedence.
+
 * Preserve OpenTelemetry `test.execution` roots with a private AlwaysOn provider
   while retaining suite-owned or customer-installed child instrumentation. Suite
   backends may display execution children as partial traces because private roots
