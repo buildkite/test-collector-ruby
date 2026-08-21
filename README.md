@@ -89,17 +89,19 @@ RSpec suites can also send an OpenTelemetry trace per test execution to Buildkit
 showing what each test did and where it spent its time. Each trace is rooted in a
 `test.execution` span naming the test, its file, and whether it passed.
 
-This is still under development and everything here may change. It is off by
-default, so opt in when you configure the collector:
+This feature is still under development and may change. This first release is
+intended for suites that do not already configure OpenTelemetry. It may work
+with an existing OpenTelemetry setup, but that configuration is not yet
+supported or guaranteed to work.
+
+OpenTelemetry export is off by default. Opt in when you configure the collector:
 
 ```ruby
 Buildkite::TestCollector.configure(hook: :rspec, otel_enabled: true)
 ```
 
 Execution roots use a private AlwaysOn provider so a suite's sampling policy
-cannot remove them. If the suite already runs OpenTelemetry, the collector
-forwards its sampled spans created during a test execution without changing the
-suite's provider, sampler, instrumentation, exporters, or lifecycle.
+cannot remove them.
 
 If the suite does not configure OpenTelemetry, the collector configures a global
 provider for child spans and installs all applicable instrumentation registered
@@ -121,9 +123,7 @@ Adding a gem to the Gemfile may auto-require it in applications that call
 `Bundler.require`, but that is not guaranteed. An explicit `require` is the
 recommended setup. To disable instrumentations and export only root
 `test.execution` spans, set `otel_instrumentations: []`. Any other value is
-reserved for a future release and disables span export with a warning,
-regardless of who owns the provider. In suite-owned mode, a supported
-`otel_instrumentations: []` selection is ignored with a warning. See the
+reserved for a future release and disables span export with a warning. See the
 [OpenTelemetry guide](docs/opentelemetry.md#choosing-instrumentation) for more.
 
 Export needs Ruby 3.3 or newer, which is what the OpenTelemetry gems require. On
@@ -134,8 +134,8 @@ Spans need `BUILDKITE_ANALYTICS_TOKEN` to be an agent OIDC token with the
 token still uploads executions, but its spans are rejected.
 
 Export failures never fail a test or block the normal Test Engine upload. See the
-[OpenTelemetry guide](docs/opentelemetry.md) for what you get and how it
-fits around an existing OpenTelemetry setup.
+[OpenTelemetry guide](docs/opentelemetry.md) for setup details and current
+limitations.
 
 ## More information
 

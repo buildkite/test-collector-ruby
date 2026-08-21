@@ -1,11 +1,14 @@
 # OpenTelemetry export (experimental)
 
-> **This is still under development and everything here may change.**
+> **This feature is still under development and may change.**
+> This first release is intended for suites that do not already configure
+> OpenTelemetry. Existing OpenTelemetry setups may work, but are not yet
+> supported or guaranteed to work.
 
 Every RSpec example gets an OpenTelemetry `test.execution` root. When the suite
-already uses OpenTelemetry, its sampled child spans show what the test did and
-where its time went. The traces are sent to Buildkite and shown against the
-test's execution.
+does not already configure OpenTelemetry, the collector can configure a provider
+and export instrumented child spans showing what the test did and where its time
+went. The traces are sent to Buildkite and shown against the test's execution.
 
 It is off by default. See the [README](../README.md#opentelemetry-export-experimental)
 for how to turn it on.
@@ -54,37 +57,7 @@ The trace's ID is sent with the test's execution, so Buildkite can show you the
 two together. Child spans share that ID through normal context propagation, so
 one trace holds everything the test did.
 
-## If you already use OpenTelemetry
-
-We fit around your setup rather than replacing it:
-
-- **Execution roots use a private provider.** Its sampler is AlwaysOn, so your
-  sampling policy cannot remove `test.execution` spans.
-- **Your provider remains yours.** We attach a forwarding span processor, but do
-  not replace the provider or change its resource, sampler, exporters, or
-  lifecycle.
-- **Your instrumentation is left alone.** The collector neither installs nor
-  configures instrumentation.
-- **Only execution children are forwarded.** A span must start under an active
-  Buildkite execution context. Suite setup, teardown, detached traces, and other
-  ambient spans are not sent to Buildkite.
-- **Your exporters see only your spans.** The private execution root goes only to
-  Buildkite. Suite children retain its trace ID and parent span ID through normal
-  OpenTelemetry context propagation. Because your backend does not receive that
-  root, it may display these test traces as partial or headless.
-- **Child sampling is yours.** `AlwaysOff` records no children. A parent-based
-  sampler commonly keeps children because the private root is sampled. This can
-  increase the span volume sent to your exporters during tests, even when its
-  root policy normally samples traces down. That is the suite's configured
-  parent-based behavior, not a Buildkite override. Only children marked as
-  sampled are sent to Buildkite; record-only spans are not exported.
-
-Set up the suite's provider and instrumentation before RSpec runs
-`before(:suite)` hooks. Context-propagated asynchronous work is included even if
-it finishes after the execution block; work that does not propagate the context
-is excluded.
-
-## Without suite OpenTelemetry
+## Recommended setup: suites without OpenTelemetry
 
 The collector configures a global SDK provider for child spans and installs the
 applicable instrumentation registered when the suite starts. The private
@@ -149,10 +122,6 @@ disables span export with a warning, in every path. The collector does not
 inspect instrumentation patches, so compatibility between customer-selected
 instrumentation and other APM or test-library patches remains the customer's
 responsibility.
-
-When the suite already owns OpenTelemetry, a supported `otel_instrumentations`
-selection has no effect: the collector installs nothing and uses the suite's
-instrumentation unchanged. A warning reports an `[]` selection that was ignored.
 
 ## What gets sent
 

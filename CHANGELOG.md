@@ -2,13 +2,18 @@
 
 ## Unreleased
 
-* Automatically tag executions with `ci.worker.id` from `BUILDKITE_AGENT_ID`, so failures can be grouped by the agent that ran them. An explicit caller-supplied `ci.worker.id` tag still takes precedence.
+## v2.15.0
 
-* Preserve OpenTelemetry `test.execution` roots with a private AlwaysOn provider
-  while retaining suite-owned or customer-installed child instrumentation. Suite
-  backends may display execution children as partial traces because private roots
-  are sent only to Buildkite. Parent-based suite samplers may also export more
-  children during tests because the private root is sampled.
+* Add [experimental, opt-in OpenTelemetry trace export](docs/opentelemetry.md)
+  for RSpec suites that do not already configure OpenTelemetry. Execution roots
+  use a private AlwaysOn provider. Existing OpenTelemetry setups may work, but
+  are not supported by this first release.
+* Automatically tag executions with `ci.worker.id` from `BUILDKITE_AGENT_ID`,
+  so failures can be grouped by the agent that ran them. An explicit
+  caller-supplied `ci.worker.id` tag still takes precedence.
+* Drop support for Ruby 2.x. Ruby 3.0 or newer is now required.
+
+**Full Changelog**: https://github.com/buildkite/test-collector-ruby/compare/v2.14.0...v2.15.0
 
 ## v2.14.0
 
