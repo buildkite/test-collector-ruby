@@ -3,8 +3,8 @@
 require "ostruct"
 
 class FakeExecutionResult
-  attr :started_at, :finished_at, :run_time, :status, :exception
-  def initialize(status: :passed, skipped: false, pending_fixed: false, exception: nil)
+  attr :started_at, :finished_at, :run_time, :status, :exception, :pending_message
+  def initialize(status: :passed, skipped: false, pending_fixed: false, exception: nil, pending_message: nil)
     now = Time.now
     @started_at = now
     @finished_at = now + rand(5)
@@ -13,6 +13,7 @@ class FakeExecutionResult
     @skipped = skipped
     @pending_fixed = pending_fixed
     @exception = status == :failed ? StandardError.new("fake error") : nil
+    @pending_message = pending_message
   end
   def example_skipped?
     @skipped

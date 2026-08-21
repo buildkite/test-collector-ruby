@@ -19,7 +19,7 @@ RSpec.configure do |config|
   # The OpenTelemetry gems need Ruby 3.3, so their specs are written for it and
   # older Rubies must not even parse them.
   unless Gem::Version.new(RUBY_VERSION) >= Gem::Version.new('3.3')
-    config.exclude_pattern = "{**/otel_spec.rb,**/otel/**/*_spec.rb,**/correlation_spec.rb}"
+    config.exclude_pattern = "{**/otel_spec.rb,**/otel/**/*_spec.rb,**/correlation_spec.rb,**/otel_only_spec.rb}"
   end
 
   # Enable flags like --only-failures and --next-failure
