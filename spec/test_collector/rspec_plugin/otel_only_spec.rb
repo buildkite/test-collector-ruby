@@ -79,30 +79,6 @@ RSpec.describe "RSpec OTLP-only submission" do
     expect(exception_event.attributes.fetch("exception.stacktrace")).to be_a(String)
   end
 
-  it "records a failure raised by another around hook before RSpec sees it" do
-    RSpec::Core::Sandbox.sandboxed do |config|
-      config.output_stream = StringIO.new
-      load "buildkite/test_collector/library_hooks/rspec_otel_only.rb"
-
-      # Registered after the collector's hook, so it runs inside it: the
-      # exception escapes through the collector's hook while
-      # example.exception is still nil (RSpec records it later).
-      config.around(:each) { |_example| raise "hook boom" }
-
-      group = RSpec.describe("OTLP-only group") do
-        it("does something") {}
-      end
-      group.run(RSpec.configuration.reporter)
-    end
-    span = finished_test_span
-
-    expect(span.attributes).to include("test.case.result.status" => "fail")
-    expect(span.status.code).to eq(OpenTelemetry::Trace::Status::ERROR)
-    expect(span.status.description).to eq("hook boom")
-    exception_event = span.events.find { |event| event.name == "exception" }
-    expect(exception_event.attributes).to include("exception.message" => "hook boom")
-  end
-
   it "marks a pending example as skipped" do
     run_sandboxed_example(skip: false) do
       pending("not done yet")

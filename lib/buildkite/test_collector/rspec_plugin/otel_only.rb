@@ -8,18 +8,6 @@ module Buildkite::TestCollector::RSpecPlugin
   # (`buildkite.execution.via` opts in to that). A subclass so the standard
   # Trace stays untouched for the JSON upload paths.
   class OTelOnlyTrace < Trace
-    # An exception that escaped the example without RSpec having recorded it:
-    # when another around hook raises, example.exception is only set after
-    # the collector's hook has unwound, so the result classification must
-    # weigh the escaped exception too, not just use it for failure details.
-    attr_accessor :raised
-
-    def otel_result
-      return "failed" if raised
-
-      super
-    end
-
     def otel_attributes
       file_path = strip_invalid_utf8_chars(prepend_location_prefix(file_name))
       attributes = {
@@ -126,7 +114,6 @@ module Buildkite::TestCollector::RSpecPlugin
           tags: tags,
           location_prefix: Buildkite::TestCollector.location_prefix,
         )
-        trace.raised = raised
 
         exception = raised || example.exception
         if exception
