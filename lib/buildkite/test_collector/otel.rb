@@ -3,15 +3,12 @@
 require "securerandom"
 
 module Buildkite::TestCollector
-  # Opt-in OpenTelemetry span emission.
   module OTel
     DEFAULT_ENDPOINT = "https://tests-otlp.buildkite.com/v1/traces"
 
     RESULT_ATTRIBUTE = "test.case.result.status"
 
-    # OpenTelemetry defines "pass" and "fail", which we have to use where they
-    # apply, and allows a custom value where none does. Hence "skipped", which it
-    # has no word for.
+    # OpenTelemetry has no standard value for skipped tests.
     RESULT_STATUSES = {
       "passed" => "pass",
       "failed" => "fail",
@@ -28,11 +25,9 @@ module Buildkite::TestCollector
     ROOT_SCHEDULE_DELAY_MILLISECONDS = 1_000
 
     require_relative "otel/root_span_metrics_reporter"
-    require_relative "otel/root_preserving_span_processor"
+    require_relative "otel/execution_child_forwarder"
 
-    # OpenTelemetry's default ID generator uses Ruby's global PRNG. Test suites
-    # can seed that PRNG, making separate processes generate the same trace IDs.
-    # Use the operating system's random source for the provider we create instead.
+    # Avoid duplicate IDs when test suites seed Ruby's global PRNG.
     module SecureRandomIdGenerator
       module_function
 
@@ -45,24 +40,21 @@ module Buildkite::TestCollector
       end
 
       def generate(length)
-        id = SecureRandom.random_bytes(length) until id && id != "\0" * length
-        id
+        invalid_id = "\0" * length
+        loop do
+          id = SecureRandom.random_bytes(length)
+          return id unless id == invalid_id
+        end
       end
       private_class_method :generate
     end
     private_constant :SecureRandomIdGenerator
 
     class << self
-      # True once OpenTelemetry has been turned on and set up successfully.
       def enabled?
         !@tracer.nil?
       end
 
-      # Turns on OpenTelemetry span export: loads the OTel libraries, sets up
-      # an exporter that sends spans to Buildkite, and installs the selected
-      # instrumentation when the collector owns the provider. If anything goes
-      # wrong (missing gems, bad setup, etc.), we log a warning and leave OTel
-      # turned off rather than crashing the test run.
       def configure!(endpoint: DEFAULT_ENDPOINT, api_token: nil, run_env: {}, instrumentations: nil)
         return if enabled?
 
@@ -78,20 +70,14 @@ module Buildkite::TestCollector
         require "opentelemetry/trace/propagation/trace_context"
 
         headers = request_headers(run_env, api_token)
-        @processor = build_span_processor(endpoint, headers)
-
-        provider = install_processor(@processor, instrumentations)
-
-        @tracer = provider.tracer(TRACER_NAME, Buildkite::TestCollector::VERSION)
+        @execution_provider = build_execution_provider(endpoint, headers)
+        @tracer = @execution_provider.tracer(TRACER_NAME, Buildkite::TestCollector::VERSION)
+        configure_child_export(endpoint, headers, instrumentations)
       rescue LoadError, StandardError => e
         warn "[buildkite-test_collector] OpenTelemetry span export disabled: #{e.class}: #{e.message}"
         shutdown
       end
 
-      # Starts a new span for one test and gives back both the span and its
-      # trace ID. We attach that trace ID to the test result we upload later,
-      # so the two pieces of data can be matched up once they both arrive on
-      # the server.
       def start_test_span
         return [nil, nil] unless enabled?
 
@@ -107,21 +93,14 @@ module Buildkite::TestCollector
         [nil, nil]
       end
 
-      # Runs the given block "inside" the span, so anything that happens
-      # during the block (like other instrumented calls) gets recorded as
-      # part of this test. If there's no span (OTel isn't turned on), it
-      # just runs the block as normal.
       def with_test_span(span)
         return yield unless span
 
-        OpenTelemetry::Trace.with_span(span) { yield }
+        OpenTelemetry::Context.with_value(execution_context_key, span.context.trace_id) do
+          OpenTelemetry::Trace.with_span(span) { yield }
+        end
       end
 
-      # Records what the test was and how it went, then marks the span as done,
-      # and hands back how long the span says the test took. Safe to call even
-      # if there's no span. `test` is asked for its `otel_attributes` and
-      # `otel_result` here rather than by the caller, so nothing is built when
-      # export is off and a bad value can't leave the span open or fail the test.
       def finish_test_span(span, test: nil)
         return unless span
 
@@ -139,31 +118,30 @@ module Buildkite::TestCollector
         rescue StandardError => e
           warn "[buildkite-test_collector] Could not describe OpenTelemetry test span: #{e.class}: #{e.message}"
         ensure
-          begin
-            span.finish
-          rescue StandardError => e
-            warn "[buildkite-test_collector] Could not finish OpenTelemetry test span: #{e.class}: #{e.message}"
-          end
+          finish_span(span)
         end
 
         span_duration(span)
       end
 
-      # Turns off span export and flushes anything left in the queue. Safe to
-      # call even if we were never turned on.
       def shutdown
-        @processor&.shutdown(timeout: PROCESSOR_TIMEOUT_SECONDS)
-      rescue StandardError => e
-        warn "[buildkite-test_collector] Could not shut down OpenTelemetry span export: #{e.class}: #{e.message}"
+        forwarder_error = deactivate_child_forwarder(@execution_child_forwarder)
+        export_error = shutdown_exports(PROCESSOR_TIMEOUT_SECONDS)
+        error = forwarder_error || export_error
+        if error
+          warn "[buildkite-test_collector] Could not shut down OpenTelemetry span export: #{error.class}: #{error.message}"
+        end
       ensure
-        @processor = nil
+        @execution_provider = nil
+        @execution_child_processor = nil
+        @execution_child_forwarder = nil
         @tracer = nil
       end
 
       private
 
-      def build_span_processor(endpoint, headers)
-        root_processor = batch_processor(
+      def build_execution_provider(endpoint, headers)
+        execution_processor = batch_processor(
           endpoint,
           headers,
           max_queue_size: ROOT_MAX_QUEUE_SIZE,
@@ -171,19 +149,15 @@ module Buildkite::TestCollector
           schedule_delay: ROOT_SCHEDULE_DELAY_MILLISECONDS,
           metrics_reporter: RootSpanMetricsReporter.new,
         )
-        children_processor = batch_processor(endpoint, headers)
-        RootPreservingSpanProcessor.new(
-          root: root_processor,
-          children: children_processor,
+        execution_provider = OpenTelemetry::SDK::Trace::TracerProvider.new(
+          sampler: OpenTelemetry::SDK::Trace::Samplers::ALWAYS_ON,
+          id_generator: SecureRandomIdGenerator,
+          resource: execution_resource,
         )
+        execution_provider.add_span_processor(execution_processor)
+        execution_provider
       rescue StandardError
-        [root_processor, children_processor].compact.each do |processor|
-          begin
-            processor.shutdown(timeout: 0)
-          rescue StandardError
-            nil
-          end
-        end
+        stop_processor(execution_processor)
         raise
       end
 
@@ -195,40 +169,90 @@ module Buildkite::TestCollector
         OpenTelemetry::SDK::Trace::Export::BatchSpanProcessor.new(exporter, **options)
       end
 
-      # We don't set up our own tracer provider. Instead we plug our
-      # processor into whatever provider the test suite is already using
-      # (its own, or OpenTelemetry's default one), and only take
-      # responsibility for shutting down our own processor later.
-      def install_processor(processor, instrumentations)
+      def configure_child_export(endpoint, headers, instrumentations)
         provider = OpenTelemetry.tracer_provider
+        collector_managed = provider.is_a?(OpenTelemetry::Internal::ProxyTracerProvider)
+        unless collector_managed || provider.respond_to?(:add_span_processor)
+          raise "existing OpenTelemetry tracer provider does not support adding a span processor"
+        end
 
-        if provider.respond_to?(:add_span_processor)
-          # The suite runs its own OpenTelemetry. Its instrumentation already
-          # feeds this provider, so our processor sees those spans without us
-          # installing anything. Installing our own would also push spans the
-          # suite never asked for into the suite's own exporters.
-          provider.add_span_processor(processor)
+        child_processor = batch_processor(endpoint, headers)
+        child_forwarder = ExecutionChildForwarder.new(
+          child_processor,
+          context_key: execution_context_key,
+        )
+
+        if collector_managed
+          OpenTelemetry::SDK.configure do |config|
+            config.id_generator = SecureRandomIdGenerator
+            config.add_span_processor(child_forwarder)
+            config.use_all if instrumentations.nil?
+          end
+
+          if OpenTelemetry.tracer_provider.is_a?(OpenTelemetry::Internal::ProxyTracerProvider)
+            raise "OpenTelemetry SDK did not install a tracer provider"
+          end
+        else
+          provider.add_span_processor(child_forwarder)
           unless instrumentations.nil?
             warn "[buildkite-test_collector] OpenTelemetry instrumentation selection ignored because the test suite already configured OpenTelemetry: #{instrumentations.inspect}"
           end
-          provider
-        elsif provider.is_a?(OpenTelemetry::Internal::ProxyTracerProvider)
-          OpenTelemetry::SDK.configure do |c|
-            c.id_generator = SecureRandomIdGenerator
-            c.add_span_processor(processor)
-            c.use_all unless instrumentations == []
-          end
-          OpenTelemetry.tracer_provider
-        else
-          raise "existing OpenTelemetry tracer provider does not support adding a span processor"
         end
+
+        @execution_child_processor = child_processor
+        @execution_child_forwarder = child_forwarder
+      rescue StandardError => e
+        deactivate_child_forwarder(child_forwarder)
+        stop_processor(child_processor)
+        warn "[buildkite-test_collector] OpenTelemetry child span export disabled: #{e.class}: #{e.message}; test.execution export remains enabled"
       end
 
-      # How long the finished span says the test took, in seconds. We report this
-      # as the execution's duration too, so the two never disagree. Both are
-      # worked out from the monotonic clock, so neither is thrown off if the
-      # system clock moves mid-run. Anything that isn't a real recorded span
-      # (unsampled, or a stand-in) has nothing to read, and gets nil.
+      def execution_context_key
+        @execution_context_key ||= OpenTelemetry::Context.create_key("buildkite.test.execution")
+      end
+
+      def execution_resource
+        provider = OpenTelemetry.tracer_provider
+        return provider.resource if provider.respond_to?(:resource)
+
+        OpenTelemetry::SDK::Resources::Resource.default
+      end
+
+      def shutdown_exports(timeout)
+        deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + timeout
+        error = nil
+
+        [@execution_provider, @execution_child_processor].compact.each do |component|
+          remaining = [deadline - Process.clock_gettime(Process::CLOCK_MONOTONIC), 0].max
+          begin
+            component.shutdown(timeout: remaining)
+          rescue StandardError => e
+            error ||= e
+          end
+        end
+
+        error
+      end
+
+      def deactivate_child_forwarder(forwarder)
+        forwarder&.shutdown
+        nil
+      rescue StandardError => e
+        e
+      end
+
+      def stop_processor(processor)
+        processor&.shutdown(timeout: 0)
+      rescue StandardError
+        nil
+      end
+
+      def finish_span(span)
+        span.finish
+      rescue StandardError => e
+        warn "[buildkite-test_collector] Could not finish OpenTelemetry test span: #{e.class}: #{e.message}"
+      end
+
       def span_duration(span)
         return unless span.respond_to?(:to_span_data)
 
@@ -241,11 +265,6 @@ module Buildkite::TestCollector
         nil
       end
 
-      # Reads the trace ID that OpenTelemetry already generated for this span.
-      # We don't need to make up our own ID, since the SDK creates one
-      # automatically for a span that has no parent. We return it even if
-      # this trace won't end up being sampled, since deciding that isn't our
-      # job.
       def trace_id(span)
         context = span.context
         return unless context.valid?
@@ -253,9 +272,7 @@ module Buildkite::TestCollector
         context.hex_trace_id
       end
 
-      # The Agent propagates the current job trace context through these
-      # environment variables. Link to it without making it the parent: every
-      # test execution must remain the root of its own trace.
+      # Link to the Agent job while keeping each execution a trace root.
       def job_span_links
         carrier = {
           "traceparent" => ENV["TRACEPARENT"],
@@ -272,10 +289,6 @@ module Buildkite::TestCollector
         []
       end
 
-      # Builds the HTTP headers sent with every exported span. The server
-      # figures out which test run this belongs to from the run key, and
-      # figures out which job sent it from the auth token, so we don't need
-      # to send that separately.
       def request_headers(run_env, api_token)
         headers = { "Buildkite-Tests-Run-Key" => run_env["key"] }
         headers["Authorization"] = "Token token=\"#{api_token}\"" if api_token

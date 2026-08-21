@@ -2,9 +2,10 @@
 
 > **This is still under development and everything here may change.**
 
-Every RSpec example becomes a small OpenTelemetry trace, so you can see what a
-test actually did: the queries it ran, the HTTP calls it made, and where its time
-went. The traces are sent to Buildkite and shown against the test's execution.
+Every RSpec example gets an OpenTelemetry `test.execution` root. When the suite
+already uses OpenTelemetry, its sampled child spans show what the test did and
+where its time went. The traces are sent to Buildkite and shown against the
+test's execution.
 
 It is off by default. See the [README](../README.md#opentelemetry-export-experimental)
 for how to turn it on.
@@ -55,27 +56,47 @@ one trace holds everything the test did.
 
 ## If you already use OpenTelemetry
 
-We fit in around your setup rather than replacing it:
+We fit around your setup rather than replacing it:
 
-- **Your tracer provider is used as-is.** We add a span processor to it and
-  nothing else. Your resource, exporters, sampler and lifecycle are untouched.
-- **Your instrumentation is left alone.** Its spans already reach us through the
-  provider we share, so we don't install any of our own. That also means we never
-  add spans you didn't ask for to your own exporters.
-- **Your exporters will see `test.execution` spans.** A provider gives every span
-  to all of its processors, so these spans arrive in your backend too.
-- **Sampling is yours.** We don't sample, we use whatever your provider decides.
-- **We stop when the suite does.** After the run, our processor goes quiet and
-  yours keeps working.
+- **Execution roots use a private provider.** Its sampler is AlwaysOn, so your
+  sampling policy cannot remove `test.execution` spans.
+- **Your provider remains yours.** We attach a forwarding span processor, but do
+  not replace the provider or change its resource, sampler, exporters, or
+  lifecycle.
+- **Your instrumentation is left alone.** The collector neither installs nor
+  configures instrumentation.
+- **Only execution children are forwarded.** A span must start under an active
+  Buildkite execution context. Suite setup, teardown, detached traces, and other
+  ambient spans are not sent to Buildkite.
+- **Your exporters see only your spans.** The private execution root goes only to
+  Buildkite. Suite children retain its trace ID and parent span ID through normal
+  OpenTelemetry context propagation. Because your backend does not receive that
+  root, it may display these test traces as partial or headless.
+- **Child sampling is yours.** `AlwaysOff` records no children. A parent-based
+  sampler commonly keeps children because the private root is sampled. This can
+  increase the span volume sent to your exporters during tests, even when its
+  root policy normally samples traces down. That is the suite's configured
+  parent-based behavior, not a Buildkite override. Only children marked as
+  sampled are sent to Buildkite; record-only spans are not exported.
 
-If you don't have OpenTelemetry set up, we create a tracer provider and install
-all applicable instrumentation registered when the suite starts, as described
-below.
+Set up the suite's provider and instrumentation before RSpec runs
+`before(:suite)` hooks. Context-propagated asynchronous work is included even if
+it finishes after the execution block; work that does not propagate the context
+is excluded.
+
+## Without suite OpenTelemetry
+
+The collector configures a global SDK provider for child spans and installs the
+applicable instrumentation registered when the suite starts. The private
+provider still owns `test.execution`; instrumented spans use the
+collector-created provider's normal sampling. The same forwarding filter
+excludes setup, teardown, detached traces, and other spans outside an active
+execution.
 
 ## Choosing instrumentation
 
-Instrumentation selection applies only when the collector creates the
-OpenTelemetry provider. The collector includes the OpenTelemetry SDK and OTLP
+Instrumentation selection applies only when the collector configures the global
+provider. The collector includes the OpenTelemetry SDK and OTLP
 exporter, but no instrumentation gems. Add the instrumentation you want to your
 bundle and require it explicitly:
 
@@ -111,8 +132,8 @@ instrumentation. The SDK skips instrumentation whose target library is absent
 or incompatible and reports individual installation failures without stopping
 the remaining installations.
 
-To export root `test.execution` spans without installing any registered
-instrumentation, pass an empty list:
+To prevent the collector from installing registered instrumentation, pass an
+empty list. Manually created spans under an execution are still forwarded:
 
 ```ruby
 Buildkite::TestCollector.configure(
@@ -140,21 +161,21 @@ the rest of the collector. Sending them needs an agent OIDC token with the
 `write_uploads` scope; a suite API token uploads test results as normal but its
 spans are rejected.
 
-OpenTelemetry's SDK owns the batching, retries and transport. `test.execution`
-spans have a reserved, faster-draining queue and are exported separately from
-automatically instrumented spans, so a flood or invalid batch of child spans
-cannot displace the execution roots. When the suite finishes, both queues share
-one 30-second flush budget passed to the SDK, roots first. A hard exit or a
-sustained endpoint failure can still lose spans because the queues live in
-process memory.
+OpenTelemetry's SDK owns batching, retries, and transport. `test.execution`
+spans have a reserved, faster-draining queue and exporter. Forwarded children
+use a separate queue and exporter, so a child flood or invalid child request
+cannot displace or poison execution roots. When the suite finishes, both queues
+share one 30-second flush budget, roots first. A hard exit or sustained endpoint
+failure can still lose spans because the queues live in process memory.
 
 ## When something goes wrong
 
-Export never fails a test. If the OpenTelemetry gems are missing, setup fails, or
-spans can't be delivered, the collector warns and carries on, and your test
-results upload as they always have. Suite shutdown gives the OpenTelemetry SDK a
-30-second budget to export buffered spans; the SDK's own retry backoff can run
-past it when the endpoint keeps failing.
+Export never fails a test. If root setup fails, the collector warns and the
+normal test result upload continues without spans. If optional child setup or
+attachment fails, the collector warns, cleans up that path, and continues
+exporting roots. Suite shutdown gives the OpenTelemetry SDK a 30-second budget
+to export buffered spans; the SDK's own retry backoff can run past it when the
+endpoint keeps failing.
 
 Export failures are reported through OpenTelemetry's own logger. The collector
 also warns if its reserved root queue drops any `test.execution` spans; normal
