@@ -5,42 +5,47 @@ require_relative "trace"
 module Buildkite::TestCollector::RSpecPlugin
   # In OTLP-only mode the span carries everything a JSON upload would have
   # said, so the server can synthesize the execution from the span alone
-  # (`execution.via` opts in to that). A subclass so the standard Trace stays
-  # untouched for the JSON upload paths.
+  # (`buildkite.execution.via` opts in to that). A subclass so the standard
+  # Trace stays untouched for the JSON upload paths.
   class OTelOnlyTrace < Trace
-    # The exception that failed the test, recorded onto the OpenTelemetry span
-    # when OTLP is the only upload method.
-    attr_accessor :otel_exception
-
     def otel_attributes
       file_path = strip_invalid_utf8_chars(prepend_location_prefix(file_name))
       attributes = {
-        "execution.via" => "otlp",
-        "test.scope" => strip_invalid_utf8_chars(scope),
-        "test.name" => strip_invalid_utf8_chars(name),
-        "buildkite.test.location" => strip_invalid_utf8_chars(prepend_location_prefix(location)),
-        "buildkite.test.file_name" => file_path,
+        "buildkite.execution.via" => "otlp",
+        "buildkite.test.scope" => strip_invalid_utf8_chars(scope),
+        "buildkite.test.name" => strip_invalid_utf8_chars(name),
         "test.suite.name" => strip_invalid_utf8_chars(scope),
         "test.case.name" => strip_invalid_utf8_chars(example.full_description),
         "code.file.path" => file_path,
         "code.line.number" => source_line_number,
-        "buildkite.test.result" => otel_result,
       }
 
-      if failure_reason
-        attributes["buildkite.test.failure_reason"] = strip_invalid_utf8_chars(failure_reason)
-      end
-      if failure_expanded && !failure_expanded.empty?
-        attributes["buildkite.test.failure_expanded"] = JSON.generate(strip_invalid_utf8_chars(failure_expanded))
-      end
-
-      # Tags set through Buildkite::TestCollector.tag_execution become plain
-      # span attributes, which the server turns back into execution tags.
+      # Tags set through Buildkite::TestCollector.tag_execution become
+      # buildkite.tag.-prefixed span attributes, which the server strips and
+      # turns back into execution tags.
       tags&.each do |key, value|
-        attributes[key.to_s] = strip_invalid_utf8_chars(value.to_s)
+        attributes["buildkite.tag.#{key}"] = strip_invalid_utf8_chars(value.to_s)
       end
 
       attributes.reject { |_, value| value.nil? }
+    end
+
+    # The failure summary, destined for the span's error status description.
+    def otel_failure_reason
+      strip_invalid_utf8_chars(failure_reason) if failure_reason
+    end
+
+    # One semconv exception event per failure, built from the same detail the
+    # JSON upload would have carried as failure_expanded.
+    def otel_exception_events
+      (failure_expanded || []).filter_map do |failure|
+        message = Array(failure[:expanded]).join("\n")
+        stacktrace = Array(failure[:backtrace]).join("\n")
+        attributes = {}
+        attributes["exception.message"] = strip_invalid_utf8_chars(message) unless message.empty?
+        attributes["exception.stacktrace"] = strip_invalid_utf8_chars(stacktrace) unless stacktrace.empty?
+        attributes unless attributes.empty?
+      end
     end
   end
 
@@ -110,7 +115,6 @@ module Buildkite::TestCollector::RSpecPlugin
 
         exception = raised || example.exception
         if exception
-          trace.otel_exception = exception
           begin
             trace.failure_reason, trace.failure_expanded = failure_info(exception)
           rescue StandardError => e

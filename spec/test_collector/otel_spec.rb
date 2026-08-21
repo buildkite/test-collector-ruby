@@ -765,6 +765,9 @@ RSpec.describe Buildkite::TestCollector::OTel do
       exporter = OpenTelemetry::SDK::Trace::Export::InMemorySpanExporter.new
       allow(OpenTelemetry::Exporter::OTLP::Exporter).to receive(:new) { exporter }
       allow(OpenTelemetry::Instrumentation.registry).to receive(:install_all)
+      # A tag build would flip vcs.ref.head.type; pin the environment here.
+      allow(ENV).to receive(:[]).and_call_original
+      allow(ENV).to receive(:[]).with("BUILDKITE_TAG").and_return(nil)
 
       described_class.configure!(
         endpoint: "https://example.invalid/v1/traces",
@@ -789,14 +792,15 @@ RSpec.describe Buildkite::TestCollector::OTel do
 
       resource = exporter.finished_spans.fetch(0).resource.attribute_enumerator.to_h
       expect(resource).to include(
-        "buildkite.test.run.key" => "run-123",
-        "buildkite.test.run.branch" => "main",
-        "buildkite.test.run.commit_sha" => "abc123",
-        "buildkite.test.collector.name" => "ruby-buildkite-test_collector",
-        "buildkite.test.collector.version" => Buildkite::TestCollector::VERSION,
-        # User tags ride along as resource attributes, stringified.
-        "team" => "platform",
-        "speed" => "fast",
+        "buildkite.run_key" => "run-123",
+        "vcs.ref.head.name" => "main",
+        "vcs.ref.head.type" => "branch",
+        "vcs.ref.head.revision" => "abc123",
+        "buildkite.collector.name" => "ruby-buildkite-test_collector",
+        "buildkite.collector.version" => Buildkite::TestCollector::VERSION,
+        # User tags ride along as prefixed resource attributes, stringified.
+        "buildkite.tag.team" => "platform",
+        "buildkite.tag.speed" => "fast",
       )
     ensure
       described_class.shutdown
@@ -826,7 +830,7 @@ RSpec.describe Buildkite::TestCollector::OTel do
       described_class.force_flush
 
       resource = exporter.finished_spans.fetch(0).resource.attribute_enumerator.to_h
-      expect(resource).to include("buildkite.test.run.key" => "run-123")
+      expect(resource).to include("buildkite.run_key" => "run-123")
     ensure
       described_class.shutdown
       suite_provider&.shutdown
@@ -887,7 +891,7 @@ RSpec.describe Buildkite::TestCollector::OTel do
     end
   end
 
-  it "records the test's exception on the span when the test offers one" do
+  it "records the test's failure as span status and exception events when the test offers them" do
     exporter = OpenTelemetry::SDK::Trace::Export::InMemorySpanExporter.new
     provider = OpenTelemetry::SDK::Trace::TracerProvider.new
     provider.add_span_processor(
@@ -895,13 +899,14 @@ RSpec.describe Buildkite::TestCollector::OTel do
     )
     described_class.instance_variable_set(:@tracer, provider.tracer("exception-test"))
 
-    error = RuntimeError.new("kaboom")
-    error.set_backtrace(["example.rb:1"])
     test = double(
       "trace",
       otel_attributes: {},
       otel_result: "failed",
-      otel_exception: error,
+      otel_failure_reason: "kaboom",
+      otel_exception_events: [
+        { "exception.message" => "kaboom", "exception.stacktrace" => "example.rb:1" },
+      ],
     )
 
     span, = described_class.start_test_span
@@ -910,8 +915,12 @@ RSpec.describe Buildkite::TestCollector::OTel do
 
     finished = exporter.finished_spans.fetch(0)
     event = finished.events.find { |e| e.name == "exception" }
-    expect(event.attributes).to include("exception.message" => "kaboom")
+    expect(event.attributes).to include(
+      "exception.message" => "kaboom",
+      "exception.stacktrace" => "example.rb:1",
+    )
     expect(finished.status.code).to eq(OpenTelemetry::Trace::Status::ERROR)
+    expect(finished.status.description).to eq("kaboom")
   ensure
     described_class.instance_variable_set(:@tracer, nil)
     provider&.shutdown

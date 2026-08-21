@@ -130,10 +130,20 @@ module Buildkite::TestCollector
             result = test.otel_result
             status = RESULT_STATUSES[result]
             span.set_attribute(RESULT_ATTRIBUTE, status) if status
-            span.status = OpenTelemetry::Trace::Status.error if result == "failed"
 
-            if test.respond_to?(:otel_exception) && (exception = test.otel_exception)
-              span.record_exception(exception)
+            if result == "failed"
+              # The failure summary rides as the span status description, and
+              # each individual failure as a semconv exception event - the
+              # native OTel shapes, which the server maps back to the
+              # execution's failure_reason and failure_expanded.
+              reason = test.respond_to?(:otel_failure_reason) ? test.otel_failure_reason : nil
+              span.status = OpenTelemetry::Trace::Status.error(reason.to_s)
+
+              if test.respond_to?(:otel_exception_events)
+                test.otel_exception_events.each do |attributes|
+                  span.add_event("exception", attributes: attributes)
+                end
+              end
             end
           end
         rescue StandardError => e
@@ -297,30 +307,39 @@ module Buildkite::TestCollector
 
       # Describes the whole run once, on the resource, so every span carries it
       # without repeating it: which run this is, where it came from, and any
-      # tags the user gave to configure.
+      # tags the user gave to configure. Buildkite vocabulary is flat
+      # (buildkite.run_key, buildkite.build_id, ...) matching the agent's own
+      # OTel attributes; branch and commit use the OTel vcs.ref.head.*
+      # semantic conventions. User tags travel under the buildkite.tag.
+      # prefix, which the server strips and turns into upload-level tags.
       def run_resource(run_env, resource_attributes)
         attributes = {
           "service.name" => ENV["BUILDKITE_TEST_ENGINE_SUITE_SLUG"] || "buildkite-test-collector",
           "service.namespace" => ENV["BUILDKITE_ORGANIZATION_SLUG"],
           "service.instance.id" => run_env["job_id"],
-          "buildkite.test.run.key" => run_env["key"],
-          "buildkite.test.run.url" => run_env["url"],
-          "buildkite.test.run.branch" => run_env["branch"],
-          "buildkite.test.run.commit_sha" => run_env["commit_sha"],
-          "buildkite.test.run.number" => run_env["number"],
-          "buildkite.test.run.job_id" => run_env["job_id"],
-          "buildkite.test.run.message" => run_env["message"],
-          "buildkite.test.run.build_id" => ENV["BUILDKITE_BUILD_ID"],
-          "buildkite.test.run.step_id" => ENV["BUILDKITE_STEP_ID"],
-          "buildkite.test.collector.name" => run_env["collector"],
-          "buildkite.test.collector.version" => run_env["version"],
-          "test.framework.name" => Buildkite::TestCollector.test_runner,
+          "buildkite.run_key" => run_env["key"],
+          "buildkite.run_url" => run_env["url"],
+          "vcs.ref.head.name" => run_env["branch"],
+          "vcs.ref.head.revision" => run_env["commit_sha"],
+          "buildkite.build_number" => run_env["number"],
+          "buildkite.job_id" => run_env["job_id"],
+          "buildkite.message" => run_env["message"],
+          "buildkite.build_id" => ENV["BUILDKITE_BUILD_ID"],
+          "buildkite.step_id" => ENV["BUILDKITE_STEP_ID"],
+          "buildkite.collector.name" => run_env["collector"],
+          "buildkite.collector.version" => run_env["version"],
+          "buildkite.test.framework.name" => Buildkite::TestCollector.test_runner,
         }
+        if run_env["branch"]
+          tag = ENV["BUILDKITE_TAG"]
+          attributes["vcs.ref.head.type"] = tag.nil? || tag.empty? ? "branch" : "tag"
+        end
         if defined?(RSpec::Core::Version::STRING)
-          attributes["test.framework.version"] = RSpec::Core::Version::STRING
+          attributes["buildkite.test.framework.version"] = RSpec::Core::Version::STRING
         end
 
-        user_attributes = (resource_attributes || {}).map { |key, value| [key.to_s, value.to_s] }.to_h
+        user_attributes = (resource_attributes || {})
+          .map { |key, value| ["buildkite.tag.#{key}", value.to_s] }.to_h
 
         OpenTelemetry::SDK::Resources::Resource.default.merge(
           OpenTelemetry::SDK::Resources::Resource.create(

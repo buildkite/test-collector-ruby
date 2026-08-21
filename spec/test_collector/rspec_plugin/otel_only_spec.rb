@@ -51,39 +51,32 @@ RSpec.describe "RSpec OTLP-only submission" do
 
     expect(span).not_to be_nil
     expect(span.attributes).to include(
-      "execution.via" => "otlp",
-      "test.scope" => "OTLP-only group",
-      "test.name" => "does something",
+      "buildkite.execution.via" => "otlp",
+      "buildkite.test.scope" => "OTLP-only group",
+      "buildkite.test.name" => "does something",
       "test.suite.name" => "OTLP-only group",
       "test.case.name" => "OTLP-only group does something",
-      "buildkite.test.result" => "passed",
       "test.case.result.status" => "pass",
     )
     expect(span.attributes.fetch("code.file.path")).to end_with("otel_only_spec.rb")
-    expect(span.attributes.fetch("buildkite.test.file_name")).to end_with("otel_only_spec.rb")
-    expect(span.attributes.fetch("buildkite.test.location")).to match(/otel_only_spec\.rb:\d+\z/)
+    expect(span.attributes.fetch("code.line.number")).to be_an(Integer)
     expect(span.status.code).to eq(OpenTelemetry::Trace::Status::UNSET)
 
     # No JSON upload is prepared: the legacy uploader never sees the example.
     expect(Buildkite::TestCollector.uploader.traces).not_to have_key(example.id)
   end
 
-  it "records the failure on the span" do
+  it "records the failure as span status and exception events" do
     run_sandboxed_example { raise "boom happened" }
     span = finished_test_span
 
-    expect(span.attributes).to include(
-      "buildkite.test.result" => "failed",
-      "test.case.result.status" => "fail",
-      "buildkite.test.failure_reason" => "boom happened",
-    )
-    expanded = JSON.parse(span.attributes.fetch("buildkite.test.failure_expanded"))
-    expect(expanded.first.fetch("expanded")).to eq(["boom happened"])
-    expect(expanded.first.fetch("backtrace")).to be_an(Array)
+    expect(span.attributes).to include("test.case.result.status" => "fail")
     expect(span.status.code).to eq(OpenTelemetry::Trace::Status::ERROR)
+    expect(span.status.description).to eq("boom happened")
 
     exception_event = span.events.find { |event| event.name == "exception" }
     expect(exception_event.attributes).to include("exception.message" => "boom happened")
+    expect(exception_event.attributes.fetch("exception.stacktrace")).to be_a(String)
   end
 
   it "marks a pending example as skipped" do
@@ -94,7 +87,6 @@ RSpec.describe "RSpec OTLP-only submission" do
     span = finished_test_span
 
     expect(span.attributes).to include(
-      "buildkite.test.result" => "skipped",
       "test.case.result.status" => "skipped",
     )
   end
@@ -108,7 +100,7 @@ RSpec.describe "RSpec OTLP-only submission" do
 
     annotation = span.events.find { |event| event.name == "test.annotation" }
     expect(annotation.attributes).to eq("buildkite.annotation" => "checkpoint reached")
-    expect(span.attributes).to include("team" => "platform")
+    expect(span.attributes).to include("buildkite.tag.team" => "platform")
   end
 end
 
@@ -131,54 +123,59 @@ RSpec.describe Buildkite::TestCollector::RSpecPlugin::OTelOnlyTrace do
       allow(example).to receive(:exception) { nil }
 
       expect(trace.otel_attributes).to eq(
-        "execution.via" => "otlp",
-        "test.scope" => "this is a fake example full description",
-        "test.name" => "fake example name",
-        "buildkite.test.location" => "./spec/foo_spec.rb:42",
-        "buildkite.test.file_name" => "./spec/foo_spec.rb",
+        "buildkite.execution.via" => "otlp",
+        "buildkite.test.scope" => "this is a fake example full description",
+        "buildkite.test.name" => "fake example name",
         "test.suite.name" => "this is a fake example full description",
         "test.case.name" => "this is a fake example full description",
         "code.file.path" => "./spec/foo_spec.rb",
         "code.line.number" => 42,
-        "buildkite.test.result" => "passed",
-      )
-    end
-
-    it "includes failure details as attributes" do
-      allow(example).to receive(:exception) { StandardError.new("it broke") }
-      trace.failure_reason = "it broke"
-      trace.failure_expanded = [{ expanded: ["it broke"], backtrace: ["foo.rb:1"] }]
-
-      expect(trace.otel_attributes).to include(
-        "buildkite.test.result" => "failed",
-        "buildkite.test.failure_reason" => "it broke",
-        "buildkite.test.failure_expanded" =>
-          %([{"expanded":["it broke"],"backtrace":["foo.rb:1"]}]),
       )
     end
 
     context "with execution tags" do
       let(:tags) { { "team" => "platform" } }
 
-      it "includes them as span attributes" do
+      it "includes them as prefixed span attributes" do
         allow(example).to receive(:exception) { nil }
 
-        expect(trace.otel_attributes).to include("team" => "platform")
+        expect(trace.otel_attributes).to include("buildkite.tag.team" => "platform")
       end
     end
 
     context "when location_prefix is provided" do
       let(:location_prefix) { "some/prefix" }
 
-      it "prefixes the file and location paths" do
+      it "prefixes the file path" do
         allow(example).to receive(:exception) { nil }
 
         expect(trace.otel_attributes).to include(
-          "buildkite.test.file_name" => "some/prefix/spec/foo_spec.rb",
           "code.file.path" => "some/prefix/spec/foo_spec.rb",
-          "buildkite.test.location" => "some/prefix/spec/foo_spec.rb:42",
         )
       end
+    end
+  end
+
+  describe "#otel_failure_reason and #otel_exception_events" do
+    it "exposes the failure summary and one exception event per failure" do
+      trace.failure_reason = "it broke"
+      trace.failure_expanded = [
+        { expanded: ["it broke"], backtrace: ["foo.rb:1", "foo.rb:9"] },
+        { expanded: [], backtrace: [] },
+      ]
+
+      expect(trace.otel_failure_reason).to eq("it broke")
+      expect(trace.otel_exception_events).to eq([
+        {
+          "exception.message" => "it broke",
+          "exception.stacktrace" => "foo.rb:1\nfoo.rb:9",
+        },
+      ])
+    end
+
+    it "is empty when the test did not fail" do
+      expect(trace.otel_failure_reason).to be_nil
+      expect(trace.otel_exception_events).to eq([])
     end
   end
 end

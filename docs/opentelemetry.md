@@ -5,12 +5,13 @@
 This page describes `otel_enabled`, where spans are exported *alongside* the
 normal JSON upload and linked to it by trace ID. There is also an OTLP-only
 mode (`otel_only`) where the span *is* the submission: it carries the full
-execution details (`execution.via=otlp`, result, failure reason and backtrace,
-tags) and Buildkite synthesizes the execution from it server-side, with nothing
-sent to `/v1/uploads`. In that mode the run's details (run key, branch, commit,
-and any `tags:` you configure) travel as OpenTelemetry resource attributes on
-the spans the collector exports. See the
-[README](../README.md#otlp-only-submission-experimental) for how to turn it on.
+execution details (`buildkite.execution.via=otlp`, result, failure reason and
+backtrace, tags) and Buildkite synthesizes the execution from it server-side,
+with nothing sent to `/v1/uploads`. In that mode the run's details (run key,
+branch, commit, and any `tags:` you configure) travel as OpenTelemetry resource
+attributes on the spans the collector exports. See the
+[README](../README.md#otlp-only-submission-experimental) for how to turn it on,
+and [OTLP-only attributes](#otlp-only-attributes) below for what's sent.
 
 Every RSpec example gets an OpenTelemetry `test.execution` root. When the suite
 already uses OpenTelemetry, its sampled child spans show what the test did and
@@ -57,6 +58,56 @@ Two things worth knowing:
   example that failed as expected.
 - The execution's duration is whatever the span timed, so the two always agree.
   With the export off, the collector times the example itself as it always has.
+
+## OTLP-only attributes
+
+With `otel_only`, the span is the submission, so it carries more. Buildkite
+attributes are flat (`buildkite.run_key`, `buildkite.build_id`, ...), matching
+the agent's own OpenTelemetry attributes; everything else follows OpenTelemetry
+semantic conventions.
+
+Run-level details travel once, as resource attributes on every span:
+
+| Resource attribute | Value | Execution field |
+| --- | --- | --- |
+| `buildkite.run_key` | the run key (required) | run key |
+| `buildkite.run_url` | the build URL | URL |
+| `vcs.ref.head.name` | the branch (or tag) name | branch |
+| `vcs.ref.head.revision` | the commit SHA | commit |
+| `vcs.ref.head.type` | `branch` or `tag` | — |
+| `buildkite.build_number` | the build number | number |
+| `buildkite.build_id` | the build's UUID | build ID |
+| `buildkite.job_id` | the job's UUID | job ID |
+| `buildkite.step_id` | the step's UUID | step ID |
+| `buildkite.message` | the commit message | message |
+| `buildkite.collector.name` | this gem's name | collector |
+| `buildkite.collector.version` | this gem's version | version |
+| `buildkite.tag.<key>` | each `tags:` entry from `configure` | run tag `<key>` |
+
+The resource also names the suite for any other OpenTelemetry backend looking
+at the same spans: `service.name` (the suite slug), `service.namespace` (the
+organization slug), `service.instance.id` (the job UUID), and
+`buildkite.test.framework.name`/`.version`. Buildkite doesn't use these.
+
+Each test's span carries the execution itself:
+
+| Span attribute | Value | Execution field |
+| --- | --- | --- |
+| `buildkite.execution.via` | `otlp` — opts this span in to synthesis | — |
+| `buildkite.test.scope` | the example group | scope |
+| `buildkite.test.name` | the example's description | name |
+| `test.suite.name` | the example group | — |
+| `test.case.name` | the example's full description | — |
+| `code.file.path` | the file the test is in | file name, location |
+| `code.line.number` | the line number | location |
+| `test.case.result.status` | `pass`, `fail`, `skipped` | result |
+| `buildkite.tag.<key>` | each `tag_execution` tag | execution tag `<key>` |
+
+A failure travels in OpenTelemetry's native shapes rather than as attributes:
+the failure summary is the span's error status description, and each individual
+failure is a semconv `exception` event (`exception.message`,
+`exception.stacktrace`). The server maps these back to the execution's failure
+reason and expanded failure detail.
 
 ## Finding a test's trace
 
