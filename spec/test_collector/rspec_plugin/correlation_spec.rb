@@ -4,12 +4,17 @@ require "opentelemetry/sdk"
 require "rspec/core/sandbox"
 
 RSpec.describe "RSpec execution and OpenTelemetry correlation" do
-  # Runs one example through the collector's real around hook. Sandboxed, so
-  # registering that hook doesn't disturb the suite running this test.
+  # Runs one example through the collector's real around hook and the
+  # span-finishing reporter. Sandboxed, so registering that hook doesn't
+  # disturb the suite running this test. The hook file registers its
+  # formatters from before(:suite), which group.run does not fire, so the
+  # span-finishing one is added directly here (the JSON-uploading Reporter
+  # stays out: it is not under test and would open an upload session).
   def run_sandboxed_example(metadata = {}, &block)
     RSpec::Core::Sandbox.sandboxed do |config|
       config.output_stream = StringIO.new
       load "buildkite/test_collector/library_hooks/rspec.rb"
+      config.add_formatter Buildkite::TestCollector::RSpecPlugin::OTelReporter
 
       group = RSpec.describe("Correlated group") do
         it("passes", metadata, &(block || proc { nil }))
@@ -155,6 +160,103 @@ RSpec.describe "RSpec execution and OpenTelemetry correlation" do
     expect(example.execution_result.status).to eq(:pending)
     expect(span.attributes.fetch("test.case.result.status")).to eq("skipped")
     expect(span.status.code).to eq(OpenTelemetry::Trace::Status::UNSET)
+  ensure
+    Buildkite::TestCollector::OTel.instance_variable_set(:@tracer, nil)
+    Buildkite::TestCollector.uploader.traces.delete(example&.id)
+    provider&.shutdown
+  end
+
+  it "classifies a failure raised by an outer around hook after the example ran" do
+    exporter = OpenTelemetry::SDK::Trace::Export::InMemorySpanExporter.new
+    provider = OpenTelemetry::SDK::Trace::TracerProvider.new
+    provider.add_span_processor(
+      OpenTelemetry::SDK::Trace::Export::SimpleSpanProcessor.new(exporter)
+    )
+    Buildkite::TestCollector::OTel.instance_variable_set(
+      :@tracer, provider.tracer("correlation-test")
+    )
+
+    example = RSpec::Core::Sandbox.sandboxed do |config|
+      config.output_stream = StringIO.new
+
+      # Registered before the collector's hook, so it wraps it: the
+      # collector's hook has fully unwound (span handed off, still open)
+      # before this raises. The span is only classified at reporter time,
+      # once RSpec has recorded the failure.
+      config.around(:each) do |inner|
+        inner.run
+        raise "outer boom"
+      end
+
+      load "buildkite/test_collector/library_hooks/rspec.rb"
+      config.add_formatter Buildkite::TestCollector::RSpecPlugin::OTelReporter
+
+      group = RSpec.describe("Correlated group") { it("passes") { nil } }
+      group.run(RSpec.configuration.reporter)
+      group.examples.first
+    end
+    provider.force_flush
+
+    span = exporter.finished_spans.find { |finished| finished.name == "test.execution" }
+    expect(example.execution_result.status).to eq(:failed)
+    expect(span.attributes.fetch("test.case.result.status")).to eq("fail")
+    expect(span.status.code).to eq(OpenTelemetry::Trace::Status::ERROR)
+  ensure
+    Buildkite::TestCollector::OTel.instance_variable_set(:@tracer, nil)
+    Buildkite::TestCollector.uploader.traces.delete(example&.id)
+    provider&.shutdown
+  end
+
+  it "classifies a pending example that unexpectedly passes as failed" do
+    exporter = OpenTelemetry::SDK::Trace::Export::InMemorySpanExporter.new
+    provider = OpenTelemetry::SDK::Trace::TracerProvider.new
+    provider.add_span_processor(
+      OpenTelemetry::SDK::Trace::Export::SimpleSpanProcessor.new(exporter)
+    )
+    Buildkite::TestCollector::OTel.instance_variable_set(
+      :@tracer, provider.tracer("correlation-test")
+    )
+
+    example = run_sandboxed_example(pending: "not fixed yet")
+    provider.force_flush
+
+    span = exporter.finished_spans.find { |finished| finished.name == "test.execution" }
+    expect(example.execution_result.status).to eq(:failed)
+    expect(span.attributes.fetch("test.case.result.status")).to eq("fail")
+    expect(span.status.code).to eq(OpenTelemetry::Trace::Status::ERROR)
+  ensure
+    Buildkite::TestCollector::OTel.instance_variable_set(:@tracer, nil)
+    Buildkite::TestCollector.uploader.traces.delete(example&.id)
+    provider&.shutdown
+  end
+
+  it "finishes spans through the reporter that before(:suite) registers" do
+    exporter = OpenTelemetry::SDK::Trace::Export::InMemorySpanExporter.new
+    provider = OpenTelemetry::SDK::Trace::TracerProvider.new
+    provider.add_span_processor(
+      OpenTelemetry::SDK::Trace::Export::SimpleSpanProcessor.new(exporter)
+    )
+    Buildkite::TestCollector::OTel.instance_variable_set(
+      :@tracer, provider.tracer("correlation-test")
+    )
+    Buildkite::TestCollector.instance_variable_set(:@otel_options, nil)
+    # before(:suite) also registers the JSON-uploading Reporter, whose
+    # send queue needs a batch size; configure normally supplies it.
+    Buildkite::TestCollector.batch_size ||= Buildkite::TestCollector::DEFAULT_UPLOAD_BATCH_SIZE
+
+    example = RSpec::Core::Sandbox.sandboxed do |config|
+      config.output_stream = StringIO.new
+      load "buildkite/test_collector/library_hooks/rspec.rb"
+
+      group = RSpec.describe("Correlated group") { it("passes") { nil } }
+      config.with_suite_hooks { group.run(RSpec.configuration.reporter) }
+      group.examples.first
+    end
+    provider.force_flush
+
+    span = exporter.finished_spans.find { |finished| finished.name == "test.execution" }
+    expect(span).not_to be_nil
+    expect(span.attributes.fetch("test.case.result.status")).to eq("pass")
   ensure
     Buildkite::TestCollector::OTel.instance_variable_set(:@tracer, nil)
     Buildkite::TestCollector.uploader.traces.delete(example&.id)

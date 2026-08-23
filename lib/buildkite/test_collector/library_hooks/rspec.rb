@@ -4,6 +4,7 @@ require "rspec/core"
 require "rspec/expectations"
 
 require_relative "../rspec_plugin/reporter"
+require_relative "../rspec_plugin/otel_reporter"
 require_relative "../rspec_plugin/trace"
 
 Buildkite::TestCollector.uploader = Buildkite::TestCollector::Uploader
@@ -12,6 +13,9 @@ RSpec.configure do |config|
   config.before(:suite) do
     Buildkite::TestCollector.start_otel
 
+    # OTelReporter first: it finishes the example's span (and settles the
+    # history's duration) before Reporter queues the example for upload.
+    config.add_formatter Buildkite::TestCollector::RSpecPlugin::OTelReporter
     config.add_formatter Buildkite::TestCollector::RSpecPlugin::Reporter
   end
 
@@ -46,15 +50,14 @@ RSpec.configure do |config|
         trace_id: trace_id,
       )
 
-      # Finish the span here rather than from the reporter, so its duration is
-      # the example itself and not the reporting that follows. When there is a
-      # span, report what it timed as the execution's duration too, so the two
-      # never disagree. `end_at` moves with it, so the history still describes
-      # itself and its children still sit inside it.
-      span_duration = Buildkite::TestCollector::OTel.finish_test_span(otel_span, test: trace)
-      if span_duration
-        trace.history[:duration] = span_duration
-        trace.history[:end_at] = trace.history[:start_at] + span_duration
+      # The span is finished from the reporter's notifications (OTelReporter),
+      # after every around hook has unwound, so its result classification
+      # reads RSpec's settled verdict instead of unwind-time heuristics. The
+      # end timestamp is captured here so the span still times the example
+      # itself, not the hooks and reporting that follow.
+      if otel_span
+        trace.otel_span = otel_span
+        trace.otel_end_timestamp = Buildkite::TestCollector::OTel.current_timestamp
       end
 
       Buildkite::TestCollector.uploader.traces[example.id] = trace

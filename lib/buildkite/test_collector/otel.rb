@@ -131,7 +131,16 @@ module Buildkite::TestCollector
         end
       end
 
-      def finish_test_span(span, test: nil)
+      # The moment "now" as the OpenTelemetry SDK would stamp it: the realtime
+      # clock, in seconds. Captured at hook-unwind time and applied when the
+      # span is finished later (at reporter time), so the span still times the
+      # example itself and not the reporting that follows. Deliberately not
+      # Time.now, which suites that freeze time (e.g. with Timecop) fake out.
+      def current_timestamp
+        Rational(Process.clock_gettime(Process::CLOCK_REALTIME, :nanosecond), 1_000_000_000)
+      end
+
+      def finish_test_span(span, test: nil, end_timestamp: nil)
         return unless span
 
         begin
@@ -162,7 +171,7 @@ module Buildkite::TestCollector
         rescue StandardError => e
           warn "[buildkite-test_collector] Could not describe OpenTelemetry test span: #{e.class}: #{e.message}"
         ensure
-          finish_span(span)
+          finish_span(span, end_timestamp)
         end
 
         span_duration(span)
@@ -446,8 +455,12 @@ module Buildkite::TestCollector
         nil
       end
 
-      def finish_span(span)
-        span.finish
+      def finish_span(span, end_timestamp = nil)
+        if end_timestamp
+          span.finish(end_timestamp: end_timestamp)
+        else
+          span.finish
+        end
       rescue StandardError => e
         warn "[buildkite-test_collector] Could not finish OpenTelemetry test span: #{e.class}: #{e.message}"
       end

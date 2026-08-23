@@ -5,12 +5,15 @@ require "rspec/core/sandbox"
 require "buildkite/test_collector/rspec_plugin/otel_only"
 
 RSpec.describe "RSpec OTLP-only submission" do
-  # Runs one example through the OTLP-only around hook. Sandboxed, so
-  # registering that hook doesn't disturb the suite running this test.
+  # Runs one example through the OTLP-only around hook and reporter.
+  # Sandboxed, so registering that hook doesn't disturb the suite running
+  # this test. The hook file registers its formatter from before(:suite),
+  # which group.run does not fire, so the formatter is added directly here.
   def run_sandboxed_example(metadata = {}, &block)
     RSpec::Core::Sandbox.sandboxed do |config|
       config.output_stream = StringIO.new
       load "buildkite/test_collector/library_hooks/rspec_otel_only.rb"
+      config.add_formatter Buildkite::TestCollector::RSpecPlugin::OTelOnly::Reporter
 
       group = RSpec.describe("OTLP-only group") do
         it("does something", metadata, &(block || proc { nil }))
@@ -89,6 +92,123 @@ RSpec.describe "RSpec OTLP-only submission" do
     expect(span.attributes).to include(
       "test.case.result.status" => "skipped",
     )
+  end
+
+  it "classifies a failure raised by an inner around hook after the example ran" do
+    example = RSpec::Core::Sandbox.sandboxed do |config|
+      config.output_stream = StringIO.new
+      load "buildkite/test_collector/library_hooks/rspec_otel_only.rb"
+      config.add_formatter Buildkite::TestCollector::RSpecPlugin::OTelOnly::Reporter
+
+      # Registered after the collector's hook, so it runs inside it: the
+      # exception escapes through the collector's hook while
+      # example.exception is still nil (RSpec records it later).
+      config.around(:each) do |inner|
+        inner.run
+        raise "hook boom"
+      end
+
+      group = RSpec.describe("OTLP-only group") do
+        it("does something") {}
+      end
+      group.run(RSpec.configuration.reporter)
+      group.examples.first
+    end
+    span = finished_test_span
+
+    expect(example.execution_result.status).to eq(:failed)
+    expect(span.attributes).to include("test.case.result.status" => "fail")
+    expect(span.status.code).to eq(OpenTelemetry::Trace::Status::ERROR)
+    expect(span.status.description).to eq("hook boom")
+    exception_event = span.events.find { |event| event.name == "exception" }
+    expect(exception_event.attributes).to include("exception.message" => "hook boom")
+  end
+
+  it "classifies a failure raised by an outer around hook after the example ran" do
+    example = RSpec::Core::Sandbox.sandboxed do |config|
+      config.output_stream = StringIO.new
+
+      # Registered before the collector's hook, so it wraps it: the
+      # collector's hook has fully unwound (span handed off, still open)
+      # before this raises.
+      config.around(:each) do |inner|
+        inner.run
+        raise "outer boom"
+      end
+
+      load "buildkite/test_collector/library_hooks/rspec_otel_only.rb"
+      config.add_formatter Buildkite::TestCollector::RSpecPlugin::OTelOnly::Reporter
+
+      group = RSpec.describe("OTLP-only group") do
+        it("does something") {}
+      end
+      group.run(RSpec.configuration.reporter)
+      group.examples.first
+    end
+    span = finished_test_span
+
+    expect(example.execution_result.status).to eq(:failed)
+    expect(span.attributes).to include("test.case.result.status" => "fail")
+    expect(span.status.code).to eq(OpenTelemetry::Trace::Status::ERROR)
+    expect(span.status.description).to eq("outer boom")
+  end
+
+  it "keeps an acknowledged-pending example skipped when a hook raises deliberately" do
+    example = RSpec::Core::Sandbox.sandboxed do |config|
+      config.output_stream = StringIO.new
+      load "buildkite/test_collector/library_hooks/rspec_otel_only.rb"
+      config.add_formatter Buildkite::TestCollector::RSpecPlugin::OTelOnly::Reporter
+
+      # The Scientist-style acknowledgement pattern: a hook detects a known
+      # mismatch after the example ran, marks the example pending, and raises
+      # deliberately so RSpec keeps it pending (exit 0) rather than passed.
+      config.around(:each) do |inner|
+        inner.run
+        pending("acknowledged mismatch")
+        raise "deliberate failure to keep RSpec's pending semantics"
+      end
+
+      group = RSpec.describe("OTLP-only group") do
+        it("does something") {}
+      end
+      group.run(RSpec.configuration.reporter)
+      group.examples.first
+    end
+    span = finished_test_span
+
+    expect(example.execution_result.status).to eq(:pending)
+    expect(span.attributes).to include("test.case.result.status" => "skipped")
+    expect(span.status.code).to eq(OpenTelemetry::Trace::Status::UNSET)
+  end
+
+  it "classifies a pending example that unexpectedly passes as failed" do
+    example = run_sandboxed_example do
+      pending("will be fixed one day")
+      expect(true).to eq(true)
+    end
+    span = finished_test_span
+
+    expect(example.execution_result.status).to eq(:failed)
+    expect(span.attributes).to include("test.case.result.status" => "fail")
+    expect(span.status.code).to eq(OpenTelemetry::Trace::Status::ERROR)
+  end
+
+  it "finishes spans through the reporter that before(:suite) registers" do
+    Buildkite::TestCollector.instance_variable_set(:@otel_options, nil)
+
+    RSpec::Core::Sandbox.sandboxed do |config|
+      config.output_stream = StringIO.new
+      load "buildkite/test_collector/library_hooks/rspec_otel_only.rb"
+
+      group = RSpec.describe("OTLP-only group") do
+        it("does something") {}
+      end
+      config.with_suite_hooks { group.run(RSpec.configuration.reporter) }
+    end
+    span = finished_test_span
+
+    expect(span).not_to be_nil
+    expect(span.attributes).to include("test.case.result.status" => "pass")
   end
 
   it "turns annotations into span events and tags into span attributes" do
