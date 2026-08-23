@@ -1,19 +1,9 @@
 # frozen_string_literal: true
 
 module Buildkite::TestCollector::RSpecPlugin
-  # Finishes each example's OpenTelemetry test span from RSpec's reporter
-  # notifications, which fire after every around hook has unwound. By then
-  # RSpec has settled the example's final result, so the span's classification
-  # simply reads that verdict: an around hook that raises after example.run
-  # comes out failed, an acknowledged-pending example (pending plus a
-  # deliberate raise) skipped, and a pending-but-fixed example failed.
-  #
-  # The span still times the example itself, not the reporting that follows:
-  # the around hook captured the end timestamp at unwind, and the span is
-  # finished here with that timestamp.
-  #
-  # Registered before Reporter, so the span (and the history's duration,
-  # which mirrors it) is settled before the example is queued for upload.
+  # Finishes each example's test span once RSpec's reporter notifications
+  # fire, after every around hook has unwound and the result is settled.
+  # Registered before Reporter, so the span settles before upload.
   class OTelReporter
     RSpec::Core::Formatters.register self, :example_passed, :example_failed, :example_pending
 
@@ -32,12 +22,8 @@ module Buildkite::TestCollector::RSpecPlugin
       )
       trace.otel_span = nil
 
-      # When there is a span, report what it timed as the execution's duration
-      # too, so the two never disagree. `end_at` moves with it, so the history
-      # still describes itself and its children still sit inside it. The
-      # captured end is a realtime reading, so a clock step during the example
-      # could make it precede the span's start; keep the tracer's own timing
-      # rather than upload a negative duration.
+      # Mirror the span's timing onto the history so the two never disagree;
+      # skip if a clock step made the duration negative.
       if span_duration && span_duration >= 0
         trace.history[:duration] = span_duration
         trace.history[:end_at] = trace.history[:start_at] + span_duration

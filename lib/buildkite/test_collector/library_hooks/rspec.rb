@@ -50,11 +50,8 @@ RSpec.configure do |config|
         trace_id: trace_id,
       )
 
-      # The span is finished from the reporter's notifications (OTelReporter),
-      # after every around hook has unwound, so its result classification
-      # reads RSpec's settled verdict instead of unwind-time heuristics. The
-      # end timestamp is captured here so the span still times the example
-      # itself, not the hooks and reporting that follow.
+      # Left open for OTelReporter to finish once RSpec settles the result;
+      # the end timestamp keeps the span timing the example itself.
       if otel_span
         trace.otel_span = otel_span
         trace.otel_end_timestamp = Buildkite::TestCollector::OTel.current_timestamp

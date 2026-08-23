@@ -5,10 +5,8 @@ require "rspec/core/sandbox"
 require "buildkite/test_collector/rspec_plugin/otel_only"
 
 RSpec.describe "RSpec OTLP-only submission" do
-  # Runs one example through the OTLP-only around hook and reporter.
-  # Sandboxed, so registering that hook doesn't disturb the suite running
-  # this test. The hook file registers its formatter from before(:suite),
-  # which group.run does not fire, so the formatter is added directly here.
+  # Sandboxed so the collector's hooks don't disturb this suite. group.run
+  # doesn't fire before(:suite), so the formatter is added directly.
   def run_sandboxed_example(metadata = {}, &block)
     RSpec::Core::Sandbox.sandboxed do |config|
       config.output_stream = StringIO.new
@@ -100,9 +98,8 @@ RSpec.describe "RSpec OTLP-only submission" do
       load "buildkite/test_collector/library_hooks/rspec_otel_only.rb"
       config.add_formatter Buildkite::TestCollector::RSpecPlugin::OTelOnly::Reporter
 
-      # Registered after the collector's hook, so it runs inside it: the
-      # exception escapes through the collector's hook while
-      # example.exception is still nil (RSpec records it later).
+      # Registered after the collector's hook, so its exception escapes
+      # through the collector while example.exception is still nil.
       config.around(:each) do |inner|
         inner.run
         raise "hook boom"
@@ -128,9 +125,8 @@ RSpec.describe "RSpec OTLP-only submission" do
     example = RSpec::Core::Sandbox.sandboxed do |config|
       config.output_stream = StringIO.new
 
-      # Registered before the collector's hook, so it wraps it: the
-      # collector's hook has fully unwound (span handed off, still open)
-      # before this raises.
+      # Registered before the collector's hook, so it wraps it and raises
+      # after the collector has fully unwound.
       config.around(:each) do |inner|
         inner.run
         raise "outer boom"
@@ -159,9 +155,8 @@ RSpec.describe "RSpec OTLP-only submission" do
       load "buildkite/test_collector/library_hooks/rspec_otel_only.rb"
       config.add_formatter Buildkite::TestCollector::RSpecPlugin::OTelOnly::Reporter
 
-      # The Scientist-style acknowledgement pattern: a hook detects a known
-      # mismatch after the example ran, marks the example pending, and raises
-      # deliberately so RSpec keeps it pending (exit 0) rather than passed.
+      # Scientist-style acknowledgement: pending plus a deliberate raise is
+      # pending to RSpec (exit 0), not failed.
       config.around(:each) do |inner|
         inner.run
         pending("acknowledged mismatch")

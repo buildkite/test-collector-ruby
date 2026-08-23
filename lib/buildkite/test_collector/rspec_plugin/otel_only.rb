@@ -54,11 +54,8 @@ module Buildkite::TestCollector::RSpecPlugin
   # OpenTelemetry `test.execution` span carrying everything the server needs
   # to synthesize the test execution, and that's the gem's whole job.
   module OTelOnly
-    # Finishes each example's span from RSpec's reporter notifications, which
-    # fire after every around hook has unwound: RSpec has settled the
-    # example's final result by then, so the span's classification reads that
-    # verdict instead of unwind-time heuristics. Registered as a formatter by
-    # install!'s before(:suite), mirroring how the JSON modes add theirs.
+    # Finishes each example's span once RSpec's reporter notifications fire,
+    # after every around hook has unwound and the result is settled.
     class Reporter
       RSpec::Core::Formatters.register self, :example_passed, :example_failed, :example_pending
 
@@ -77,10 +74,9 @@ module Buildkite::TestCollector::RSpecPlugin
     class << self
       def install!
         RSpec.configure do |config|
-          # Deferred from configure until before(:suite), after application
-          # and support files have loaded, same as the otel_enabled mode.
-          # The formatter is also added here rather than at configure time,
-          # so it does not displace RSpec's default progress output.
+          # Deferred until before(:suite), after application and support
+          # files have loaded, same as the otel_enabled mode. Adding the
+          # formatter here keeps RSpec's default progress output.
           config.before(:suite) do
             Buildkite::TestCollector.start_otel
             config.add_formatter Buildkite::TestCollector::RSpecPlugin::OTelOnly::Reporter
@@ -121,11 +117,6 @@ module Buildkite::TestCollector::RSpecPlugin
         end
       end
 
-      # Called from the reporter's notifications, after every around hook has
-      # unwound: RSpec has settled the example's result and recorded any
-      # exception another hook raised after example.run, so the span's
-      # classification and failure details rest on the final verdict. Fails
-      # open: OTel.finish_test_span never raises into the reporter.
       def finish_example(example)
         trace = pending_traces.delete(example.id)
         return unless trace
@@ -150,12 +141,9 @@ module Buildkite::TestCollector::RSpecPlugin
 
       private
 
-      # Describes the example onto a trace at hook-unwind time, but leaves the
-      # span open for finish_example: RSpec only settles the example's result
-      # (and records exceptions other around hooks raise) after this hook has
-      # returned. The end timestamp is captured here so the span still times
-      # the example itself, not the hooks and reporting that follow. Runs
-      # inside an ensure, so nothing here may raise into the test run.
+      # RSpec only settles the example's result after this hook returns, so
+      # leave the span open for finish_example. Runs inside an ensure, so
+      # nothing here may raise into the test run.
       def defer_finish(example, span, tags)
         trace = Buildkite::TestCollector::RSpecPlugin::OTelOnlyTrace.new(
           example,
@@ -171,17 +159,12 @@ module Buildkite::TestCollector::RSpecPlugin
         Buildkite::TestCollector::OTel.finish_test_span(span)
       end
 
-      # Spans handed off from the around hook, awaiting their example's
-      # reporter notification. One example is in flight at a time per process,
-      # so this stays small; an entry only lingers if the run aborts before
-      # its notification fires, in which case the span is never exported.
+      # Entries linger only if the run aborts before the notification fires;
+      # their spans never export.
       def pending_traces
         @pending_traces ||= {}
       end
 
-      # Derives the failure details from the exception itself, the way RSpec's
-      # own formatters do for multiple failures (summary plus one entry per
-      # exception).
       def failure_info(exception)
         exceptions = exception.respond_to?(:all_exceptions) ? Array(exception.all_exceptions) : [exception]
         exceptions = [exception] if exceptions.empty?

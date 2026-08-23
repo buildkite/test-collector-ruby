@@ -4,9 +4,8 @@ module Buildkite::TestCollector::RSpecPlugin
   class Trace < Buildkite::TestCollector::Trace
     attr_accessor :example, :failure_reason, :failure_expanded
 
-    # The example's OpenTelemetry span, and when it ended. The around hook
-    # captures both at unwind time but leaves the span open; the reporter
-    # finishes it once RSpec has settled the example's result.
+    # Left open by the around hook; OTelReporter finishes it once RSpec
+    # settles the example's result.
     attr_accessor :otel_span, :otel_end_timestamp
 
     attr_reader :history
@@ -34,11 +33,7 @@ module Buildkite::TestCollector::RSpecPlugin
       end
     end
 
-    # The span is finished from RSpec's reporter notifications, after every
-    # around hook has unwound, so by the time this is read RSpec has settled
-    # the example's result: just report that verdict. Hook-raised exceptions
-    # come out failed, acknowledged-pending examples skipped, and
-    # pending-but-fixed examples failed - no unwind-time heuristics.
+    # Read at reporter time, when the result is final.
     def otel_result
       result
     end

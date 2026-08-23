@@ -4,12 +4,9 @@ require "opentelemetry/sdk"
 require "rspec/core/sandbox"
 
 RSpec.describe "RSpec execution and OpenTelemetry correlation" do
-  # Runs one example through the collector's real around hook and the
-  # span-finishing reporter. Sandboxed, so registering that hook doesn't
-  # disturb the suite running this test. The hook file registers its
-  # formatters from before(:suite), which group.run does not fire, so the
-  # span-finishing one is added directly here (the JSON-uploading Reporter
-  # stays out: it is not under test and would open an upload session).
+  # Sandboxed so the collector's hooks don't disturb this suite. group.run
+  # doesn't fire before(:suite), so OTelReporter is added directly (the
+  # JSON-uploading Reporter stays out: it would open an upload session).
   def run_sandboxed_example(metadata = {}, &block)
     RSpec::Core::Sandbox.sandboxed do |config|
       config.output_stream = StringIO.new
@@ -179,10 +176,8 @@ RSpec.describe "RSpec execution and OpenTelemetry correlation" do
     example = RSpec::Core::Sandbox.sandboxed do |config|
       config.output_stream = StringIO.new
 
-      # Registered before the collector's hook, so it wraps it: the
-      # collector's hook has fully unwound (span handed off, still open)
-      # before this raises. The span is only classified at reporter time,
-      # once RSpec has recorded the failure.
+      # Registered before the collector's hook, so it wraps it and raises
+      # after the collector has fully unwound.
       config.around(:each) do |inner|
         inner.run
         raise "outer boom"

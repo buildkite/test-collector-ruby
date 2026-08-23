@@ -131,11 +131,8 @@ module Buildkite::TestCollector
         end
       end
 
-      # The moment "now" as the OpenTelemetry SDK would stamp it: the realtime
-      # clock, in seconds. Captured at hook-unwind time and applied when the
-      # span is finished later (at reporter time), so the span still times the
-      # example itself and not the reporting that follows. Deliberately not
-      # Time.now, which suites that freeze time (e.g. with Timecop) fake out.
+      # "Now" as the SDK would stamp it: the realtime clock, in seconds.
+      # Not Time.now, which suites that freeze time (Timecop) fake out.
       def current_timestamp
         Rational(Process.clock_gettime(Process::CLOCK_REALTIME, :nanosecond), 1_000_000_000)
       end
