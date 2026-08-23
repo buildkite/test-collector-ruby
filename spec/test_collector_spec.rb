@@ -91,6 +91,76 @@ RSpec.describe Buildkite::TestCollector do
         ),
       )
     end
+
+    it "submits results only via OTLP when otel_only is set, with tags as resource attributes" do
+      run_env = { "key" => "run-key" }
+      allow(Buildkite::TestCollector::CI).to receive(:env) { run_env }
+      allow(Buildkite::TestCollector::OTel).to receive(:configure!)
+      allow(Buildkite::TestCollector::OTel).to receive(:enabled?) { true }
+      # Stubbed so the OTLP-only hooks aren't installed into this very suite.
+      allow(Buildkite::TestCollector).to receive(:hook_into)
+      env_overlay["BUILDKITE_ANALYTICS_TOKEN"] = "MyToken"
+      env_overlay["BUILDKITE_AGENT_ID"] = "agent-123"
+
+      Buildkite::TestCollector.configure(
+        hook: hook,
+        otel_only: true,
+        tags: { "team" => "platform" },
+      )
+
+      expect(Buildkite::TestCollector.otel_only?).to eq true
+      expect(Buildkite::TestCollector).to have_received(:hook_into).with(hook)
+      expect(Buildkite::TestCollector::OTel).not_to have_received(:configure!)
+
+      Buildkite::TestCollector.start_otel
+
+      expect(Buildkite::TestCollector::OTel).to have_received(:configure!).with(
+        endpoint: "https://tests-otlp.buildkite.com/v1/traces",
+        api_token: "MyToken",
+        run_env: run_env,
+        otel_only: true,
+        instrumentations: nil,
+        # The merged tags, so the automatic worker tag reaches OTLP too.
+        resource_attributes: { "ci.worker.id" => "agent-123", "team" => "platform" },
+      )
+    ensure
+      Buildkite::TestCollector.otel_only = false
+    end
+
+    it "rejects otel_enabled alongside otel_only, whichever way it is set" do
+      [true, false].each do |otel_enabled|
+        expect {
+          Buildkite::TestCollector.configure(hook: hook, otel_only: true, otel_enabled: otel_enabled)
+        }.to raise_error(ArgumentError, /otel_enabled and otel_only are mutually exclusive/)
+      end
+    end
+
+    it "warns prominently when otel_only is set but OpenTelemetry could not be configured" do
+      # configure! is stubbed to do nothing, so OTel stays disabled: the
+      # otel_only run would silently upload nothing without the banner.
+      allow(Buildkite::TestCollector::OTel).to receive(:configure!)
+      allow(Buildkite::TestCollector::OTel).to receive(:enabled?) { false }
+      allow(Buildkite::TestCollector).to receive(:hook_into)
+
+      Buildkite::TestCollector.configure(hook: hook, otel_only: true)
+
+      expect {
+        Buildkite::TestCollector.start_otel
+      }.to output(/NO TEST RESULTS UPLOADED/).to_stderr
+    ensure
+      Buildkite::TestCollector.otel_only = false
+    end
+
+    it "routes annotations to OpenTelemetry in OTLP-only mode" do
+      allow(Buildkite::TestCollector::OTel).to receive(:annotate)
+      Buildkite::TestCollector.otel_only = true
+
+      Buildkite::TestCollector.annotate("a thing happened")
+
+      expect(Buildkite::TestCollector::OTel).to have_received(:annotate).with("a thing happened")
+    ensure
+      Buildkite::TestCollector.otel_only = false
+    end
   end
 
   context "worker ID tag" do
@@ -180,6 +250,12 @@ RSpec.describe Buildkite::TestCollector do
       Buildkite::TestCollector.start_otel
 
       expect(Buildkite::TestCollector::OTel).not_to have_received(:configure!)
+    end
+
+    it "rejects otel_only rather than silently uploading nothing" do
+      expect {
+        Buildkite::TestCollector.configure(hook: hook, otel_only: true)
+      }.to raise_error(ArgumentError, /otel_only is currently only supported with the rspec hook/)
     end
   end
 
