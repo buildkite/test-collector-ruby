@@ -453,6 +453,11 @@ module Buildkite::TestCollector
       end
 
       def finish_span(span, end_timestamp = nil)
+        # A backwards clock step while the test ran can put the captured
+        # realtime end before the span's start; fall back to the SDK's own
+        # monotonic timing rather than export an invalid span.
+        end_timestamp = nil if end_timestamp && precedes_start?(span, end_timestamp)
+
         if end_timestamp
           span.finish(end_timestamp: end_timestamp)
         else
@@ -460,6 +465,14 @@ module Buildkite::TestCollector
         end
       rescue StandardError => e
         warn "[buildkite-test_collector] Could not finish OpenTelemetry test span: #{e.class}: #{e.message}"
+      end
+
+      def precedes_start?(span, end_timestamp)
+        return false unless span.respond_to?(:start_timestamp) && span.start_timestamp
+
+        (end_timestamp.to_r * 1_000_000_000).to_i < span.start_timestamp
+      rescue StandardError
+        false
       end
 
       def span_duration(span)
