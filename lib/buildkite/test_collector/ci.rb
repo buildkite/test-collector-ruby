@@ -67,10 +67,14 @@ class Buildkite::TestCollector::CI
   end
 
   def github_actions
+    repository = ENV["GITHUB_REPOSITORY"]
+    run_id = ENV["GITHUB_RUN_ID"]
+    url = File.join("https://github.com", repository, "actions/runs", run_id) if repository && run_id
+
     {
       "CI" => "github_actions",
       "key" => "#{ENV["GITHUB_ACTION"]}-#{ENV["GITHUB_RUN_NUMBER"]}-#{ENV["GITHUB_RUN_ATTEMPT"]}",
-      "url" => File.join("https://github.com", ENV["GITHUB_REPOSITORY"], "actions/runs", ENV["GITHUB_RUN_ID"]),
+      "url" => url,
       "branch" => ENV["GITHUB_REF_NAME"],
       "commit_sha" => ENV["GITHUB_SHA"],
       "number" => ENV["GITHUB_RUN_NUMBER"],
