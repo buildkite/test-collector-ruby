@@ -74,7 +74,6 @@ RSpec.describe Buildkite::TestCollector do
         endpoint: "https://tests-otlp.buildkite.com/v1/traces",
         api_token: "MyToken",
         run_env: run_env,
-        otel_only: false,
         instrumentations: [],
         resource_attributes: { "team" => "platform" },
       )
@@ -100,7 +99,7 @@ RSpec.describe Buildkite::TestCollector do
       allow(Buildkite::TestCollector::CI).to receive(:env) { run_env }
       allow(Buildkite::TestCollector::OTel).to receive(:configure!)
       allow(Buildkite::TestCollector::OTel).to receive(:enabled?) { true }
-      # Stubbed so the OTLP-only hooks aren't installed into this very suite.
+      # Stubbed so another copy of the RSpec hooks is not installed here.
       allow(Buildkite::TestCollector).to receive(:hook_into)
       env_overlay["BUILDKITE_ANALYTICS_TOKEN"] = "MyToken"
       env_overlay["BUILDKITE_AGENT_ID"] = "agent-123"
@@ -121,7 +120,6 @@ RSpec.describe Buildkite::TestCollector do
         endpoint: "https://tests-otlp.buildkite.com/v1/traces",
         api_token: "MyToken",
         run_env: run_env,
-        otel_only: true,
         instrumentations: nil,
         # The merged tags, so the automatic worker tag reaches OTLP too.
         resource_attributes: { "ci.worker.id" => "agent-123", "team" => "platform" },
@@ -163,6 +161,18 @@ RSpec.describe Buildkite::TestCollector do
       expect(Buildkite::TestCollector::OTel).to have_received(:annotate).with("a thing happened")
     ensure
       Buildkite::TestCollector.otel_only = false
+    end
+
+    it "routes annotations to OpenTelemetry alongside the standard trace" do
+      allow(Buildkite::TestCollector::OTel).to receive(:annotate)
+      tracer = spy("tracer")
+      allow(Buildkite::TestCollector::Uploader).to receive(:tracer) { tracer }
+
+      Buildkite::TestCollector.annotate("a thing happened")
+
+      expect(Buildkite::TestCollector::OTel).to have_received(:annotate).with("a thing happened")
+      expect(tracer).to have_received(:enter).with("annotation", content: "a thing happened")
+      expect(tracer).to have_received(:leave)
     end
   end
 

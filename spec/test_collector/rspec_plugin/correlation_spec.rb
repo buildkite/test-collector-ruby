@@ -5,13 +5,12 @@ require "rspec/core/sandbox"
 
 RSpec.describe "RSpec execution and OpenTelemetry correlation" do
   # Sandboxed so the collector's hooks don't disturb this suite. group.run
-  # doesn't fire before(:suite), so OTelReporter is added directly (the
-  # JSON-uploading Reporter stays out: it would open an upload session).
+  # doesn't fire before(:suite), so the shared Reporter is added directly.
   def run_sandboxed_example(metadata = {}, &block)
     RSpec::Core::Sandbox.sandboxed do |config|
       config.output_stream = StringIO.new
       load "buildkite/test_collector/library_hooks/rspec.rb"
-      config.add_formatter Buildkite::TestCollector::RSpecPlugin::OTelReporter
+      config.add_formatter Buildkite::TestCollector::RSpecPlugin::Reporter
 
       group = RSpec.describe("Correlated group") do
         it("passes", metadata, &(block || proc { nil }))
@@ -46,7 +45,6 @@ RSpec.describe "RSpec execution and OpenTelemetry correlation" do
       endpoint: "https://tests-otlp.buildkite.com/v1/traces",
       api_token: nil,
       run_env: run_env,
-      otel_only: false,
       instrumentations: nil,
       resource_attributes: {},
       )
@@ -136,6 +134,9 @@ RSpec.describe "RSpec execution and OpenTelemetry correlation" do
     span = exporter.finished_spans.find { |finished| finished.name == "test.execution" }
     expect(span.attributes.fetch("test.case.result.status")).to eq("fail")
     expect(span.status.code).to eq(OpenTelemetry::Trace::Status::ERROR)
+    expect(span.status.description).to include("nope")
+    exception_event = span.events.find { |event| event.name == "exception" }
+    expect(exception_event.attributes.fetch("exception.message")).to include("nope")
   ensure
     Buildkite::TestCollector::OTel.instance_variable_set(:@tracer, nil)
     Buildkite::TestCollector.uploader.traces.delete(example&.id)
@@ -186,7 +187,7 @@ RSpec.describe "RSpec execution and OpenTelemetry correlation" do
       end
 
       load "buildkite/test_collector/library_hooks/rspec.rb"
-      config.add_formatter Buildkite::TestCollector::RSpecPlugin::OTelReporter
+      config.add_formatter Buildkite::TestCollector::RSpecPlugin::Reporter
 
       group = RSpec.describe("Correlated group") { it("passes") { nil } }
       group.run(RSpec.configuration.reporter)
@@ -217,7 +218,7 @@ RSpec.describe "RSpec execution and OpenTelemetry correlation" do
     example = RSpec::Core::Sandbox.sandboxed do |config|
       config.output_stream = StringIO.new
       load "buildkite/test_collector/library_hooks/rspec.rb"
-      config.add_formatter Buildkite::TestCollector::RSpecPlugin::OTelReporter
+      config.add_formatter Buildkite::TestCollector::RSpecPlugin::Reporter
 
       # Registered after the collector's hook, so its exception escapes
       # through the collector while example.exception is still nil.
@@ -255,7 +256,7 @@ RSpec.describe "RSpec execution and OpenTelemetry correlation" do
     example = RSpec::Core::Sandbox.sandboxed do |config|
       config.output_stream = StringIO.new
       load "buildkite/test_collector/library_hooks/rspec.rb"
-      config.add_formatter Buildkite::TestCollector::RSpecPlugin::OTelReporter
+      config.add_formatter Buildkite::TestCollector::RSpecPlugin::Reporter
 
       # Scientist-style acknowledgement: pending plus a deliberate raise is
       # pending to RSpec (exit 0), not failed.
@@ -314,8 +315,8 @@ RSpec.describe "RSpec execution and OpenTelemetry correlation" do
       :@tracer, provider.tracer("correlation-test")
     )
     Buildkite::TestCollector.instance_variable_set(:@otel_options, nil)
-    # before(:suite) also registers the JSON-uploading Reporter, whose
-    # send queue needs a batch size; configure normally supplies it.
+    # before(:suite) registers Reporter, whose JSON send queue needs a batch
+    # size; configure normally supplies it.
     Buildkite::TestCollector.batch_size ||= Buildkite::TestCollector::DEFAULT_UPLOAD_BATCH_SIZE
 
     example = RSpec::Core::Sandbox.sandboxed do |config|

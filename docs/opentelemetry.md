@@ -4,11 +4,11 @@
 
 This page describes `otel_enabled`, where spans are exported *alongside* the
 normal JSON upload and linked to it by trace ID. There is also an OTLP-only
-mode (`otel_only`) where the span *is* the submission: it carries the full
-execution details (`buildkite.execution.via=otlp`, result, failure reason and
-backtrace, tags) and Buildkite synthesizes the execution from it server-side,
-with nothing sent to `/v1/uploads`. In that mode the run's details (run key,
-branch, commit, and any `tags:` you configure) travel as OpenTelemetry resource
+mode (`otel_only`) that exports the same spans but adds
+`buildkite.execution.via=otlp`. That marker makes the span itself the
+submission: Buildkite synthesizes the execution from it server-side, with
+nothing sent to `/v1/uploads`. In both modes the run's details (run key, branch,
+commit, and any `tags:` you configure) travel as OpenTelemetry resource
 attributes on the spans the collector exports. See the
 [README](../README.md#otlp-only-submission-experimental) for how to turn it on,
 and [OTLP-only attributes](#otlp-only-attributes) below for what's sent.
@@ -45,6 +45,8 @@ as span attributes.
 
 | Attribute | Value |
 | --- | --- |
+| `buildkite.test.scope` | the example group |
+| `buildkite.test.name` | the example's description |
 | `test.case.name` | the example's full description |
 | `test.suite.name` | the example group |
 | `code.file.path` | the file the test is in |
@@ -53,8 +55,9 @@ as span attributes.
 | `buildkite.test.execution.external_id` | the ID of the matching Test Engine execution |
 | `buildkite.tag.<key>` | each `tag_execution` tag |
 
-A failed test also sets the span's status to error. Why it failed stays on the
-test's execution in Test Engine rather than on the span.
+A failed test also sets the span's status to error with the failure summary as
+its description. Each failure is recorded as a semconv `exception` event with
+`exception.message` and `exception.stacktrace` attributes.
 
 Two things worth knowing:
 
@@ -70,10 +73,11 @@ Two things worth knowing:
 
 ## OTLP-only attributes
 
-With `otel_only`, the span is the submission, so it carries more. Buildkite
-attributes are flat (`buildkite.run_key`, `buildkite.build_id`, ...), matching
-the agent's own OpenTelemetry attributes; everything else follows OpenTelemetry
-semantic conventions.
+Both modes use the same resource and span attributes. With `otel_only`, the
+`buildkite.execution.via=otlp` marker opts the span into execution synthesis.
+Buildkite attributes are flat (`buildkite.run_key`, `buildkite.build_id`, ...),
+matching the agent's own OpenTelemetry attributes; everything else follows
+OpenTelemetry semantic conventions.
 
 Run-level details travel once, as resource attributes on every span:
 
@@ -102,7 +106,7 @@ Each test's span carries the execution itself:
 
 | Span attribute | Value | Execution field |
 | --- | --- | --- |
-| `buildkite.execution.via` | `otlp` — opts this span in to synthesis | — |
+| `buildkite.execution.via` | `otlp` in OTLP-only mode — opts this span in to synthesis | — |
 | `buildkite.test.scope` | the example group | scope |
 | `buildkite.test.name` | the example's description | name |
 | `test.suite.name` | the example group | — |
@@ -110,19 +114,18 @@ Each test's span carries the execution itself:
 | `code.file.path` | the file the test is in | file name, location |
 | `code.line.number` | the line number | location |
 | `test.case.result.status` | `pass`, `fail`, `skipped` | result |
+| `buildkite.test.execution.external_id` | the execution's collector-generated ID | external ID |
 | `buildkite.tag.<key>` | each `tag_execution` tag | execution tag `<key>` |
 
-A failure travels in OpenTelemetry's native shapes rather than as attributes:
-the failure summary is the span's error status description, and each individual
-failure is a semconv `exception` event (`exception.message`,
-`exception.stacktrace`). The server maps these back to the execution's failure
-reason and expanded failure detail.
+In OTLP-only mode the server maps the span's failure status and exception events
+back to the execution's failure reason and expanded failure detail.
 
 ## Finding a test's trace
 
-The trace's ID is sent with the test's execution, so Buildkite can show you the
-two together. Child spans share that ID through normal context propagation, so
-one trace holds everything the test did.
+With `otel_enabled`, the trace's ID is sent in the JSON execution so Buildkite
+can show the two together. With `otel_only`, the span is the execution. Child
+spans share the root's trace ID through normal context propagation, so one trace
+holds everything the test did.
 
 ## If you already use OpenTelemetry
 

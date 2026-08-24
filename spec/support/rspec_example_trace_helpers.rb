@@ -53,7 +53,11 @@ module RSpecExampleTraceHelpers
   end
 
   def fake_trace(a_example)
-    fake_trace = double("Buildkite::TestCollector::RSpecPlugin::Trace", example: a_example)
+    fake_trace = double(
+      "Buildkite::TestCollector::RSpecPlugin::Trace",
+      example: a_example,
+      otel_span: nil,
+    )
     allow(fake_trace).to receive(:[]) { fake_trace }
     allow(fake_trace).to receive(:example=)
     allow(fake_trace).to receive(:failure_reason=)

@@ -4,7 +4,7 @@ module Buildkite::TestCollector::RSpecPlugin
   class Trace < Buildkite::TestCollector::Trace
     attr_accessor :example, :failure_reason, :failure_expanded
 
-    # Left open by the around hook; OTelReporter finishes it once RSpec
+    # Left open by the around hook; Reporter finishes it once RSpec
     # settles the example's result.
     attr_accessor :otel_span, :otel_end_timestamp
 
@@ -38,20 +38,38 @@ module Buildkite::TestCollector::RSpecPlugin
       result
     end
 
-    # What the span says about the test itself. Same file path as the execution
-    # upload, so the two agree.
+    # What the span says about the test itself. The two OTel modes use the same
+    # attributes; buildkite.execution.via is the sole synthesis opt-in.
     def otel_attributes
       attributes = {
+        "buildkite.test.scope" => strip_invalid_utf8_chars(scope),
+        "buildkite.test.name" => strip_invalid_utf8_chars(name),
         "test.case.name" => strip_invalid_utf8_chars(example.full_description),
         "test.suite.name" => strip_invalid_utf8_chars(scope),
         "code.file.path" => strip_invalid_utf8_chars(prepend_location_prefix(file_name)),
         "code.line.number" => source_line_number,
       }
+      attributes["buildkite.execution.via"] = "otlp" if Buildkite::TestCollector.otel_only?
       attributes["buildkite.test.execution.external_id"] = external_id if external_id
       tags&.each do |key, value|
         attributes["buildkite.tag.#{key}"] = strip_invalid_utf8_chars(value.to_s)
       end
       attributes
+    end
+
+    def otel_failure_reason
+      strip_invalid_utf8_chars(failure_reason) if failure_reason
+    end
+
+    def otel_exception_events
+      (failure_expanded || []).filter_map do |failure|
+        message = Array(failure[:expanded]).join("\n")
+        stacktrace = Array(failure[:backtrace]).join("\n")
+        attributes = {}
+        attributes["exception.message"] = strip_invalid_utf8_chars(message) unless message.empty?
+        attributes["exception.stacktrace"] = strip_invalid_utf8_chars(stacktrace) unless stacktrace.empty?
+        attributes unless attributes.empty?
+      end
     end
 
     private

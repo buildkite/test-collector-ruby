@@ -56,7 +56,7 @@ module Buildkite::TestCollector
         !@tracer.nil?
       end
 
-      def configure!(endpoint: DEFAULT_ENDPOINT, api_token: nil, run_env: {}, instrumentations: nil, otel_only: false, resource_attributes: {})
+      def configure!(endpoint: DEFAULT_ENDPOINT, api_token: nil, run_env: {}, instrumentations: nil, resource_attributes: {})
         if enabled?
           # One process serves one run: the exporters and providers live for
           # the whole process, so run identity is fixed at first configure.
@@ -87,14 +87,13 @@ module Buildkite::TestCollector
         @run_key = run_env["key"]
         headers = request_headers(run_env, api_token)
 
-        # In OTLP-only mode the run-level detail (run key, branch, commit,
-        # user tags) travels as the resource of the providers we create, so
-        # every exported span carries it without repeating it per span.
-        resource = otel_only ? run_resource(run_env, resource_attributes) : execution_resource(resource_attributes)
+        # Run-level detail travels as the resource of the providers we create,
+        # so every exported span carries it without repeating it per span.
+        resource = run_resource(run_env, resource_attributes)
 
         @execution_provider = build_execution_provider(endpoint, headers, resource)
         @tracer = @execution_provider.tracer(TRACER_NAME, Buildkite::TestCollector::VERSION)
-        configure_child_export(endpoint, headers, instrumentations, resource: otel_only ? resource : nil)
+        configure_child_export(endpoint, headers, instrumentations, resource: resource)
         register_shutdown_at_exit
       rescue LoadError, StandardError => e
         warn "[buildkite-test_collector] OpenTelemetry span export disabled: #{e.class}: #{e.message}"
@@ -331,10 +330,10 @@ module Buildkite::TestCollector
         warn "[buildkite-test_collector] Could not exempt the OTLP endpoint from VCR: #{e.class}: #{e.message}"
       end
 
-      # In OTLP-only mode the collector-managed child provider carries the
-      # same run resource as the execution provider, so instrumentation spans
-      # and any spans the suite starts through the global tracer carry the
-      # run's identity too. A suite-owned provider keeps its own resource.
+      # The collector-managed child provider carries the same run resource as
+      # the execution provider, so instrumentation spans and any spans the
+      # suite starts through the global tracer carry the run's identity too.
+      # A suite-owned provider keeps its own resource.
       def configure_child_export(endpoint, headers, instrumentations, resource: nil)
         provider = OpenTelemetry.tracer_provider
         collector_managed = provider.is_a?(OpenTelemetry::Internal::ProxyTracerProvider)
@@ -376,20 +375,6 @@ module Buildkite::TestCollector
 
       def execution_context_key
         @execution_context_key ||= OpenTelemetry::Context.create_key("buildkite.test.execution")
-      end
-
-      def execution_resource(resource_attributes = {})
-        provider = OpenTelemetry.tracer_provider
-        resource = if provider.respond_to?(:resource)
-          provider.resource
-        else
-          OpenTelemetry::SDK::Resources::Resource.default
-        end
-
-        tags = tag_attributes(resource_attributes)
-        return resource if tags.empty?
-
-        resource.merge(OpenTelemetry::SDK::Resources::Resource.create(tags))
       end
 
       # User tags travel under the buildkite.tag. prefix, which the server

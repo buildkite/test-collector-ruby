@@ -416,6 +416,7 @@ RSpec.describe Buildkite::TestCollector::OTel do
     allow(OpenTelemetry::SDK).to receive(:configure) do |&block|
       block.call(config)
     end
+    allow(config).to receive(:resource=)
     allow(described_class).to receive(:batch_processor)
       .and_return(execution_processor, child_processor)
 
@@ -527,45 +528,39 @@ RSpec.describe Buildkite::TestCollector::OTel do
     )
   end
 
-  it "uses an AlwaysOn sampler, process-safe random IDs, and the suite resource for execution roots" do
+  it "uses an AlwaysOn sampler, process-safe random IDs, and the run resource for execution roots" do
     processor = spy(
       "execution processor",
       shutdown: OpenTelemetry::SDK::Trace::Export::SUCCESS,
     )
     generator = described_class.const_get(:SecureRandomIdGenerator, false)
-    resource = OpenTelemetry::SDK::Resources::Resource.create("service.name" => "my-suite")
-    provider = OpenTelemetry::SDK::Trace::TracerProvider.new(resource: resource)
-    allow(OpenTelemetry).to receive(:tracer_provider).and_return(provider)
+    resource = described_class.send(:run_resource, { "key" => "run-123" }, {})
     allow(described_class).to receive(:batch_processor).and_return(processor)
 
     execution_provider = described_class.send(
       :build_execution_provider,
       "https://example.invalid/v1/traces",
       {},
-      described_class.send(:execution_resource),
+      resource,
     )
 
     expect(execution_provider.id_generator).to equal(generator)
     expect(execution_provider.sampler).to equal(OpenTelemetry::SDK::Trace::Samplers::ALWAYS_ON)
     expect(execution_provider.resource).to equal(resource)
-  ensure
-    execution_provider&.shutdown
-    provider&.shutdown
-  end
-
-  it "adds user tags to the suite resource for execution roots" do
-    resource = OpenTelemetry::SDK::Resources::Resource.create("service.name" => "my-suite")
-    provider = OpenTelemetry::SDK::Trace::TracerProvider.new(resource: resource)
-    allow(OpenTelemetry).to receive(:tracer_provider).and_return(provider)
-
-    tagged = described_class.send(:execution_resource, "team" => "platform")
-
-    expect(tagged.attribute_enumerator.to_h).to include(
-      "service.name" => "my-suite",
-      "buildkite.tag.team" => "platform",
+    expect(execution_provider.resource.attribute_enumerator.to_h).to include(
+      "buildkite.run_key" => "run-123",
     )
   ensure
-    provider&.shutdown
+    execution_provider&.shutdown
+  end
+
+  it "adds user tags to the run resource for execution roots" do
+    tagged = described_class.send(:run_resource, {}, { "team" => "platform" })
+
+    expect(tagged.attribute_enumerator.to_h).to include(
+      "service.name" => "buildkite-test-collector",
+      "buildkite.tag.team" => "platform",
+    )
   end
 
   it "exports roots privately and only forwards execution children" do
@@ -645,7 +640,9 @@ RSpec.describe Buildkite::TestCollector::OTel do
     exported_child = child_exporter.finished_spans.find { |span| span.name == "child" }
     expect(exported_child.trace_id).to eq(exported_root.trace_id)
     expect(exported_child.parent_span_id).to eq(exported_root.span_id)
-    expect(exported_root.resource).to equal(suite_resource)
+    expect(exported_root.resource.attribute_enumerator.to_h).to include(
+      "service.name" => "buildkite-test-collector",
+    )
     expect(exported_child.resource).to equal(suite_resource)
 
     described_class.shutdown
@@ -944,7 +941,7 @@ RSpec.describe Buildkite::TestCollector::OTel do
     described_class.shutdown
   end
 
-  describe "OTLP-only mode" do
+  describe "run resources" do
     it "exports spans carrying the run and user tags as the resource" do
       original = OpenTelemetry.tracer_provider
       OpenTelemetry.tracer_provider = OpenTelemetry::Internal::ProxyTracerProvider.new
@@ -964,7 +961,6 @@ RSpec.describe Buildkite::TestCollector::OTel do
           "collector" => "ruby-buildkite-test_collector",
           "version" => Buildkite::TestCollector::VERSION,
         },
-        otel_only: true,
         resource_attributes: { "team" => "platform", :speed => :fast },
       )
 
@@ -1002,7 +998,6 @@ RSpec.describe Buildkite::TestCollector::OTel do
       described_class.configure!(
         endpoint: "https://example.invalid/v1/traces",
         run_env: { "key" => "run-123" },
-        otel_only: true,
       )
 
       # The suite's provider is not replaced or reconfigured: the execution

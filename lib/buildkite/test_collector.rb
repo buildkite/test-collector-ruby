@@ -82,7 +82,7 @@ module Buildkite
 
       # Defer OTel setup until RSpec's before(:suite), after application and support files have loaded.
       # otel_only already guarantees the rspec hook (checked above), so both
-      # modes reduce to the same options apart from the otel_only flag itself.
+      # modes use exactly the same OpenTelemetry setup.
       @otel_options = nil
       if otel_only || (otel_enabled && test_runner == "rspec")
         @otel_options = {
@@ -90,7 +90,6 @@ module Buildkite
           endpoint: ENV["BUILDKITE_ANALYTICS_OTLP_ENDPOINT"] || Buildkite::TestCollector::OTel::DEFAULT_ENDPOINT,
           api_token: api_token,
           run_env: Buildkite::TestCollector::CI.env,
-          otel_only: otel_only,
           instrumentations: otel_instrumentations,
           # Tags describe the whole run, so they ride along as resource
           # attributes on every exported span. The merged self.tags, not the
@@ -107,7 +106,7 @@ module Buildkite
       return unless options
 
       Buildkite::TestCollector::OTel.configure!(**options)
-      warn_otel_only_disabled if options[:otel_only] && !Buildkite::TestCollector::OTel.enabled?
+      warn_otel_only_disabled if otel_only? && !Buildkite::TestCollector::OTel.enabled?
     end
 
     def self.otel_only?
@@ -144,7 +143,6 @@ module Buildkite
 
     def self.hook_into(hook)
       file = "test_collector/library_hooks/#{hook}"
-      file += "_otel_only" if otel_only?
       require_relative file
     rescue LoadError
       raise ArgumentError.new("#{hook.inspect} is not a supported Buildkite Analytics Test library hook.")
@@ -163,16 +161,14 @@ module Buildkite
     private_class_method :worker_id_tag
 
     def self.annotate(content)
-      # With OTLP as the only upload method there is no legacy trace to
-      # annotate, so the annotation becomes an event on the current
-      # OpenTelemetry test span instead.
-      if otel_only?
-        Buildkite::TestCollector::OTel.annotate(content)
-      else
-        tracer = Buildkite::TestCollector::Uploader.tracer
-        tracer&.enter("annotation", **{ content: content })
-        tracer&.leave
-      end
+      # Keep the OpenTelemetry span identical in both export modes. The
+      # standard mode additionally records the annotation in its JSON trace.
+      Buildkite::TestCollector::OTel.annotate(content)
+      return if otel_only?
+
+      tracer = Buildkite::TestCollector::Uploader.tracer
+      tracer&.enter("annotation", **{ content: content })
+      tracer&.leave
     end
 
     # Set a key=value tag on the current test execution.
