@@ -98,6 +98,7 @@ module Buildkite
         }
       end
       self.hook_into(hook)
+      enable_tracing! if test_runner == "rspec" && !otel_only?
     end
 
     def self.start_otel
@@ -192,10 +193,12 @@ module Buildkite
       return unless defined?(ActiveSupport)
 
       require "active_support/notifications"
+      return if @active_support_tracing_enabled
 
       ActiveSupport::Notifications.subscribe("sql.active_record") do |name, start, finish, id, payload|
         Buildkite::TestCollector::Uploader.tracer&.backfill(:sql, finish - start, **{ query: payload[:sql] })
       end
+      @active_support_tracing_enabled = true
     end
 
     class MinDurationSpanFilter

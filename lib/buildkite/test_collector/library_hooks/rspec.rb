@@ -75,5 +75,3 @@ RSpec.configure do |config|
     end
   end
 end
-
-Buildkite::TestCollector.enable_tracing! unless Buildkite::TestCollector.otel_only?

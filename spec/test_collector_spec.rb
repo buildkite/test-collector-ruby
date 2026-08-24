@@ -174,6 +174,25 @@ RSpec.describe Buildkite::TestCollector do
       expect(tracer).to have_received(:enter).with("annotation", content: "a thing happened")
       expect(tracer).to have_received(:leave)
     end
+
+    it "enables legacy tracing after OTLP-only without duplicating SQL subscriptions" do
+      previous = Buildkite::TestCollector.instance_variable_get(:@active_support_tracing_enabled)
+      Buildkite::TestCollector.instance_variable_set(:@active_support_tracing_enabled, nil)
+      allow(Buildkite::TestCollector).to receive(:hook_into)
+      allow(Buildkite::TestCollector::Network).to receive(:configure)
+      allow(Buildkite::TestCollector::Object).to receive(:configure)
+      allow(ActiveSupport::Notifications).to receive(:subscribe)
+
+      Buildkite::TestCollector.configure(hook: hook, otel_only: true)
+      2.times { Buildkite::TestCollector.configure(hook: hook) }
+
+      expect(Buildkite::TestCollector::Network).to have_received(:configure).twice
+      expect(Buildkite::TestCollector::Object).to have_received(:configure).twice
+      expect(ActiveSupport::Notifications).to have_received(:subscribe).once
+    ensure
+      Buildkite::TestCollector.instance_variable_set(:@active_support_tracing_enabled, previous)
+      Buildkite::TestCollector.otel_only = false
+    end
   end
 
   context "worker ID tag" do
