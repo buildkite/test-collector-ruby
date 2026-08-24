@@ -75,14 +75,12 @@ module Buildkite::TestCollector::RSpecPlugin
           end
 
           # before/after(:suite) can run more than once in a single process
-          # (warm test pools re-run suites), so flush here but keep the
-          # exporter alive until the process exits.
+          # (warm test pools re-run suites), so only flush spans here; OTel
+          # registered a process-lifetime at_exit shutdown when it configured.
           config.after(:suite) do
             Buildkite::TestCollector::OTel.force_flush
           end
         end
-
-        at_exit { Buildkite::TestCollector::OTel.shutdown }
       end
 
       def trace(example)

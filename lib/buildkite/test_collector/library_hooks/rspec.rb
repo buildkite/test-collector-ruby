@@ -62,7 +62,10 @@ RSpec.configure do |config|
   end
 
   config.after(:suite) do
-    Buildkite::TestCollector::OTel.shutdown
+    # before/after(:suite) can run more than once in a single process (warm
+    # test pools re-run suites), so only flush spans here; OTel registered a
+    # process-lifetime at_exit shutdown when it configured.
+    Buildkite::TestCollector::OTel.force_flush
 
     if Buildkite::TestCollector.artifact_path
       filename = File.join(Buildkite::TestCollector.artifact_path, "buildkite-test-collector-rspec-#{Buildkite::TestCollector::UUID.call}.json.gz")

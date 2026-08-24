@@ -95,6 +95,7 @@ module Buildkite::TestCollector
         @execution_provider = build_execution_provider(endpoint, headers, resource)
         @tracer = @execution_provider.tracer(TRACER_NAME, Buildkite::TestCollector::VERSION)
         configure_child_export(endpoint, headers, instrumentations, resource: otel_only ? resource : nil)
+        register_shutdown_at_exit
       rescue LoadError, StandardError => e
         warn "[buildkite-test_collector] OpenTelemetry span export disabled: #{e.class}: #{e.message}"
         shutdown
@@ -220,6 +221,19 @@ module Buildkite::TestCollector
       end
 
       private
+
+      # Suite hooks only flush, because a suite's before/after(:suite) can run
+      # more than once in a single process (warm test pools re-run suites).
+      # The process-lifetime shutdown lives here instead, registered once on
+      # first successful configure. The flag survives shutdown so an explicit
+      # mid-process shutdown followed by a reconfigure cannot stack handlers;
+      # shutdown is a safe no-op when nothing is configured.
+      def register_shutdown_at_exit
+        return if @shutdown_at_exit_registered
+
+        @shutdown_at_exit_registered = true
+        at_exit { Buildkite::TestCollector::OTel.shutdown }
+      end
 
       def build_execution_provider(endpoint, headers, resource)
         execution_processor = batch_processor(

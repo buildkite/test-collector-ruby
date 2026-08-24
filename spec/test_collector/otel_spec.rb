@@ -269,6 +269,36 @@ RSpec.describe Buildkite::TestCollector::OTel do
     expect(described_class).not_to be_enabled
   end
 
+  it "registers a process-lifetime at_exit shutdown once, on successful configure" do
+    suite_provider = OpenTelemetry::SDK::Trace::TracerProvider.new
+    allow(OpenTelemetry).to receive(:tracer_provider).and_return(suite_provider)
+    allow(OpenTelemetry::Exporter::OTLP::Exporter).to receive(:new) do
+      OpenTelemetry::SDK::Trace::Export::InMemorySpanExporter.new
+    end
+    previous = described_class.instance_variable_get(:@shutdown_at_exit_registered)
+    described_class.instance_variable_set(:@shutdown_at_exit_registered, nil)
+    registrations = 0
+    allow(described_class).to receive(:at_exit) { registrations += 1 }
+
+    # A failed configure leaves nothing to shut down at exit.
+    expect do
+      described_class.configure!(instrumentations: [:all])
+    end.to output(/OpenTelemetry span export disabled/).to_stderr
+    expect(registrations).to eq(0)
+
+    described_class.configure!(endpoint: "https://example.invalid/v1/traces")
+    expect(registrations).to eq(1)
+
+    # Reconfiguring after an explicit shutdown must not stack another handler.
+    described_class.shutdown
+    described_class.configure!(endpoint: "https://example.invalid/v1/traces")
+    expect(registrations).to eq(1)
+  ensure
+    described_class.shutdown
+    described_class.instance_variable_set(:@shutdown_at_exit_registered, previous)
+    suite_provider&.shutdown
+  end
+
   it "shuts down the execution processor when private provider setup fails" do
     execution_processor = spy(
       "OpenTelemetry execution processor",

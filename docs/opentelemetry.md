@@ -250,9 +250,9 @@ run. Reporting a new run requires a new process.
 Export never fails a test. If root setup fails, the collector warns and the
 normal test result upload continues without spans. If optional child setup or
 attachment fails, the collector warns, cleans up that path, and continues
-exporting roots. Suite shutdown gives the OpenTelemetry SDK a 30-second budget
-to export buffered spans; the SDK's own retry backoff can run past it when the
-endpoint keeps failing.
+exporting roots. The suite-end flush and the process-exit shutdown each give
+the OpenTelemetry SDK a 30-second budget to export buffered spans; the SDK's
+own retry backoff can run past it when the endpoint keeps failing.
 
 Export failures are reported through OpenTelemetry's own logger. The collector
 also warns if its reserved root queue drops any `test.execution` spans; normal
