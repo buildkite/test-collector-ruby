@@ -103,11 +103,33 @@ RSpec.describe Buildkite::TestCollector::RSpecPlugin::Trace do
 
     it "describes the test, using the same path as the upload" do
       expect(trace.otel_attributes).to eq(
+        "buildkite.test.scope" => example.example_group.metadata[:full_description],
+        "buildkite.test.name" => example.description,
         "test.case.name" => example.full_description,
         "test.suite.name" => example.example_group.metadata[:full_description],
         "code.file.path" => "./spec/foo_spec.rb",
         "code.line.number" => 42,
       )
+    end
+
+    context "with OTLP-only submission" do
+      around do |test|
+        original_otel_only = Buildkite::TestCollector.otel_only
+        Buildkite::TestCollector.otel_only = true
+        test.run
+      ensure
+        Buildkite::TestCollector.otel_only = original_otel_only
+      end
+
+      it "adds only the execution synthesis marker" do
+        Buildkite::TestCollector.otel_only = false
+        standard_attributes = trace.otel_attributes
+        Buildkite::TestCollector.otel_only = true
+
+        expect(trace.otel_attributes).to eq(
+          standard_attributes.merge("buildkite.execution.via" => "otlp"),
+        )
+      end
     end
 
     context "with an external ID" do
@@ -155,6 +177,29 @@ RSpec.describe Buildkite::TestCollector::RSpecPlugin::Trace do
           "code.line.number" => 17,
         )
       end
+    end
+  end
+
+  describe "#otel_failure_reason and #otel_exception_events" do
+    it "exposes the failure summary and one exception event per failure" do
+      trace.failure_reason = "it broke"
+      trace.failure_expanded = [
+        { expanded: ["it broke"], backtrace: ["foo.rb:1", "foo.rb:9"] },
+        { expanded: [], backtrace: [] },
+      ]
+
+      expect(trace.otel_failure_reason).to eq("it broke")
+      expect(trace.otel_exception_events).to eq([
+        {
+          "exception.message" => "it broke",
+          "exception.stacktrace" => "foo.rb:1\nfoo.rb:9",
+        },
+      ])
+    end
+
+    it "is empty when the test did not fail" do
+      expect(trace.otel_failure_reason).to be_nil
+      expect(trace.otel_exception_events).to eq([])
     end
   end
 end

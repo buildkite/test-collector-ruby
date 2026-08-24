@@ -4,7 +4,6 @@ require "rspec/core"
 require "rspec/expectations"
 
 require_relative "../rspec_plugin/reporter"
-require_relative "../rspec_plugin/otel_reporter"
 require_relative "../rspec_plugin/trace"
 
 Buildkite::TestCollector.uploader = Buildkite::TestCollector::Uploader
@@ -12,17 +11,15 @@ Buildkite::TestCollector.uploader = Buildkite::TestCollector::Uploader
 RSpec.configure do |config|
   config.before(:suite) do
     Buildkite::TestCollector.start_otel
-
-    # OTelReporter first: it finishes the example's span (and settles the
-    # history's duration) before Reporter queues the example for upload.
-    config.add_formatter Buildkite::TestCollector::RSpecPlugin::OTelReporter
     config.add_formatter Buildkite::TestCollector::RSpecPlugin::Reporter
   end
 
   config.around(:each) do |example|
-    tracer = Buildkite::TestCollector::Tracer.new(
-      min_duration: Buildkite::TestCollector.trace_min_duration,
-    )
+    tracer = unless Buildkite::TestCollector.otel_only?
+      Buildkite::TestCollector::Tracer.new(
+        min_duration: Buildkite::TestCollector.trace_min_duration,
+      )
+    end
 
     tags = {}
 
@@ -39,18 +36,18 @@ RSpec.configure do |config|
       Thread.current[:_buildkite_tracer] = nil
       Thread.current[:_buildkite_tags] = nil
 
-      tracer.finalize
+      tracer&.finalize
 
       trace = Buildkite::TestCollector::RSpecPlugin::Trace.new(
         example,
-        history: tracer.history,
+        history: tracer ? tracer.history : {},
         tags: tags,
         location_prefix: Buildkite::TestCollector.location_prefix,
         external_id: Buildkite::TestCollector::UUID.v7,
         trace_id: trace_id,
       )
 
-      # Left open for OTelReporter to finish once RSpec settles the result;
+      # Left open for Reporter to finish once RSpec settles the result;
       # the end timestamp keeps the span timing the example itself.
       if otel_span
         trace.otel_span = otel_span
@@ -67,7 +64,7 @@ RSpec.configure do |config|
     # process-lifetime at_exit shutdown when it configured.
     Buildkite::TestCollector::OTel.force_flush
 
-    if Buildkite::TestCollector.artifact_path
+    if !Buildkite::TestCollector.otel_only? && Buildkite::TestCollector.artifact_path
       filename = File.join(Buildkite::TestCollector.artifact_path, "buildkite-test-collector-rspec-#{Buildkite::TestCollector::UUID.call}.json.gz")
       data_set = { results: Buildkite::TestCollector.uploader.traces.values.map(&:as_hash) }
       File.open(filename, "wb") do |f|
@@ -78,5 +75,3 @@ RSpec.configure do |config|
     end
   end
 end
-
-Buildkite::TestCollector.enable_tracing!

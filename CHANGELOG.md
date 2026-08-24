@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+* Align `otel_enabled` and `otel_only` on the same execution spans and run
+  resources. `otel_only` now differs by adding `buildkite.execution.via=otlp`
+  while skipping legacy trace capture and JSON result uploads.
+
 * Automatically tag executions with `ci.worker.id` from `BUILDKITE_AGENT_ID`, so failures can be grouped by the agent that ran them. An explicit caller-supplied `ci.worker.id` tag still takes precedence.
 
 * Preserve OpenTelemetry `test.execution` roots with a private AlwaysOn provider

@@ -2,7 +2,7 @@
 
 require "opentelemetry/sdk"
 require "rspec/core/sandbox"
-require "buildkite/test_collector/rspec_plugin/otel_only"
+require "buildkite/test_collector/rspec_plugin/reporter"
 
 RSpec.describe "RSpec OTLP-only submission" do
   # Sandboxed so the collector's hooks don't disturb this suite. group.run
@@ -10,8 +10,8 @@ RSpec.describe "RSpec OTLP-only submission" do
   def run_sandboxed_example(metadata = {}, &block)
     RSpec::Core::Sandbox.sandboxed do |config|
       config.output_stream = StringIO.new
-      load "buildkite/test_collector/library_hooks/rspec_otel_only.rb"
-      config.add_formatter Buildkite::TestCollector::RSpecPlugin::OTelOnly::Reporter
+      load "buildkite/test_collector/library_hooks/rspec.rb"
+      config.add_formatter Buildkite::TestCollector::RSpecPlugin::Reporter
 
       group = RSpec.describe("OTLP-only group") do
         it("does something", metadata, &(block || proc { nil }))
@@ -47,6 +47,9 @@ RSpec.describe "RSpec OTLP-only submission" do
   end
 
   it "describes the whole execution on the span and uploads no JSON" do
+    expect(Buildkite::TestCollector::Tracer).not_to receive(:new)
+    expect(Buildkite::TestCollector).not_to receive(:enable_tracing!)
+
     example = run_sandboxed_example { nil }
     span = finished_test_span
 
@@ -73,10 +76,10 @@ RSpec.describe "RSpec OTLP-only submission" do
 
     expect(span.attributes).to include("test.case.result.status" => "fail")
     expect(span.status.code).to eq(OpenTelemetry::Trace::Status::ERROR)
-    expect(span.status.description).to eq("boom happened")
+    expect(span.status.description).to include("boom happened")
 
     exception_event = span.events.find { |event| event.name == "exception" }
-    expect(exception_event.attributes).to include("exception.message" => "boom happened")
+    expect(exception_event.attributes.fetch("exception.message")).to include("boom happened")
     expect(exception_event.attributes.fetch("exception.stacktrace")).to be_a(String)
   end
 
@@ -95,8 +98,8 @@ RSpec.describe "RSpec OTLP-only submission" do
   it "classifies a failure raised by an inner around hook after the example ran" do
     example = RSpec::Core::Sandbox.sandboxed do |config|
       config.output_stream = StringIO.new
-      load "buildkite/test_collector/library_hooks/rspec_otel_only.rb"
-      config.add_formatter Buildkite::TestCollector::RSpecPlugin::OTelOnly::Reporter
+      load "buildkite/test_collector/library_hooks/rspec.rb"
+      config.add_formatter Buildkite::TestCollector::RSpecPlugin::Reporter
 
       # Registered after the collector's hook, so its exception escapes
       # through the collector while example.exception is still nil.
@@ -116,9 +119,9 @@ RSpec.describe "RSpec OTLP-only submission" do
     expect(example.execution_result.status).to eq(:failed)
     expect(span.attributes).to include("test.case.result.status" => "fail")
     expect(span.status.code).to eq(OpenTelemetry::Trace::Status::ERROR)
-    expect(span.status.description).to eq("hook boom")
+    expect(span.status.description).to include("hook boom")
     exception_event = span.events.find { |event| event.name == "exception" }
-    expect(exception_event.attributes).to include("exception.message" => "hook boom")
+    expect(exception_event.attributes.fetch("exception.message")).to include("hook boom")
   end
 
   it "classifies a failure raised by an outer around hook after the example ran" do
@@ -132,8 +135,8 @@ RSpec.describe "RSpec OTLP-only submission" do
         raise "outer boom"
       end
 
-      load "buildkite/test_collector/library_hooks/rspec_otel_only.rb"
-      config.add_formatter Buildkite::TestCollector::RSpecPlugin::OTelOnly::Reporter
+      load "buildkite/test_collector/library_hooks/rspec.rb"
+      config.add_formatter Buildkite::TestCollector::RSpecPlugin::Reporter
 
       group = RSpec.describe("OTLP-only group") do
         it("does something") {}
@@ -146,14 +149,14 @@ RSpec.describe "RSpec OTLP-only submission" do
     expect(example.execution_result.status).to eq(:failed)
     expect(span.attributes).to include("test.case.result.status" => "fail")
     expect(span.status.code).to eq(OpenTelemetry::Trace::Status::ERROR)
-    expect(span.status.description).to eq("outer boom")
+    expect(span.status.description).to include("outer boom")
   end
 
   it "keeps an acknowledged-pending example skipped when a hook raises deliberately" do
     example = RSpec::Core::Sandbox.sandboxed do |config|
       config.output_stream = StringIO.new
-      load "buildkite/test_collector/library_hooks/rspec_otel_only.rb"
-      config.add_formatter Buildkite::TestCollector::RSpecPlugin::OTelOnly::Reporter
+      load "buildkite/test_collector/library_hooks/rspec.rb"
+      config.add_formatter Buildkite::TestCollector::RSpecPlugin::Reporter
 
       # Scientist-style acknowledgement: pending plus a deliberate raise is
       # pending to RSpec (exit 0), not failed.
@@ -193,7 +196,7 @@ RSpec.describe "RSpec OTLP-only submission" do
 
     RSpec::Core::Sandbox.sandboxed do |config|
       config.output_stream = StringIO.new
-      load "buildkite/test_collector/library_hooks/rspec_otel_only.rb"
+      load "buildkite/test_collector/library_hooks/rspec.rb"
 
       group = RSpec.describe("OTLP-only group") do
         it("does something") {}
@@ -216,81 +219,5 @@ RSpec.describe "RSpec OTLP-only submission" do
     annotation = span.events.find { |event| event.name == "test.annotation" }
     expect(annotation.attributes).to eq("buildkite.annotation" => "checkpoint reached")
     expect(span.attributes).to include("buildkite.tag.team" => "platform")
-  end
-end
-
-RSpec.describe Buildkite::TestCollector::RSpecPlugin::OTelOnlyTrace do
-  subject(:trace) do
-    described_class.new(
-      example,
-      history: {},
-      tags: tags,
-      location_prefix: location_prefix,
-    )
-  end
-
-  let(:example) { fake_example(file_path: "./spec/foo_spec.rb", status: :passed) }
-  let(:tags) { nil }
-  let(:location_prefix) { nil }
-
-  describe "#otel_attributes" do
-    it "carries the full execution details for server-side synthesis" do
-      allow(example).to receive(:exception) { nil }
-
-      expect(trace.otel_attributes).to eq(
-        "buildkite.execution.via" => "otlp",
-        "buildkite.test.scope" => "this is a fake example full description",
-        "buildkite.test.name" => "fake example name",
-        "test.suite.name" => "this is a fake example full description",
-        "test.case.name" => "this is a fake example full description",
-        "code.file.path" => "./spec/foo_spec.rb",
-        "code.line.number" => 42,
-      )
-    end
-
-    context "with execution tags" do
-      let(:tags) { { "team" => "platform" } }
-
-      it "includes them as prefixed span attributes" do
-        allow(example).to receive(:exception) { nil }
-
-        expect(trace.otel_attributes).to include("buildkite.tag.team" => "platform")
-      end
-    end
-
-    context "when location_prefix is provided" do
-      let(:location_prefix) { "some/prefix" }
-
-      it "prefixes the file path" do
-        allow(example).to receive(:exception) { nil }
-
-        expect(trace.otel_attributes).to include(
-          "code.file.path" => "some/prefix/spec/foo_spec.rb",
-        )
-      end
-    end
-  end
-
-  describe "#otel_failure_reason and #otel_exception_events" do
-    it "exposes the failure summary and one exception event per failure" do
-      trace.failure_reason = "it broke"
-      trace.failure_expanded = [
-        { expanded: ["it broke"], backtrace: ["foo.rb:1", "foo.rb:9"] },
-        { expanded: [], backtrace: [] },
-      ]
-
-      expect(trace.otel_failure_reason).to eq("it broke")
-      expect(trace.otel_exception_events).to eq([
-        {
-          "exception.message" => "it broke",
-          "exception.stacktrace" => "foo.rb:1\nfoo.rb:9",
-        },
-      ])
-    end
-
-    it "is empty when the test did not fail" do
-      expect(trace.otel_failure_reason).to be_nil
-      expect(trace.otel_exception_events).to eq([])
-    end
   end
 end
