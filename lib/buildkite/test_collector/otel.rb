@@ -56,13 +56,6 @@ module Buildkite::TestCollector
         !@tracer.nil?
       end
 
-      # True when OTLP is the only upload method: the spans carry everything
-      # the server needs to synthesize test executions, with no JSON upload
-      # alongside.
-      def otel_only?
-        @otel_only == true
-      end
-
       def configure!(endpoint: DEFAULT_ENDPOINT, api_token: nil, run_env: {}, instrumentations: nil, otel_only: false, resource_attributes: {})
         if enabled?
           # One process serves one run: the exporters and providers live for
@@ -98,7 +91,6 @@ module Buildkite::TestCollector
         # user tags) travels as the resource of the providers we create, so
         # every exported span carries it without repeating it per span.
         resource = otel_only ? run_resource(run_env, resource_attributes) : execution_resource(resource_attributes)
-        @otel_only = true if otel_only
 
         @execution_provider = build_execution_provider(endpoint, headers, resource)
         @tracer = @execution_provider.tracer(TRACER_NAME, Buildkite::TestCollector::VERSION)
@@ -225,7 +217,6 @@ module Buildkite::TestCollector
         @api_token = nil
         @run_key = nil
         @tracer = nil
-        @otel_only = nil
       end
 
       private
@@ -380,11 +371,18 @@ module Buildkite::TestCollector
         else
           OpenTelemetry::SDK::Resources::Resource.default
         end
-        return resource if resource_attributes.nil? || resource_attributes.empty?
 
-        attributes = resource_attributes
+        tags = tag_attributes(resource_attributes)
+        return resource if tags.empty?
+
+        resource.merge(OpenTelemetry::SDK::Resources::Resource.create(tags))
+      end
+
+      # User tags travel under the buildkite.tag. prefix, which the server
+      # strips and turns into upload-level tags.
+      def tag_attributes(resource_attributes)
+        (resource_attributes || {})
           .map { |key, value| ["buildkite.tag.#{key}", value.to_s] }.to_h
-        resource.merge(OpenTelemetry::SDK::Resources::Resource.create(attributes))
       end
 
       # Describes the whole run once, on the resource, so every span carries it
@@ -392,8 +390,7 @@ module Buildkite::TestCollector
       # tags the user gave to configure. Buildkite vocabulary is flat
       # (buildkite.run_key, buildkite.build_id, ...) matching the agent's own
       # OTel attributes; branch and commit use the OTel vcs.ref.head.*
-      # semantic conventions. User tags travel under the buildkite.tag.
-      # prefix, which the server strips and turns into upload-level tags.
+      # semantic conventions.
       def run_resource(run_env, resource_attributes)
         attributes = {
           "service.name" => ENV["BUILDKITE_TEST_ENGINE_SUITE_SLUG"] || "buildkite-test-collector",
@@ -420,12 +417,9 @@ module Buildkite::TestCollector
           attributes["buildkite.test.framework.version"] = RSpec::Core::Version::STRING
         end
 
-        user_attributes = (resource_attributes || {})
-          .map { |key, value| ["buildkite.tag.#{key}", value.to_s] }.to_h
-
         OpenTelemetry::SDK::Resources::Resource.default.merge(
           OpenTelemetry::SDK::Resources::Resource.create(
-            attributes.reject { |_, value| value.nil? }.merge(user_attributes)
+            attributes.reject { |_, value| value.nil? }.merge(tag_attributes(resource_attributes))
           )
         )
       end

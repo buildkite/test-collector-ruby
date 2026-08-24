@@ -81,27 +81,20 @@ module Buildkite
       end
 
       # Defer OTel setup until RSpec's before(:suite), after application and support files have loaded.
+      # otel_only already guarantees the rspec hook (checked above), so both
+      # modes reduce to the same options apart from the otel_only flag itself.
       @otel_options = nil
-      if otel_only
+      if otel_only || (otel_enabled && test_runner == "rspec")
         @otel_options = {
           # Undocumented, for development purposes.
           endpoint: ENV["BUILDKITE_ANALYTICS_OTLP_ENDPOINT"] || Buildkite::TestCollector::OTel::DEFAULT_ENDPOINT,
           api_token: api_token,
           run_env: Buildkite::TestCollector::CI.env,
-          otel_only: true,
+          otel_only: otel_only,
           instrumentations: otel_instrumentations,
           # Tags describe the whole run, so they ride along as resource
           # attributes on every exported span. The merged self.tags, not the
           # raw argument, so the automatic ci.worker.id tag comes too.
-          resource_attributes: self.tags,
-        }
-      elsif otel_enabled && test_runner == "rspec"
-        @otel_options = {
-          # Undocumented, for development purposes.
-          endpoint: ENV["BUILDKITE_ANALYTICS_OTLP_ENDPOINT"] || Buildkite::TestCollector::OTel::DEFAULT_ENDPOINT,
-          api_token: api_token,
-          run_env: Buildkite::TestCollector::CI.env,
-          instrumentations: otel_instrumentations,
           resource_attributes: self.tags,
         }
       end

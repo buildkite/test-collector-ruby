@@ -74,6 +74,7 @@ RSpec.describe Buildkite::TestCollector do
         endpoint: "https://tests-otlp.buildkite.com/v1/traces",
         api_token: "MyToken",
         run_env: run_env,
+        otel_only: false,
         instrumentations: [],
         resource_attributes: { "team" => "platform" },
       )

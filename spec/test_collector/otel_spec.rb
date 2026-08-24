@@ -939,7 +939,6 @@ RSpec.describe Buildkite::TestCollector::OTel do
       )
 
       expect(described_class).to be_enabled
-      expect(described_class).to be_otel_only
       expect(OpenTelemetry.tracer_provider).not_to equal(original)
 
       span, = described_class.start_test_span
@@ -990,26 +989,6 @@ RSpec.describe Buildkite::TestCollector::OTel do
     ensure
       described_class.shutdown
       suite_provider&.shutdown
-      OpenTelemetry.tracer_provider = original
-    end
-
-    it "forgets OTLP-only mode on shutdown" do
-      exporter = OpenTelemetry::SDK::Trace::Export::InMemorySpanExporter.new
-      original = OpenTelemetry.tracer_provider
-      OpenTelemetry.tracer_provider = OpenTelemetry::Internal::ProxyTracerProvider.new
-      allow(OpenTelemetry::Exporter::OTLP::Exporter).to receive(:new) { exporter }
-      allow(OpenTelemetry::Instrumentation.registry).to receive(:install_all)
-
-      described_class.configure!(
-        endpoint: "https://example.invalid/v1/traces",
-        otel_only: true,
-      )
-      expect(described_class).to be_otel_only
-
-      described_class.shutdown
-      expect(described_class).not_to be_otel_only
-    ensure
-      described_class.shutdown
       OpenTelemetry.tracer_provider = original
     end
   end
