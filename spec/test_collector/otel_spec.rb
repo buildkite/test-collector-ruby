@@ -145,6 +145,22 @@ RSpec.describe Buildkite::TestCollector::OTel do
     provider&.shutdown
   end
 
+  it "falls back to the SDK's clock when the captured end precedes the span's start" do
+    provider = OpenTelemetry::SDK::Trace::TracerProvider.new
+    described_class.instance_variable_set(:@tracer, provider.tracer("clock-step-test"))
+
+    span, = described_class.start_test_span
+    stepped_back = described_class.current_timestamp - 60
+    duration = described_class.finish_test_span(span, end_timestamp: stepped_back)
+
+    data = span.to_span_data
+    expect(data.end_timestamp).to be >= data.start_timestamp
+    expect(duration).to be >= 0
+  ensure
+    described_class.instance_variable_set(:@tracer, nil)
+    provider&.shutdown
+  end
+
   it "reports no duration for a span it cannot read" do
     span = double("OpenTelemetry span")
     allow(span).to receive(:finish)

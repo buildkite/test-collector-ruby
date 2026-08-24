@@ -131,7 +131,13 @@ module Buildkite::TestCollector
         end
       end
 
-      def finish_test_span(span, test: nil)
+      # "Now" as the SDK would stamp it: the realtime clock, in seconds.
+      # Not Time.now, which suites that freeze time (Timecop) fake out.
+      def current_timestamp
+        Rational(Process.clock_gettime(Process::CLOCK_REALTIME, :nanosecond), 1_000_000_000)
+      end
+
+      def finish_test_span(span, test: nil, end_timestamp: nil)
         return unless span
 
         begin
@@ -162,7 +168,7 @@ module Buildkite::TestCollector
         rescue StandardError => e
           warn "[buildkite-test_collector] Could not describe OpenTelemetry test span: #{e.class}: #{e.message}"
         ensure
-          finish_span(span)
+          finish_span(span, end_timestamp)
         end
 
         span_duration(span)
@@ -446,10 +452,27 @@ module Buildkite::TestCollector
         nil
       end
 
-      def finish_span(span)
-        span.finish
+      def finish_span(span, end_timestamp = nil)
+        # A backwards clock step while the test ran can put the captured
+        # realtime end before the span's start; fall back to the SDK's own
+        # monotonic timing rather than export an invalid span.
+        end_timestamp = nil if end_timestamp && precedes_start?(span, end_timestamp)
+
+        if end_timestamp
+          span.finish(end_timestamp: end_timestamp)
+        else
+          span.finish
+        end
       rescue StandardError => e
         warn "[buildkite-test_collector] Could not finish OpenTelemetry test span: #{e.class}: #{e.message}"
+      end
+
+      def precedes_start?(span, end_timestamp)
+        return false unless span.respond_to?(:start_timestamp) && span.start_timestamp
+
+        (end_timestamp.to_r * 1_000_000_000).to_i < span.start_timestamp
+      rescue StandardError
+        false
       end
 
       def span_duration(span)

@@ -3,6 +3,11 @@
 module Buildkite::TestCollector::RSpecPlugin
   class Trace < Buildkite::TestCollector::Trace
     attr_accessor :example, :failure_reason, :failure_expanded
+
+    # Left open by the around hook; OTelReporter finishes it once RSpec
+    # settles the example's result.
+    attr_accessor :otel_span, :otel_end_timestamp
+
     attr_reader :history
     attr_reader :tags
     attr_reader :location_prefix
@@ -28,17 +33,9 @@ module Buildkite::TestCollector::RSpecPlugin
       end
     end
 
-    # RSpec settles an example's result after our around hook returns, so derive
-    # it the way RSpec itself does: an exception means failed, a pending message
-    # means skipped, anything else passed.
+    # Read at reporter time, when the result is final.
     def otel_result
-      if example.exception
-        "failed"
-      elsif example.execution_result.pending_message
-        "skipped"
-      else
-        "passed"
-      end
+      result
     end
 
     # What the span says about the test itself. Same file path as the execution

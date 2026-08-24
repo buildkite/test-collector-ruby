@@ -58,6 +58,10 @@ Two things worth knowing:
   example that failed as expected.
 - The execution's duration is whatever the span timed, so the two always agree.
   With the export off, the collector times the example itself as it always has.
+- The result is RSpec's final verdict, read after every `around` hook has
+  unwound: an `around` hook that raises after the example ran counts as a
+  failure, and an example a hook marks `pending` before deliberately raising
+  stays skipped.
 
 ## OTLP-only attributes
 

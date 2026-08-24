@@ -54,13 +54,32 @@ module Buildkite::TestCollector::RSpecPlugin
   # OpenTelemetry `test.execution` span carrying everything the server needs
   # to synthesize the test execution, and that's the gem's whole job.
   module OTelOnly
+    # Finishes each example's span once RSpec's reporter notifications fire,
+    # after every around hook has unwound and the result is settled.
+    class Reporter
+      RSpec::Core::Formatters.register self, :example_passed, :example_failed, :example_pending
+
+      def initialize(_output)
+      end
+
+      def handle_example(notification)
+        Buildkite::TestCollector::RSpecPlugin::OTelOnly.finish_example(notification.example)
+      end
+
+      alias_method :example_passed, :handle_example
+      alias_method :example_failed, :handle_example
+      alias_method :example_pending, :handle_example
+    end
+
     class << self
       def install!
         RSpec.configure do |config|
-          # Deferred from configure until before(:suite), after application
-          # and support files have loaded, same as the otel_enabled mode.
+          # Deferred until before(:suite), after application and support
+          # files have loaded, same as the otel_enabled mode. Adding the
+          # formatter here keeps RSpec's default progress output.
           config.before(:suite) do
             Buildkite::TestCollector.start_otel
+            config.add_formatter Buildkite::TestCollector::RSpecPlugin::OTelOnly::Reporter
           end
 
           # Never runs for pre-skipped examples (skip/xit), so they produce no
@@ -89,34 +108,21 @@ module Buildkite::TestCollector::RSpecPlugin
         Thread.current[:_buildkite_tags] = tags
 
         span, _trace_id = Buildkite::TestCollector::OTel.start_test_span
-        raised = nil
 
         begin
           Buildkite::TestCollector::OTel.with_test_span(span) { yield }
-        rescue Exception => e # rubocop:disable Lint/RescueException
-          raised = e
-          raise
         ensure
           Thread.current[:_buildkite_tags] = nil
-          finish(span, example, raised, tags) if span
+          defer_finish(example, span, tags) if span
         end
       end
 
-      private
+      def finish_example(example)
+        trace = pending_traces.delete(example.id)
+        return unless trace
 
-      # Describes the finished example onto the span. Runs inside an ensure,
-      # so nothing here may raise into the test run: the describing work is
-      # delegated to OTel.finish_test_span, which fails open.
-      def finish(span, example, raised, tags)
-        trace = Buildkite::TestCollector::RSpecPlugin::OTelOnlyTrace.new(
-          example,
-          history: {},
-          tags: tags,
-          location_prefix: Buildkite::TestCollector.location_prefix,
-        )
-
-        exception = raised || example.exception
-        if exception
+        exception = example.exception
+        if example.execution_result.status == :failed && exception
           begin
             trace.failure_reason, trace.failure_expanded = failure_info(exception)
           rescue StandardError => e
@@ -124,12 +130,41 @@ module Buildkite::TestCollector::RSpecPlugin
           end
         end
 
-        Buildkite::TestCollector::OTel.finish_test_span(span, test: trace)
+        Buildkite::TestCollector::OTel.finish_test_span(
+          trace.otel_span,
+          test: trace,
+          end_timestamp: trace.otel_end_timestamp,
+        )
+      rescue StandardError => e
+        warn "[buildkite-test_collector] Could not finish the OpenTelemetry test span: #{e.class}: #{e.message}"
       end
 
-      # No reporter runs in OTLP-only mode, so derive the failure details from
-      # the exception itself, the way RSpec's own formatters do for multiple
-      # failures (summary plus one entry per exception).
+      private
+
+      # RSpec only settles the example's result after this hook returns, so
+      # leave the span open for finish_example. Runs inside an ensure, so
+      # nothing here may raise into the test run.
+      def defer_finish(example, span, tags)
+        trace = Buildkite::TestCollector::RSpecPlugin::OTelOnlyTrace.new(
+          example,
+          history: {},
+          tags: tags,
+          location_prefix: Buildkite::TestCollector.location_prefix,
+        )
+        trace.otel_span = span
+        trace.otel_end_timestamp = Buildkite::TestCollector::OTel.current_timestamp
+        pending_traces[example.id] = trace
+      rescue StandardError => e
+        warn "[buildkite-test_collector] Could not describe the test onto its OpenTelemetry span: #{e.class}: #{e.message}"
+        Buildkite::TestCollector::OTel.finish_test_span(span)
+      end
+
+      # Entries linger only if the run aborts before the notification fires;
+      # their spans never export.
+      def pending_traces
+        @pending_traces ||= {}
+      end
+
       def failure_info(exception)
         exceptions = exception.respond_to?(:all_exceptions) ? Array(exception.all_exceptions) : [exception]
         exceptions = [exception] if exceptions.empty?
