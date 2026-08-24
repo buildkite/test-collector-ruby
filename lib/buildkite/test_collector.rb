@@ -102,6 +102,7 @@ module Buildkite
           api_token: api_token,
           run_env: Buildkite::TestCollector::CI.env,
           instrumentations: otel_instrumentations,
+          resource_attributes: self.tags,
         }
       end
       self.hook_into(hook)

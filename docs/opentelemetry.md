@@ -39,6 +39,10 @@ letting you navigate between them without combining every test into one trace.
 
 ## What's on the span
 
+Each `tags:` entry passed to `configure` is attached to the root as a
+`buildkite.tag.<key>` resource attribute. Per-execution tags use the same prefix
+as span attributes.
+
 | Attribute | Value |
 | --- | --- |
 | `test.case.name` | the example's full description |
@@ -47,6 +51,7 @@ letting you navigate between them without combining every test into one trace.
 | `code.line.number` | the line, or the call site for a shared example |
 | `test.case.result.status` | `pass`, `fail` or `skipped` |
 | `buildkite.test.execution.external_id` | the ID of the matching Test Engine execution |
+| `buildkite.tag.<key>` | each `tag_execution` tag |
 
 A failed test also sets the span's status to error. Why it failed stays on the
 test's execution in Test Engine rather than on the span.

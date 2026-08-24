@@ -97,7 +97,7 @@ module Buildkite::TestCollector
         # In OTLP-only mode the run-level detail (run key, branch, commit,
         # user tags) travels as the resource of the providers we create, so
         # every exported span carries it without repeating it per span.
-        resource = otel_only ? run_resource(run_env, resource_attributes) : execution_resource
+        resource = otel_only ? run_resource(run_env, resource_attributes) : execution_resource(resource_attributes)
         @otel_only = true if otel_only
 
         @execution_provider = build_execution_provider(endpoint, headers, resource)
@@ -373,11 +373,18 @@ module Buildkite::TestCollector
         @execution_context_key ||= OpenTelemetry::Context.create_key("buildkite.test.execution")
       end
 
-      def execution_resource
+      def execution_resource(resource_attributes = {})
         provider = OpenTelemetry.tracer_provider
-        return provider.resource if provider.respond_to?(:resource)
+        resource = if provider.respond_to?(:resource)
+          provider.resource
+        else
+          OpenTelemetry::SDK::Resources::Resource.default
+        end
+        return resource if resource_attributes.nil? || resource_attributes.empty?
 
-        OpenTelemetry::SDK::Resources::Resource.default
+        attributes = resource_attributes
+          .map { |key, value| ["buildkite.tag.#{key}", value.to_s] }.to_h
+        resource.merge(OpenTelemetry::SDK::Resources::Resource.create(attributes))
       end
 
       # Describes the whole run once, on the resource, so every span carries it

@@ -523,6 +523,21 @@ RSpec.describe Buildkite::TestCollector::OTel do
     provider&.shutdown
   end
 
+  it "adds user tags to the suite resource for execution roots" do
+    resource = OpenTelemetry::SDK::Resources::Resource.create("service.name" => "my-suite")
+    provider = OpenTelemetry::SDK::Trace::TracerProvider.new(resource: resource)
+    allow(OpenTelemetry).to receive(:tracer_provider).and_return(provider)
+
+    tagged = described_class.send(:execution_resource, "team" => "platform")
+
+    expect(tagged.attribute_enumerator.to_h).to include(
+      "service.name" => "my-suite",
+      "buildkite.tag.team" => "platform",
+    )
+  ensure
+    provider&.shutdown
+  end
+
   it "exports roots privately and only forwards execution children" do
     suite_exporter = OpenTelemetry::SDK::Trace::Export::InMemorySpanExporter.new
     allow(suite_exporter).to receive(:shutdown).and_call_original
