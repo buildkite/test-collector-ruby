@@ -190,6 +190,26 @@ RSpec.describe Buildkite::TestCollector::CI do
         })
       end
 
+      context "without GITHUB_REPOSITORY" do
+        before do
+          fake_env("GITHUB_REPOSITORY", nil)
+        end
+
+        it "returns a nil URL" do
+          expect(Buildkite::TestCollector::CI.env["url"]).to be_nil
+        end
+      end
+
+      context "without GITHUB_RUN_ID" do
+        before do
+          fake_env("GITHUB_RUN_ID", nil)
+        end
+
+        it "returns a nil URL" do
+          expect(Buildkite::TestCollector::CI.env["url"]).to be_nil
+        end
+      end
+
       context "when setting the analytics env" do
         before do
           fake_env("BUILDKITE_ANALYTICS_KEY", key)
