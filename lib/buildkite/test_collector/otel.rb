@@ -56,13 +56,6 @@ module Buildkite::TestCollector
         !@tracer.nil?
       end
 
-      # True when OTLP is the only upload method: the spans carry everything
-      # the server needs to synthesize test executions, with no JSON upload
-      # alongside.
-      def otel_only?
-        @otel_only == true
-      end
-
       def configure!(endpoint: DEFAULT_ENDPOINT, api_token: nil, run_env: {}, instrumentations: nil, otel_only: false, resource_attributes: {})
         if enabled?
           # One process serves one run: the exporters and providers live for
@@ -98,7 +91,6 @@ module Buildkite::TestCollector
         # user tags) travels as the resource of the providers we create, so
         # every exported span carries it without repeating it per span.
         resource = otel_only ? run_resource(run_env, resource_attributes) : execution_resource(resource_attributes)
-        @otel_only = true if otel_only
 
         @execution_provider = build_execution_provider(endpoint, headers, resource)
         @tracer = @execution_provider.tracer(TRACER_NAME, Buildkite::TestCollector::VERSION)
@@ -225,7 +217,6 @@ module Buildkite::TestCollector
         @api_token = nil
         @run_key = nil
         @tracer = nil
-        @otel_only = nil
       end
 
       private
