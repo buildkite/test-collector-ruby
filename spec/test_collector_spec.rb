@@ -63,6 +63,7 @@ RSpec.describe Buildkite::TestCollector do
         tracing_enabled: false,
         otel_enabled: true,
         otel_instrumentations: [],
+        tags: { "team" => "platform" },
       )
 
       expect(Buildkite::TestCollector::OTel).not_to have_received(:configure!)
@@ -74,6 +75,7 @@ RSpec.describe Buildkite::TestCollector do
         api_token: "MyToken",
         run_env: run_env,
         instrumentations: [],
+        resource_attributes: { "team" => "platform" },
       )
     end
 

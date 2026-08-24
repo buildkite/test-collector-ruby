@@ -87,7 +87,9 @@ Add the `BUILDKITE_ANALYTICS_TOKEN` secret to your CI, push your changes to a br
 
 RSpec suites can also send an OpenTelemetry trace per test execution to Buildkite,
 showing what each test did and where it spent its time. Each trace is rooted in a
-`test.execution` span naming the test, its file, and whether it passed.
+`test.execution` span naming the test, its file, and whether it passed. Tags passed
+to `configure` appear as resource attributes, while `tag_execution` adds attributes
+to the current test's root span.
 
 This is still under development and everything here may change. It is off by
 default, so opt in when you configure the collector:

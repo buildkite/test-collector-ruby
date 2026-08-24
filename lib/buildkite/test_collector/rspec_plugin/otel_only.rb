@@ -5,29 +5,15 @@ require_relative "trace"
 module Buildkite::TestCollector::RSpecPlugin
   # In OTLP-only mode the span carries everything a JSON upload would have
   # said, so the server can synthesize the execution from the span alone
-  # (`buildkite.execution.via` opts in to that). A subclass so the standard
-  # Trace stays untouched for the JSON upload paths.
+  # (`buildkite.execution.via` opts in to that). A subclass keeps those
+  # synthesis-only attributes out of the JSON upload path.
   class OTelOnlyTrace < Trace
     def otel_attributes
-      file_path = strip_invalid_utf8_chars(prepend_location_prefix(file_name))
-      attributes = {
+      super.merge(
         "buildkite.execution.via" => "otlp",
         "buildkite.test.scope" => strip_invalid_utf8_chars(scope),
         "buildkite.test.name" => strip_invalid_utf8_chars(name),
-        "test.suite.name" => strip_invalid_utf8_chars(scope),
-        "test.case.name" => strip_invalid_utf8_chars(example.full_description),
-        "code.file.path" => file_path,
-        "code.line.number" => source_line_number,
-      }
-
-      # Tags set through Buildkite::TestCollector.tag_execution become
-      # buildkite.tag.-prefixed span attributes, which the server strips and
-      # turns back into execution tags.
-      tags&.each do |key, value|
-        attributes["buildkite.tag.#{key}"] = strip_invalid_utf8_chars(value.to_s)
-      end
-
-      attributes.reject { |_, value| value.nil? }
+      ).reject { |_, value| value.nil? }
     end
 
     # The failure summary, destined for the span's error status description.

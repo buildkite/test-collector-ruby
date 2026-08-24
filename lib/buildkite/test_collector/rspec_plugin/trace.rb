@@ -42,12 +42,15 @@ module Buildkite::TestCollector::RSpecPlugin
     # upload, so the two agree.
     def otel_attributes
       attributes = {
-        "test.case.name" => example.full_description,
-        "test.suite.name" => scope,
+        "test.case.name" => strip_invalid_utf8_chars(example.full_description),
+        "test.suite.name" => strip_invalid_utf8_chars(scope),
         "code.file.path" => strip_invalid_utf8_chars(prepend_location_prefix(file_name)),
         "code.line.number" => source_line_number,
       }
       attributes["buildkite.test.execution.external_id"] = external_id if external_id
+      tags&.each do |key, value|
+        attributes["buildkite.tag.#{key}"] = strip_invalid_utf8_chars(value.to_s)
+      end
       attributes
     end
 

@@ -119,6 +119,14 @@ RSpec.describe Buildkite::TestCollector::RSpecPlugin::Trace do
       end
     end
 
+    context "with execution tags" do
+      let(:tags) { { "team" => "platform" } }
+
+      it "includes them as prefixed span attributes" do
+        expect(trace.otel_attributes).to include("buildkite.tag.team" => "platform")
+      end
+    end
+
     context "when location_prefix is provided" do
       let(:location_prefix) { "some/prefix" }
 
